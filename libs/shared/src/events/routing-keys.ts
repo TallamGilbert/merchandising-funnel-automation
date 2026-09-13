@@ -1,0 +1,15 @@
+/**
+ * Central registry of domain-event routing keys used on the `mms.events`
+ * topic exchange (RabbitMQ). Publishers and consumers both import from here
+ * so a typo can't silently create a dead-letter routing key.
+ */
+export const EventRoutingKey = {
+  PURCHASE_ORDER_APPROVED: "purchase-order.approved",
+  GOODS_RECEIVED: "goods-received",
+  STOCK_LOW: "stock-low",
+  ITEM_SOLD: "item-sold",
+  DAY_CLOSED: "day-closed",
+} as const;
+
+export type EventRoutingKey =
+  (typeof EventRoutingKey)[keyof typeof EventRoutingKey];

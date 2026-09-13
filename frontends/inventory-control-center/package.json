@@ -1,0 +1,23 @@
+{
+  "name": "@mms/inventory-control-center",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Inventory Control Center — Browse stock levels, perform adjustments, and view valuation.",
+  "scripts": {
+    "dev": "next dev -p 3103",
+    "build": "next build",
+    "start": "next start -p 3103",
+    "lint": "eslint \"app/**/*.{ts,tsx}\""
+  },
+  "dependencies": {
+    "next": "^16.3.4",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.15",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "typescript": "^5.5.4"
+  }
+}

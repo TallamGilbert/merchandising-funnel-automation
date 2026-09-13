@@ -1,0 +1,94 @@
+generator client {
+  provider = "prisma-client-js"
+  // Custom output — pnpm dedups identical @prisma/client versions into one
+  // physical store location, so without this every service's `prisma
+  // generate` would overwrite the same shared client. This keeps each
+  // service's generated client (and its schema-specific types) isolated.
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum PurchaseOrderStatus {
+  DRAFT
+  PENDING_APPROVAL
+  APPROVED
+  SENT
+  PARTIALLY_RECEIVED
+  CLOSED
+}
+
+enum ReorderSuggestionStatus {
+  NEW
+  DISMISSED
+  CONVERTED
+}
+
+/// The decision/commitment engine (FR-2.1–FR-2.8). `supplierId` and each
+/// line's `sku` are cross-service references to Vendor Management / Inventory
+/// — plain strings, never foreign keys, since no service may reach into
+/// another's database (NFR-1).
+model PurchaseOrder {
+  id               String              @id @default(uuid())
+  /// Human-readable sequence backing poNumber generation (e.g. PO-1001).
+  sequence         Int                 @default(autoincrement())
+  poNumber         String              @unique
+  supplierId       String
+  /// Denormalized at creation time so this PO's history reads correctly
+  /// even if the supplier is later renamed or archived in Vendor Management.
+  supplierName     String
+  status           PurchaseOrderStatus @default(DRAFT)
+  /// Frozen from Vendor Management at creation time (FR-2.2) — never re-fetched.
+  paymentTermsDays Int
+  currency         String              @default("KES")
+  /// Sum of each line's (unitCost * quantityOrdered); maintained by the service.
+  totalAmount      Decimal             @db.Decimal(14, 2)
+  requestedById    String
+  approvedById     String?
+  approvedAt       DateTime?
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+
+  lines PurchaseOrderLine[]
+
+  @@index([status])
+  @@index([supplierId])
+}
+
+model PurchaseOrderLine {
+  id              String        @id @default(uuid())
+  purchaseOrderId String
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  sku             String
+  productName     String
+  quantityOrdered Int
+  /// Updated once Receiving (Phase 2) publishes GoodsReceived events
+  /// against this PO (FR-2.5). Always 0 until Receiving ships.
+  quantityReceived Int          @default(0)
+  /// Frozen from Vendor Management's SupplierProduct.unitCost at PO
+  /// creation time (FR-2.2) — never re-fetched.
+  unitCost        Decimal       @db.Decimal(12, 2)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@index([purchaseOrderId])
+  @@index([sku])
+}
+
+/// Advisory reorder suggestions surfaced from consumed StockLow events
+/// (FR-2.7). A human still creates the PO — no auto-ordering in v1.
+model ReorderSuggestion {
+  id            String                   @id @default(uuid())
+  sku           String
+  reason        String
+  /// The StockLow event's eventId, for traceability (NFR-6).
+  sourceEventId String
+  status        ReorderSuggestionStatus  @default(NEW)
+  createdAt     DateTime                 @default(now())
+
+  @@index([status])
+  @@index([sku])
+}

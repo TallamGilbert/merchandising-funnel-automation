@@ -1,0 +1,126 @@
+generator client {
+  provider = "prisma-client-js"
+  // Custom output — pnpm dedups identical @prisma/client versions into one
+  // physical store location, so without this every service's `prisma
+  // generate` would overwrite the same shared client. This keeps each
+  // service's generated client (and its schema-specific types) isolated.
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum InventoryTransactionType {
+  RECEIPT
+  SALE
+  RETURN
+  ADJUSTMENT
+  RESERVATION
+  RELEASE
+}
+
+enum ReservationStatus {
+  ACTIVE
+  RELEASED
+  CONSUMED
+}
+
+/// Product master data owned by Inventory — dimensions, weight, and the
+/// valuation baseline (unitCost) live here because Inventory is the single
+/// source of truth for "what is it worth" (FR-4.4), not Vendor Management or
+/// Procurement.
+model Product {
+  id          String   @id @default(uuid())
+  sku         String   @unique
+  name        String
+  description String?
+  lengthCm    Decimal? @db.Decimal(8, 2)
+  widthCm     Decimal? @db.Decimal(8, 2)
+  heightCm    Decimal? @db.Decimal(8, 2)
+  weightKg    Decimal? @db.Decimal(8, 2)
+  /// Valuation baseline used to value stock on hand (FR-4.4) and, later,
+  /// COGS when Retail Sales/Financials ship. Manually maintained here via
+  /// the Inventory Control Center — not sourced from the GoodsReceived event.
+  unitCost    Decimal  @db.Decimal(12, 2)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  stockLevels    StockLevel[]
+  salesVelocity  SalesVelocity[]
+  transactions   InventoryTransaction[]
+  reservations   Reservation[]
+}
+
+/// On Hand / Allocated / Available per product per location (FR-4.1, FR-4.3).
+/// `available` is intentionally NOT a stored column — it is always
+/// `onHand - allocated`, computed on read, so it can never drift out of sync.
+model StockLevel {
+  id           String   @id @default(uuid())
+  productId    String
+  product      Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  locationCode String
+  onHand       Int      @default(0)
+  allocated    Int      @default(0)
+  /// Snapshot of Product.unitCost at last update, for fast valuation reads.
+  unitValue    Decimal  @db.Decimal(12, 2)
+  updatedAt    DateTime @updatedAt
+
+  @@unique([productId, locationCode])
+  @@index([locationCode])
+}
+
+/// Rolling sales-velocity estimate per product, used to compute the dynamic
+/// StockLow reorder threshold (FR-4.6, D-3) and to answer Warehouse
+/// Operations' FR-4.7 attribute lookup.
+model SalesVelocity {
+  id           String   @id @default(uuid())
+  productId    String
+  product      Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  unitsPerDay  Decimal  @db.Decimal(10, 4)
+  windowDays   Int
+  computedAt   DateTime @default(now())
+
+  @@index([productId])
+}
+
+/// Append-only ledger of every stock movement, for auditability (NFR-6) and
+/// to derive sales velocity. Not exposed as a public mutation API — written
+/// internally whenever a stock level changes.
+model InventoryTransaction {
+  id            String                   @id @default(uuid())
+  productId     String
+  product       Product                  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  locationCode  String
+  type          InventoryTransactionType
+  /// Positive increases On Hand or Allocated (per type), negative decreases.
+  quantityDelta Int
+  /// Free-form pointer back to the causing event/action (e.g. a GRN number,
+  /// a POS transaction id, an adjustment reason) — never a foreign key into
+  /// another service's database.
+  referenceType String?
+  referenceId   String?
+  createdAt     DateTime                 @default(now())
+
+  @@index([productId, locationCode])
+  @@index([type])
+}
+
+/// Backs the gRPC checkout flow (FR-4.5, FR-6.2, NFR-5): CheckAndReserveStock
+/// creates one of these and increments StockLevel.allocated; the sale
+/// completing (ItemSold) or being abandoned (ReleaseReservation) resolves it.
+model Reservation {
+  id                   String            @id @default(uuid())
+  productId            String
+  product              Product           @relation(fields: [productId], references: [id], onDelete: Cascade)
+  locationCode         String
+  quantity             Int
+  transactionReference String
+  status               ReservationStatus @default(ACTIVE)
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
+
+  @@index([status])
+  @@index([transactionReference])
+}

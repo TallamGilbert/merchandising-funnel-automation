@@ -1,0 +1,30 @@
+{
+  "name": "merchandising-funnel-automation",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Distributed Merchandise Management System (MMS) — capstone monorepo",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20.17.0 <21",
+    "pnpm": ">=9"
+  },
+  "scripts": {
+    "lint": "pnpm -r --if-present run lint",
+    "build": "pnpm -r --if-present run build",
+    "test": "pnpm -r --if-present run test",
+    "test:e2e": "pnpm -r --if-present run test:e2e",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "proto:generate": "bash scripts/generate-proto.sh",
+    "docker:up": "docker compose up -d",
+    "docker:down": "docker compose down"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.10.0",
+    "eslint-config-prettier": "^10.1.8",
+    "prettier": "^3.3.3",
+    "typescript": "^5.5.4",
+    "typescript-eslint": "^8.70.0"
+  }
+}
