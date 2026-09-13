@@ -11,7 +11,9 @@
   "scripts": {
     "lint": "pnpm -r --if-present run lint",
     "build": "pnpm -r --if-present run build",
+    "pretest": "pnpm --filter @mms/shared run build",
     "test": "pnpm -r --if-present run test",
+    "pretest:e2e": "pnpm --filter @mms/shared run build",
     "test:e2e": "pnpm -r --if-present run test:e2e",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
