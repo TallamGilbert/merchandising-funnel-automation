@@ -1,0 +1,232 @@
+openapi: 3.0.3
+info:
+  title: Inventory Service
+  description: >
+    Single source of truth for stock levels, valuation, and product master
+    data (FR-4.1–FR-4.8). Owns its own Postgres database. The real-time
+    checkout stock check used by Retail Sales is gRPC, not REST — see
+    contracts/proto/inventory.proto — because it is the one latency-sensitive
+    sync path in the system (NFR-5). Everything else here is REST.
+  version: 0.1.0
+servers:
+  - url: http://localhost:3003
+tags:
+  - name: health
+  - name: products
+  - name: stock-levels
+  - name: valuation
+paths:
+  /health:
+    get:
+      tags: [health]
+      summary: Liveness/readiness probe. Always reachable regardless of feature flag state.
+      responses:
+        "200":
+          description: Service is up.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, example: ok }
+                  service: { type: string, example: inventory }
+                  timestamp: { type: string, format: date-time }
+  /products:
+    get:
+      tags: [products]
+      summary: List products (Inventory Control Center)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Product" }
+    post:
+      tags: [products]
+      summary: Create a product master record
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateProductDto" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Product" }
+  /products/{sku}:
+    get:
+      tags: [products]
+      summary: >
+        Get a product's attributes, sales velocity, and stock levels across
+        all locations. Also serves FR-4.7 (Warehouse Ops item-attribute
+        lookup).
+      parameters:
+        - $ref: "#/components/parameters/Sku"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProductDetail" }
+        "404": { description: Not found }
+    patch:
+      tags: [products]
+      summary: Update product attributes / unit cost (manual adjustment)
+      parameters:
+        - $ref: "#/components/parameters/Sku"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateProductDto" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Product" }
+  /products/{sku}/adjustments:
+    post:
+      tags: [stock-levels]
+      summary: >
+        Manual stock adjustment (FR-4.8) — e.g. correcting a count after a
+        physical audit. Writes an InventoryTransaction of type ADJUSTMENT.
+      parameters:
+        - $ref: "#/components/parameters/Sku"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/StockAdjustmentDto" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/StockLevel" }
+  /stock-levels:
+    get:
+      tags: [stock-levels]
+      summary: Browse stock levels across products, optionally filtered by location
+      parameters:
+        - in: query
+          name: locationCode
+          schema: { type: string }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/StockLevel" }
+  /valuation:
+    get:
+      tags: [valuation]
+      summary: Inventory valuation report (FR-4.4, FR-4.8)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ValuationReport" }
+components:
+  parameters:
+    Sku:
+      in: path
+      name: sku
+      required: true
+      schema: { type: string }
+  schemas:
+    Product:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        sku: { type: string }
+        name: { type: string }
+        description: { type: string, nullable: true }
+        lengthCm: { type: number, format: float, nullable: true }
+        widthCm: { type: number, format: float, nullable: true }
+        heightCm: { type: number, format: float, nullable: true }
+        weightKg: { type: number, format: float, nullable: true }
+        unitCost: { type: number, format: float }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    ProductDetail:
+      allOf:
+        - $ref: "#/components/schemas/Product"
+        - type: object
+          properties:
+            stockLevels:
+              type: array
+              items: { $ref: "#/components/schemas/StockLevel" }
+            salesVelocity: { $ref: "#/components/schemas/SalesVelocity" }
+    CreateProductDto:
+      type: object
+      required: [sku, name, unitCost]
+      properties:
+        sku: { type: string }
+        name: { type: string }
+        description: { type: string }
+        lengthCm: { type: number, format: float }
+        widthCm: { type: number, format: float }
+        heightCm: { type: number, format: float }
+        weightKg: { type: number, format: float }
+        unitCost: { type: number, format: float }
+    UpdateProductDto:
+      type: object
+      properties:
+        name: { type: string }
+        description: { type: string }
+        lengthCm: { type: number, format: float }
+        widthCm: { type: number, format: float }
+        heightCm: { type: number, format: float }
+        weightKg: { type: number, format: float }
+        unitCost: { type: number, format: float }
+    StockLevel:
+      type: object
+      properties:
+        productId: { type: string, format: uuid }
+        sku: { type: string }
+        locationCode: { type: string, example: WAREHOUSE-MAIN }
+        onHand: { type: integer }
+        allocated: { type: integer }
+        available:
+          type: integer
+          description: Computed as onHand - allocated, not stored.
+        unitValue: { type: number, format: float }
+        updatedAt: { type: string, format: date-time }
+    StockAdjustmentDto:
+      type: object
+      required: [locationCode, quantityDelta, reason]
+      properties:
+        locationCode: { type: string }
+        quantityDelta:
+          type: integer
+          description: Positive to increase On Hand, negative to decrease.
+        reason: { type: string }
+    SalesVelocity:
+      type: object
+      properties:
+        unitsPerDay: { type: number, format: float }
+        windowDays: { type: integer }
+        computedAt: { type: string, format: date-time }
+    ValuationReport:
+      type: object
+      properties:
+        asOf: { type: string, format: date-time }
+        totalValue: { type: number, format: float }
+        byProduct:
+          type: array
+          items:
+            type: object
+            properties:
+              sku: { type: string }
+              productName: { type: string }
+              onHand: { type: integer }
+              unitCost: { type: number, format: float }
+              totalValue: { type: number, format: float }

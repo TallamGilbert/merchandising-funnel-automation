@@ -1,0 +1,196 @@
+name: mms
+
+x-common-service-env: &common-service-env
+  NODE_ENV: production
+  RABBITMQ_USER: ${RABBITMQ_USER}
+  RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
+  RABBITMQ_HOST: rabbitmq
+  RABBITMQ_PORT: "5672"
+  RABBITMQ_EXCHANGE: ${RABBITMQ_EXCHANGE}
+  FEATURE_VENDOR_MANAGEMENT_ENABLED: ${FEATURE_VENDOR_MANAGEMENT_ENABLED}
+  FEATURE_PROCUREMENT_ENABLED: ${FEATURE_PROCUREMENT_ENABLED}
+  FEATURE_INVENTORY_ENABLED: ${FEATURE_INVENTORY_ENABLED}
+  FEATURE_RECEIVING_ENABLED: ${FEATURE_RECEIVING_ENABLED}
+  FEATURE_WAREHOUSE_OPERATIONS_ENABLED: ${FEATURE_WAREHOUSE_OPERATIONS_ENABLED}
+  FEATURE_RETAIL_SALES_ENABLED: ${FEATURE_RETAIL_SALES_ENABLED}
+  FEATURE_SALES_AUDIT_ENABLED: ${FEATURE_SALES_AUDIT_ENABLED}
+  FEATURE_FINANCIALS_ENABLED: ${FEATURE_FINANCIALS_ENABLED}
+
+x-depends-on-infra: &depends-on-infra
+  postgres:
+    condition: service_healthy
+  rabbitmq:
+    condition: service_healthy
+
+# Applies the service's Prisma schema before starting. Uses `db push`
+# (schema-sync, no migration history) for local-dev convenience since this
+# scaffold ships no committed migrations yet — once the schema stabilizes,
+# switch to `prisma migrate deploy` against committed migrations (see README).
+x-migrate-and-start: &migrate-and-start
+  sh -c "pnpm exec prisma db push --skip-generate --accept-data-loss && node dist/main.js"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      VENDOR_MANAGEMENT_DB_PASSWORD: ${VENDOR_MANAGEMENT_DB_PASSWORD}
+      PROCUREMENT_DB_PASSWORD: ${PROCUREMENT_DB_PASSWORD}
+      INVENTORY_DB_PASSWORD: ${INVENTORY_DB_PASSWORD}
+      RECEIVING_DB_PASSWORD: ${RECEIVING_DB_PASSWORD}
+      WAREHOUSE_OPERATIONS_DB_PASSWORD: ${WAREHOUSE_OPERATIONS_DB_PASSWORD}
+      RETAIL_SALES_DB_PASSWORD: ${RETAIL_SALES_DB_PASSWORD}
+      SALES_AUDIT_DB_PASSWORD: ${SALES_AUDIT_DB_PASSWORD}
+      FINANCIALS_DB_PASSWORD: ${FINANCIALS_DB_PASSWORD}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      # Runs once on first start (empty data dir) — creates one isolated
+      # role + database per service. See the script for why (NFR-1).
+      - ./docker/postgres-init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
+    ports:
+      - "${RABBITMQ_PORT:-5672}:5672"
+      - "${RABBITMQ_MANAGEMENT_PORT:-15672}:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  vendor-management:
+    build:
+      context: .
+      dockerfile: services/vendor-management/Dockerfile
+    depends_on: *depends-on-infra
+    environment:
+      <<: *common-service-env
+      PORT: ${VENDOR_MANAGEMENT_PORT:-3001}
+      DATABASE_URL: postgresql://vendor_management_svc:${VENDOR_MANAGEMENT_DB_PASSWORD}@postgres:5432/vendor_management?schema=public
+    ports:
+      - "${VENDOR_MANAGEMENT_PORT:-3001}:${VENDOR_MANAGEMENT_PORT:-3001}"
+    working_dir: /workspace/services/vendor-management
+    command: *migrate-and-start
+
+  procurement:
+    build:
+      context: .
+      dockerfile: services/procurement/Dockerfile
+    depends_on:
+      <<: *depends-on-infra
+    environment:
+      <<: *common-service-env
+      PORT: ${PROCUREMENT_PORT:-3002}
+      DATABASE_URL: postgresql://procurement_svc:${PROCUREMENT_DB_PASSWORD}@postgres:5432/procurement?schema=public
+      VENDOR_MANAGEMENT_URL: http://vendor-management:${VENDOR_MANAGEMENT_PORT:-3001}
+      PO_APPROVAL_THRESHOLD_KES: ${PO_APPROVAL_THRESHOLD_KES:-100000}
+    ports:
+      - "${PROCUREMENT_PORT:-3002}:${PROCUREMENT_PORT:-3002}"
+    working_dir: /workspace/services/procurement
+    command: *migrate-and-start
+
+  inventory:
+    build:
+      context: .
+      dockerfile: services/inventory/Dockerfile
+    depends_on: *depends-on-infra
+    environment:
+      <<: *common-service-env
+      PORT: ${INVENTORY_PORT:-3003}
+      DATABASE_URL: postgresql://inventory_svc:${INVENTORY_DB_PASSWORD}@postgres:5432/inventory?schema=public
+      INVENTORY_GRPC_PORT: ${INVENTORY_GRPC_PORT:-5003}
+      REORDER_LEAD_TIME_DAYS: ${REORDER_LEAD_TIME_DAYS:-7}
+    ports:
+      - "${INVENTORY_PORT:-3003}:${INVENTORY_PORT:-3003}"
+      - "${INVENTORY_GRPC_PORT:-5003}:${INVENTORY_GRPC_PORT:-5003}"
+    working_dir: /workspace/services/inventory
+    command: *migrate-and-start
+
+  receiving:
+    build:
+      context: .
+      dockerfile: services/receiving/Dockerfile
+    depends_on: *depends-on-infra
+    environment:
+      <<: *common-service-env
+      PORT: ${RECEIVING_PORT:-3004}
+      DATABASE_URL: postgresql://receiving_svc:${RECEIVING_DB_PASSWORD}@postgres:5432/receiving?schema=public
+    ports:
+      - "${RECEIVING_PORT:-3004}:${RECEIVING_PORT:-3004}"
+    working_dir: /workspace/services/receiving
+    command: *migrate-and-start
+
+  warehouse-operations:
+    build:
+      context: .
+      dockerfile: services/warehouse-operations/Dockerfile
+    depends_on: *depends-on-infra
+    environment:
+      <<: *common-service-env
+      PORT: ${WAREHOUSE_OPERATIONS_PORT:-3005}
+      DATABASE_URL: postgresql://warehouse_operations_svc:${WAREHOUSE_OPERATIONS_DB_PASSWORD}@postgres:5432/warehouse_operations?schema=public
+    ports:
+      - "${WAREHOUSE_OPERATIONS_PORT:-3005}:${WAREHOUSE_OPERATIONS_PORT:-3005}"
+    working_dir: /workspace/services/warehouse-operations
+    command: *migrate-and-start
+
+  retail-sales:
+    build:
+      context: .
+      dockerfile: services/retail-sales/Dockerfile
+    depends_on: *depends-on-infra
+    environment:
+      <<: *common-service-env
+      PORT: ${RETAIL_SALES_PORT:-3006}
+      DATABASE_URL: postgresql://retail_sales_svc:${RETAIL_SALES_DB_PASSWORD}@postgres:5432/retail_sales?schema=public
+      INVENTORY_GRPC_URL: inventory:${INVENTORY_GRPC_PORT:-5003}
+    ports:
+      - "${RETAIL_SALES_PORT:-3006}:${RETAIL_SALES_PORT:-3006}"
+    working_dir: /workspace/services/retail-sales
+    command: *migrate-and-start
+
+  sales-audit:
+    build:
+      context: .
+      dockerfile: services/sales-audit/Dockerfile
+    depends_on: *depends-on-infra
+    environment:
+      <<: *common-service-env
+      PORT: ${SALES_AUDIT_PORT:-3007}
+      DATABASE_URL: postgresql://sales_audit_svc:${SALES_AUDIT_DB_PASSWORD}@postgres:5432/sales_audit?schema=public
+      RETAIL_SALES_URL: http://retail-sales:${RETAIL_SALES_PORT:-3006}
+    ports:
+      - "${SALES_AUDIT_PORT:-3007}:${SALES_AUDIT_PORT:-3007}"
+    working_dir: /workspace/services/sales-audit
+    command: *migrate-and-start
+
+  financials:
+    build:
+      context: .
+      dockerfile: services/financials/Dockerfile
+    depends_on: *depends-on-infra
+    environment:
+      <<: *common-service-env
+      PORT: ${FINANCIALS_PORT:-3008}
+      DATABASE_URL: postgresql://financials_svc:${FINANCIALS_DB_PASSWORD}@postgres:5432/financials?schema=public
+      PROCUREMENT_URL: http://procurement:${PROCUREMENT_PORT:-3002}
+      INVENTORY_URL: http://inventory:${INVENTORY_PORT:-3003}
+    ports:
+      - "${FINANCIALS_PORT:-3008}:${FINANCIALS_PORT:-3008}"
+    working_dir: /workspace/services/financials
+    command: *migrate-and-start
+
+volumes:
+  postgres-data:

@@ -1,0 +1,44 @@
+syntax = "proto3";
+
+// Source of truth for the one latency-sensitive sync path in the system:
+// Retail Sales -> Inventory stock check + reservation at checkout
+// (FR-4.5, FR-6.2, NFR-5). Every other cross-service sync call uses REST —
+// see contracts/openapi/.
+package mms.inventory.v1;
+
+service InventoryStock {
+  // Atomically checks availability and reserves stock for a pending sale.
+  // Inventory decrements Available (increments Allocated) on success so no
+  // other channel can sell the same unit while the POS transaction completes.
+  rpc CheckAndReserveStock(StockCheckRequest) returns (StockCheckResponse);
+
+  // Releases a reservation without completing the sale (payment failed,
+  // cashier voided the line, POS transaction timed out).
+  rpc ReleaseReservation(ReleaseReservationRequest)
+      returns (ReleaseReservationResponse);
+}
+
+message StockCheckRequest {
+  string sku = 1;
+  string location_code = 2;
+  int32 quantity_requested = 3;
+  // Retail Sales transaction id — used for idempotency and audit trail.
+  string transaction_reference = 4;
+}
+
+message StockCheckResponse {
+  bool available = 1;
+  int32 quantity_reserved = 2;
+  int32 available_quantity_after_reservation = 3;
+  // Empty when available = false. Pass back to ReleaseReservation if the
+  // sale doesn't complete.
+  string reservation_id = 4;
+}
+
+message ReleaseReservationRequest {
+  string reservation_id = 1;
+}
+
+message ReleaseReservationResponse {
+  bool released = 1;
+}

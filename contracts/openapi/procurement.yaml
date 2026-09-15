@@ -1,0 +1,256 @@
+openapi: 3.0.3
+info:
+  title: Procurement Service
+  description: >
+    The decision/commitment engine for what the business buys (FR-2.1–FR-2.8).
+    Locks unit cost and payment terms onto a PO at creation time by calling
+    Vendor Management (REST), enforces a value-based approval workflow
+    (D-1), and publishes PurchaseOrderApproved. Owns its own Postgres
+    database.
+  version: 0.1.0
+servers:
+  - url: http://localhost:3002
+tags:
+  - name: health
+  - name: purchase-orders
+  - name: reorder-suggestions
+paths:
+  /health:
+    get:
+      tags: [health]
+      summary: Liveness/readiness probe. Always reachable regardless of feature flag state.
+      responses:
+        "200":
+          description: Service is up.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, example: ok }
+                  service: { type: string, example: procurement }
+                  timestamp: { type: string, format: date-time }
+  /purchase-orders:
+    get:
+      tags: [purchase-orders]
+      summary: List purchase orders (Procurement Dashboard)
+      parameters:
+        - in: query
+          name: status
+          schema: { $ref: "#/components/schemas/PurchaseOrderStatus" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/PurchaseOrder" }
+    post:
+      tags: [purchase-orders]
+      summary: >
+        Create a draft PO (FR-2.1). Fetches supplier pricing/terms from
+        Vendor Management and freezes them onto the PO lines (FR-2.2) —
+        prices are never re-fetched after this point.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreatePurchaseOrderDto" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PurchaseOrder" }
+  /purchase-orders/{id}:
+    get:
+      tags: [purchase-orders]
+      summary: Get a purchase order and its lines
+      parameters:
+        - $ref: "#/components/parameters/PurchaseOrderId"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PurchaseOrder" }
+        "404": { description: Not found }
+  /purchase-orders/{id}/submit:
+    post:
+      tags: [purchase-orders]
+      summary: Draft -> Pending Approval (FR-2.4)
+      parameters:
+        - $ref: "#/components/parameters/PurchaseOrderId"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PurchaseOrder" }
+  /purchase-orders/{id}/approve:
+    post:
+      tags: [purchase-orders]
+      summary: >
+        Pending Approval -> Approved (FR-2.3, D-1). Requires MANAGER role
+        below PO_APPROVAL_THRESHOLD_KES, OWNER role at/above it. Publishes
+        PurchaseOrderApproved on success (FR-2.6).
+      parameters:
+        - $ref: "#/components/parameters/PurchaseOrderId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ApprovePurchaseOrderDto" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PurchaseOrder" }
+        "403":
+          description: Approver role insufficient for this PO's total amount.
+  /purchase-orders/{id}/mark-sent:
+    post:
+      tags: [purchase-orders]
+      summary: Approved -> Sent (PO has been transmitted to the supplier)
+      parameters:
+        - $ref: "#/components/parameters/PurchaseOrderId"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PurchaseOrder" }
+  /purchase-orders/lookup/{poNumber}:
+    get:
+      tags: [purchase-orders]
+      summary: >
+        Server side of FR-3.1 — Receiving calls this (REST, sync) to
+        validate an open, approved PO exists for a delivery before accepting
+        it. Only returns POs in APPROVED, SENT, or PARTIALLY_RECEIVED state.
+      parameters:
+        - in: path
+          name: poNumber
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PurchaseOrder" }
+        "404": { description: No open PO with that number. }
+  /reorder-suggestions:
+    get:
+      tags: [reorder-suggestions]
+      summary: >
+        FR-2.7 — reorder suggestions surfaced from consumed StockLow events.
+        A human still creates the PO; this is advisory only (no
+        auto-ordering).
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/ReorderSuggestion" }
+  /reorder-suggestions/{id}/dismiss:
+    post:
+      tags: [reorder-suggestions]
+      summary: Dismiss a reorder suggestion without acting on it
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ReorderSuggestion" }
+components:
+  parameters:
+    PurchaseOrderId:
+      in: path
+      name: id
+      required: true
+      schema: { type: string, format: uuid }
+  schemas:
+    PurchaseOrderStatus:
+      type: string
+      enum:
+        [
+          DRAFT,
+          PENDING_APPROVAL,
+          APPROVED,
+          SENT,
+          PARTIALLY_RECEIVED,
+          CLOSED,
+        ]
+    PurchaseOrderLine:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        sku: { type: string }
+        productName: { type: string }
+        quantityOrdered: { type: integer }
+        quantityReceived:
+          type: integer
+          description: >
+            Updated once Receiving (Phase 2) publishes GoodsReceived events
+            against this PO. Always 0 until then.
+        unitCost:
+          type: number
+          format: float
+          description: Frozen at PO creation time; never re-fetched (FR-2.2).
+    PurchaseOrder:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        poNumber: { type: string, example: PO-1001 }
+        supplierId: { type: string, format: uuid }
+        supplierName: { type: string }
+        status: { $ref: "#/components/schemas/PurchaseOrderStatus" }
+        paymentTermsDays: { type: integer }
+        currency: { type: string }
+        totalAmount: { type: number, format: float }
+        requestedById: { type: string }
+        approvedById: { type: string, nullable: true }
+        approvedAt: { type: string, format: date-time, nullable: true }
+        lines:
+          type: array
+          items: { $ref: "#/components/schemas/PurchaseOrderLine" }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    CreatePurchaseOrderDto:
+      type: object
+      required: [supplierId, requestedById, lines]
+      properties:
+        supplierId: { type: string, format: uuid }
+        requestedById: { type: string }
+        lines:
+          type: array
+          items:
+            type: object
+            required: [sku, quantityOrdered]
+            properties:
+              sku: { type: string }
+              quantityOrdered: { type: integer }
+    ApprovePurchaseOrderDto:
+      type: object
+      required: [approvedById, approverRole]
+      properties:
+        approvedById: { type: string }
+        approverRole: { type: string, enum: [MANAGER, OWNER] }
+    ReorderSuggestion:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        sku: { type: string }
+        reason: { type: string }
+        sourceEventId: { type: string }
+        status: { type: string, enum: [NEW, DISMISSED, CONVERTED] }
+        createdAt: { type: string, format: date-time }

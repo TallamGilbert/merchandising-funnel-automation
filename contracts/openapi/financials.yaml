@@ -1,0 +1,31 @@
+openapi: 3.0.3
+info:
+  title: Financials Service
+  description: >
+    Scaffold only in this pass — Phase 4 — Accounting per PRD Section 7. Routes
+    beyond /health are gated behind this module's feature flag and return
+    503 "not yet implemented" until the module is built. This file will be
+    expanded to the module's full contract (and regenerated from the live
+    /docs-json) when its phase begins, per NFR-4 (contract-first) and the
+    Definition of Done in CONTRIBUTING.md.
+  version: 0.1.0
+servers:
+  - url: http://localhost:3008
+tags:
+  - name: health
+paths:
+  /health:
+    get:
+      tags: [health]
+      summary: Liveness/readiness probe. Always reachable regardless of feature flag state.
+      responses:
+        "200":
+          description: Service is up.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, example: ok }
+                  service: { type: string, example: financials }
+                  timestamp: { type: string, format: date-time }
