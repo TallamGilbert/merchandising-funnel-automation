@@ -41,7 +41,9 @@ flowchart TB
     PR -. "event: PurchaseOrderApproved" .-> RC
     RC -. "event: GoodsReceived" .-> INV
     RC -. "event: GoodsReceived" .-> WO
+    RC -. "event: GoodsReceived" .-> PR
     RC -. "event: GoodsReceived" .-> FI
+    WO -. "event: StockTransferred" .-> INV
     INV -. "event: StockLow" .-> PR
     RS -. "event: ItemSold" .-> INV
     RS -. "event: ItemSold" .-> SA

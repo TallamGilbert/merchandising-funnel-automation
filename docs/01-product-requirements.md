@@ -87,14 +87,14 @@ Each module below lists: domain boundary, what it must do, what it explicitly mu
 - FR-2.2: Lock in unit cost and payment terms at PO creation time (frozen, not re-fetched later).
 - FR-2.3: Enforce a value-based approval workflow — POs under a configurable threshold (e.g. KES 100,000) may be approved by a manager role; POs at or above the threshold require owner-level approval. A PO is invalid until the required role has approved it.
 - FR-2.4: Track PO lifecycle state: Draft → Pending Approval → Approved → Sent → Partially Received → Closed.
-- FR-2.5: Track remaining open quantity on partially received POs.
+- FR-2.5: Track remaining open quantity on partially received POs (fed by `GoodsReceived` — see D-6).
 - FR-2.6: Publish `PurchaseOrderApproved` on approval.
 - FR-2.7: Consume `StockLow` from Inventory and surface it as a reorder suggestion (human still creates the PO).
 - FR-2.8: Provide a web dashboard (Procurement Dashboard) to create POs, route approvals, view open orders.
 
 **Must not:** Handle physical goods arrival; check warehouse reality.
 
-**Consumes (event):** `StockLow` (Inventory).
+**Consumes (event):** `StockLow` (Inventory), `GoodsReceived` (Receiving) — the latter only to update received quantities and PO status (D-6).
 **Publishes (event):** `PurchaseOrderApproved`.
 **Serves (sync):** Receiving → "is there an open approved PO for these items?" (REST).
 **Calls (sync):** Vendor Management → supplier/pricing/terms (REST).
@@ -123,7 +123,7 @@ Each module below lists: domain boundary, what it must do, what it explicitly mu
 
 **Must:**
 - FR-4.1: Maintain perpetual real-time stock counts per product per location (warehouse, store backrooms).
-- FR-4.2: Increase stock on `GoodsReceived`; decrease on `ItemSold` (and on approved returns).
+- FR-4.2: Increase stock on `GoodsReceived`; decrease on `ItemSold` (and on approved returns); move stock between locations on `StockTransferred` (D-7).
 - FR-4.3: Track On Hand, Allocated (reserved), and Available quantities as distinct values.
 - FR-4.4: Track monetary valuation of stock on hand.
 - FR-4.5: Serve real-time stock availability checks to Retail Sales — low-latency, synchronous (gRPC).
@@ -133,7 +133,7 @@ Each module below lists: domain boundary, what it must do, what it explicitly mu
 
 **Must not:** Decide physical bin placement; process sales itself.
 
-**Consumes (event):** `GoodsReceived`, `ItemSold`.
+**Consumes (event):** `GoodsReceived`, `ItemSold`, `StockTransferred`.
 **Publishes (event):** `StockLow`.
 **Serves (sync):** Retail Sales → stock check + reservation (gRPC); Warehouse Ops → item attributes/velocity (REST).
 
@@ -144,7 +144,7 @@ Each module below lists: domain boundary, what it must do, what it explicitly mu
 - FR-5.1: Assign a specific bin/shelf/zone to every received product.
 - FR-5.2: Direct putaway: tell a worker exactly where to place newly received stock.
 - FR-5.3: Direct picking: tell a worker exactly where to retrieve stock for a transfer or order.
-- FR-5.4: Manage and record stock transfers between physical locations (warehouse → showroom).
+- FR-5.4: Manage and record stock transfers between physical locations (warehouse → showroom), publishing `StockTransferred` when a transfer completes (D-7).
 - FR-5.5: Track warehouse space capacity and utilization.
 - FR-5.6: Consume `GoodsReceived` to trigger a putaway task automatically.
 - FR-5.7: Confirm final bin location back to Inventory once putaway completes (sync, REST).
@@ -153,6 +153,7 @@ Each module below lists: domain boundary, what it must do, what it explicitly mu
 **Must not:** Track overall stock quantity (Inventory's job); decide what to reorder.
 
 **Consumes (event):** `GoodsReceived`.
+**Publishes (event):** `StockTransferred`.
 **Calls (sync):** Inventory → item attributes/velocity (read), confirm bin location (write) (REST).
 
 ### 4.6 Retail Sales (POS)
@@ -219,7 +220,8 @@ Each module below lists: domain boundary, what it must do, what it explicitly mu
 | Sales Audit → Retail Sales | REST (sync) | Get expected register total |
 | Retail Sales → Inventory | **gRPC (sync)** | Real-time stock check + reservation at checkout |
 | Procurement → * | Event: `PurchaseOrderApproved` | Consumed by Receiving, Inventory, Financials |
-| Receiving → * | Event: `GoodsReceived` | Consumed by Inventory, Warehouse Ops, Financials |
+| Receiving → * | Event: `GoodsReceived` | Consumed by Inventory, Warehouse Ops, Procurement (received quantities only, D-6), Financials |
+| Warehouse Ops → * | Event: `StockTransferred` | Consumed by Inventory (D-7) |
 | Inventory → * | Event: `StockLow` | Consumed by Procurement |
 | Retail Sales → * | Event: `ItemSold` | Consumed by Inventory, Sales Audit, Financials |
 | Sales Audit → * | Event: `DayClosed` | Consumed by Financials |
@@ -274,6 +276,8 @@ A module is "Ready for Review" only when:
 | D-3 | StockLow threshold | Dynamic, computed from sales velocity rather than a static manual number | A fixed threshold under- or over-triggers as demand shifts seasonally; velocity-based keeps reorder timing realistic | FR-4.6 |
 | D-4 | Multi-till reconciliation | Store-level close — all registers in a showroom roll up into one reconciliation and one close, not per-register | Matches how a single store manager actually closes a showroom at night; per-cashier discrepancy tracking is kept for pattern detection even though the close itself is store-wide | FR-7.1–7.4 |
 | D-5 | POS returns | Returned stock re-added to Available immediately, no inspection step | Keeps returns simple for v1; can be hardened later if damaged-return abuse becomes a real problem | FR-6.4 |
+| D-6 | How Procurement learns what was received | Procurement consumes `GoodsReceived` and applies received quantities per PO line (GOOD + DAMAGED, matching Receiving's own tally); the PO moves to Partially Received, then Closed once every line is fully received. Applied once per GRN. | FR-2.5 and the PO lifecycle need received quantities, but the brief lists only `StockLow` for Procurement. An event keeps Receiving from blocking on Procurement (NFR-3) and Procurement still never handles the goods (it reads quantities only). There is no manual close in v1, so a PO whose supplier never delivers the shortfall stays Partially Received. | FR-2.4, FR-2.5, §4.2 Consumes, §5 |
+| D-7 | How Inventory learns stock moved between locations | Warehouse Ops publishes `StockTransferred` when every pick for a transfer is confirmed; Inventory consumes it and moves On Hand from the source to the destination location, applied once per transfer number. | Inventory owns per-location counts (FR-4.1) but nothing told it a transfer happened, leaving showroom stock wrong for Phase 3's checkout stock-check. An event matches the bus pattern used everywhere else and keeps the warehouse floor from blocking on Inventory. The event carries no cost or bin codes. | FR-4.1, FR-4.2, FR-5.4, §4.4/§4.5, §5 |
 
 This table is the record of every judgment call made beyond what the brief specified outright — future changes to any of these should update this log, not silently override it.
 
