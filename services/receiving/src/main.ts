@@ -14,7 +14,7 @@ async function bootstrap() {
 
   const config = new DocumentBuilder()
     .setTitle("Receiving Service")
-    .setDescription("Phase 2 scaffold. Validates inbound goods against approved POs and produces GRNs (FR-3.x).")
+    .setDescription("Validates inbound goods against approved POs and produces GRNs (FR-3.x).")
     .setVersion("0.1.0")
     .build();
   const document = SwaggerModule.createDocument(app, config);

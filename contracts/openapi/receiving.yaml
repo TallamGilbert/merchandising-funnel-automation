@@ -2,17 +2,21 @@ openapi: 3.0.3
 info:
   title: Receiving Service
   description: >
-    Scaffold only in this pass — Phase 2 — Warehouse per PRD Section 7. Routes
-    beyond /health are gated behind this module's feature flag and return
-    503 "not yet implemented" until the module is built. This file will be
-    expanded to the module's full contract (and regenerated from the live
-    /docs-json) when its phase begins, per NFR-4 (contract-first) and the
-    Definition of Done in CONTRIBUTING.md.
+    The validation point between what was ordered and what physically
+    arrived (FR-3.1–FR-3.8). Learns which deliveries to expect from the
+    PurchaseOrderApproved event (FR-3.7), validates each delivery against
+    Procurement (REST), records what dock staff actually scan, flags
+    shortages / overages / damage (FR-3.3), quarantines damaged goods
+    (FR-3.4, D-2 — flag only), and publishes GoodsReceived once a GRN is
+    finalized (FR-3.6). Never stores or exposes cost data and never decides
+    storage location. Owns its own Postgres database.
   version: 0.1.0
 servers:
   - url: http://localhost:3004
 tags:
   - name: health
+  - name: expected-deliveries
+  - name: grns
 paths:
   /health:
     get:
@@ -29,3 +33,222 @@ paths:
                   status: { type: string, example: ok }
                   service: { type: string, example: receiving }
                   timestamp: { type: string, format: date-time }
+  /expected-deliveries:
+    get:
+      tags: [expected-deliveries]
+      summary: >
+        List deliveries Receiving expects, built from consumed
+        PurchaseOrderApproved events (FR-3.7).
+      parameters:
+        - in: query
+          name: status
+          schema: { $ref: "#/components/schemas/ExpectedDeliveryStatus" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/ExpectedDelivery" }
+  /expected-deliveries/{poNumber}:
+    get:
+      tags: [expected-deliveries]
+      summary: Get one expected delivery and its remaining open quantities
+      parameters:
+        - $ref: "#/components/parameters/PoNumber"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ExpectedDelivery" }
+        "404": { description: No expected delivery for that PO number. }
+  /grns:
+    get:
+      tags: [grns]
+      summary: List Goods Received Notes
+      parameters:
+        - in: query
+          name: status
+          schema: { $ref: "#/components/schemas/GrnStatus" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Grn" }
+    post:
+      tags: [grns]
+      summary: >
+        Open a draft GRN when a truck arrives (FR-3.1). Calls Procurement
+        (REST) to confirm an open, approved PO exists, then pre-populates one
+        GOOD line per SKU still outstanding on that PO.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateGrnDto" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Grn" }
+        "404": { description: Procurement has no open approved PO with that number. }
+        "503": { description: Procurement is unreachable. }
+  /grns/{id}:
+    get:
+      tags: [grns]
+      summary: Get a GRN and its lines
+      parameters:
+        - $ref: "#/components/parameters/GrnId"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Grn" }
+        "404": { description: Not found }
+  /grns/{id}/scans:
+    post:
+      tags: [grns]
+      summary: >
+        Record a barcode scan against a draft GRN (FR-3.2, FR-3.8).
+        Quantities accumulate per (sku, condition). The response's
+        `discrepancyType` on each line is recomputed immediately so dock
+        staff see shortages, overages and damage at time of scan (FR-3.3).
+        DAMAGED lines are quarantined (FR-3.4). A SKU that is not on the PO
+        is accepted and flagged OVERAGE.
+      parameters:
+        - $ref: "#/components/parameters/GrnId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RecordScanDto" }
+      responses:
+        "201":
+          description: Scan recorded; returns the updated GRN.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Grn" }
+        "400": { description: GRN is already finalized. }
+        "404": { description: Not found }
+  /grns/{id}/finalize:
+    post:
+      tags: [grns]
+      summary: >
+        Finalize a draft GRN (FR-3.5) — it becomes the immutable
+        system-of-record for possession. Updates the expected delivery's
+        received quantities and publishes GoodsReceived (FR-3.6). The event
+        carries physical facts only — never unit cost.
+      parameters:
+        - $ref: "#/components/parameters/GrnId"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Grn" }
+        "400": { description: GRN is already finalized, or nothing was scanned. }
+        "404": { description: Not found }
+components:
+  parameters:
+    PoNumber:
+      in: path
+      name: poNumber
+      required: true
+      schema: { type: string, example: PO-1001 }
+    GrnId:
+      in: path
+      name: id
+      required: true
+      schema: { type: string, format: uuid }
+  schemas:
+    ExpectedDeliveryStatus:
+      type: string
+      enum: [EXPECTED, PARTIALLY_RECEIVED, RECEIVED]
+    GrnStatus:
+      type: string
+      enum: [DRAFT, FINALIZED]
+    GrnCondition:
+      type: string
+      enum: [GOOD, DAMAGED]
+    GrnDiscrepancyType:
+      type: string
+      enum: [NONE, SHORTAGE, OVERAGE, DAMAGE]
+    ExpectedDelivery:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        poNumber: { type: string, example: PO-1001 }
+        supplierId: { type: string }
+        supplierName: { type: string }
+        status: { $ref: "#/components/schemas/ExpectedDeliveryStatus" }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        lines:
+          type: array
+          items: { $ref: "#/components/schemas/ExpectedDeliveryLine" }
+    ExpectedDeliveryLine:
+      type: object
+      description: No cost fields by design — Receiving never sees the value of goods.
+      properties:
+        id: { type: string, format: uuid }
+        sku: { type: string }
+        productName: { type: string }
+        quantityOrdered: { type: integer }
+        quantityReceived: { type: integer }
+    CreateGrnDto:
+      type: object
+      required: [poNumber, receivedAtLocation, receivedById]
+      properties:
+        poNumber: { type: string, example: PO-1001 }
+        receivedAtLocation:
+          type: string
+          description: Location code of the dock the goods arrived at (matches Inventory's locationCode).
+          example: WH-MAIN
+        receivedById: { type: string, description: User id of the dock worker. }
+    RecordScanDto:
+      type: object
+      required: [sku, quantity, condition]
+      properties:
+        sku: { type: string }
+        quantity: { type: integer, minimum: 1 }
+        condition: { $ref: "#/components/schemas/GrnCondition" }
+        notes: { type: string }
+    Grn:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        grnNumber: { type: string, example: GRN-1001 }
+        poNumber: { type: string }
+        supplierId: { type: string }
+        receivedAtLocation: { type: string }
+        receivedById: { type: string }
+        status: { $ref: "#/components/schemas/GrnStatus" }
+        finalizedAt: { type: string, format: date-time, nullable: true }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        lines:
+          type: array
+          items: { $ref: "#/components/schemas/GrnLine" }
+    GrnLine:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        sku: { type: string }
+        productName: { type: string }
+        quantityOrdered:
+          type: integer
+          description: Outstanding quantity on the PO when the GRN was opened. 0 on DAMAGED lines and on SKUs not on the PO.
+        quantityReceived: { type: integer }
+        condition: { $ref: "#/components/schemas/GrnCondition" }
+        discrepancyType: { $ref: "#/components/schemas/GrnDiscrepancyType" }
+        quarantined:
+          type: boolean
+          description: True for DAMAGED lines (FR-3.4). Terminal flag only in v1 (D-2).
+        notes: { type: string, nullable: true }

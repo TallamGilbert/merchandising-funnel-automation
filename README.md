@@ -67,7 +67,7 @@ Solid arrows are synchronous request/reply (REST, or gRPC on the one latency-sen
 | Vendor Management | [`services/vendor-management`](services/vendor-management) | Authoritative supplier record: contacts, terms, product catalogs, reliability history | 1 — Foundation | ✅ Implemented |
 | Procurement | [`services/procurement`](services/procurement) | PO lifecycle, value-based approval workflow, reorder suggestions | 1 — Foundation | ✅ Implemented |
 | Inventory | [`services/inventory`](services/inventory) | Stock levels (On Hand/Allocated/Available), valuation, checkout stock-check (gRPC) | 1 — Foundation | ✅ Implemented |
-| Receiving | [`services/receiving`](services/receiving) | Match deliveries to POs, flag discrepancies, generate GRNs | 2 — Warehouse | 🚧 Scaffold only |
+| Receiving | [`services/receiving`](services/receiving) | Match deliveries to POs, flag discrepancies, generate GRNs | 2 — Warehouse | ✅ Implemented |
 | Warehouse Operations | [`services/warehouse-operations`](services/warehouse-operations) | Putaway/picking direction, transfers, space utilization | 2 — Warehouse | 🚧 Scaffold only |
 | Retail Sales (POS) | [`services/retail-sales`](services/retail-sales) | Checkout, pricing/promotions, returns, payment capture | 3 — Retail | 🚧 Scaffold only |
 | Sales Audit | [`services/sales-audit`](services/sales-audit) | Store-level cash reconciliation, discrepancy sign-off | 3 — Retail | 🚧 Scaffold only |

@@ -1,9 +1,3 @@
-// Scaffold-only schema. This service is not implemented in this pass — see
-// the root README's module status table for its phase. Replace this stub
-// with the service's real domain models when its phase begins; keep the
-// datasource/generator blocks as-is (DATABASE_URL points at this service's
-// own isolated database — see docker/postgres-init/init-databases.sh).
-
 generator client {
   provider = "prisma-client-js"
   // Custom output — pnpm dedups identical @prisma/client versions into one
@@ -18,7 +12,105 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model Placeholder {
-  id        String   @id @default(uuid())
-  createdAt DateTime @default(now())
+enum ExpectedDeliveryStatus {
+  EXPECTED
+  PARTIALLY_RECEIVED
+  RECEIVED
+}
+
+enum GrnStatus {
+  DRAFT
+  FINALIZED
+}
+
+enum GrnCondition {
+  GOOD
+  DAMAGED
+}
+
+enum GrnDiscrepancyType {
+  NONE
+  SHORTAGE
+  OVERAGE
+  DAMAGE
+}
+
+/// What Receiving expects to arrive, built from consumed PurchaseOrderApproved
+/// events (FR-3.7). `supplierId` and each line's `sku` are cross-service
+/// references — plain strings, never foreign keys (NFR-1). Deliberately has
+/// no cost/price columns: Receiving never sees the financial value of goods.
+model ExpectedDelivery {
+  id           String                 @id @default(uuid())
+  poNumber     String                 @unique
+  supplierId   String
+  /// Denormalized so the dock app can show who is delivering without a call.
+  supplierName String
+  status       ExpectedDeliveryStatus @default(EXPECTED)
+  createdAt    DateTime               @default(now())
+  updatedAt    DateTime               @updatedAt
+
+  lines ExpectedDeliveryLine[]
+
+  @@index([status])
+}
+
+model ExpectedDeliveryLine {
+  id                 String           @id @default(uuid())
+  expectedDeliveryId String
+  expectedDelivery   ExpectedDelivery @relation(fields: [expectedDeliveryId], references: [id], onDelete: Cascade)
+  sku                String
+  productName        String
+  quantityOrdered    Int
+  /// Running total across finalized GRNs (GOOD + DAMAGED — everything that
+  /// physically arrived), so partial deliveries know what is still open.
+  quantityReceived   Int              @default(0)
+
+  @@unique([expectedDeliveryId, sku])
+}
+
+/// Goods Received Note — the system-of-record for possession (FR-3.5).
+/// Immutable once FINALIZED.
+model Grn {
+  id                 String    @id @default(uuid())
+  /// Human-readable sequence backing grnNumber generation (e.g. GRN-1001).
+  sequence           Int       @default(autoincrement())
+  grnNumber          String    @unique
+  poNumber           String
+  supplierId         String
+  receivedAtLocation String
+  receivedById       String
+  status             GrnStatus @default(DRAFT)
+  finalizedAt        DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  lines GrnLine[]
+
+  @@index([status])
+  @@index([poNumber])
+}
+
+/// One row per (sku, condition) on a GRN. Scans accumulate into these rows.
+/// Discrepancies are recomputed on every scan so dock staff see them at time
+/// of scan (FR-3.3); DAMAGED rows are flagged `quarantined` (FR-3.4, D-2 —
+/// flag only, no return/write-off workflow in v1).
+model GrnLine {
+  id               String             @id @default(uuid())
+  grnId            String
+  grn              Grn                @relation(fields: [grnId], references: [id], onDelete: Cascade)
+  sku              String
+  productName      String
+  /// Outstanding quantity on the PO when the GRN was opened. 0 on DAMAGED
+  /// rows and on SKUs that were not on the PO.
+  quantityOrdered  Int
+  quantityReceived Int                @default(0)
+  condition        GrnCondition
+  discrepancyType  GrnDiscrepancyType @default(NONE)
+  quarantined      Boolean            @default(false)
+  notes            String?
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+
+  @@unique([grnId, sku, condition])
+  @@index([grnId])
 }
