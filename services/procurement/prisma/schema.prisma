@@ -65,8 +65,9 @@ model PurchaseOrderLine {
   sku             String
   productName     String
   quantityOrdered Int
-  /// Updated once Receiving (Phase 2) publishes GoodsReceived events
-  /// against this PO (FR-2.5). Always 0 until Receiving ships.
+  /// Running total of everything that physically arrived against this line
+  /// (GOOD + DAMAGED, matching Receiving's own tally), maintained from
+  /// consumed GoodsReceived events (FR-2.5, D-6).
   quantityReceived Int          @default(0)
   /// Frozen from Vendor Management's SupplierProduct.unitCost at PO
   /// creation time (FR-2.2) — never re-fetched.
@@ -91,4 +92,15 @@ model ReorderSuggestion {
 
   @@index([status])
   @@index([sku])
+}
+
+/// One row per GoodsReceived event already applied to a PO, keyed by GRN
+/// number, so a redelivered event cannot add the same quantities twice (D-6).
+model ProcessedGoodsReceipt {
+  id          String   @id @default(uuid())
+  grnNumber   String   @unique
+  poNumber    String
+  processedAt DateTime @default(now())
+
+  @@index([poNumber])
 }

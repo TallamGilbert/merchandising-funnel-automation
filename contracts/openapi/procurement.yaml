@@ -5,7 +5,7 @@ info:
     The decision/commitment engine for what the business buys (FR-2.1–FR-2.8).
     Locks unit cost and payment terms onto a PO at creation time by calling
     Vendor Management (REST), enforces a value-based approval workflow
-    (D-1), and publishes PurchaseOrderApproved. Owns its own Postgres
+    (D-1), publishes PurchaseOrderApproved, and consumes GoodsReceived to track received quantities and move POs to Partially Received / Closed (FR-2.5, D-6). Owns its own Postgres
     database.
   version: 0.1.0
 servers:
@@ -200,8 +200,10 @@ components:
         quantityReceived:
           type: integer
           description: >
-            Updated once Receiving (Phase 2) publishes GoodsReceived events
-            against this PO. Always 0 until then.
+            Running total of units that physically arrived (good + damaged),
+            updated from consumed GoodsReceived events (FR-2.5, D-6). When
+            every line is fully received the PO moves to CLOSED; until then
+            any receipt moves it to PARTIALLY_RECEIVED.
         unitCost:
           type: number
           format: float

@@ -3,12 +3,14 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import {
   EventBusService,
   EventRoutingKey,
+  GoodsReceivedEvent,
   PurchaseOrderApprovedEvent,
 } from "@mms/shared";
 import { PurchaseOrderStatus } from "../generated/prisma";
@@ -25,6 +27,7 @@ const OPEN_STATUSES: PurchaseOrderStatus[] = [
 
 @Injectable()
 export class PurchaseOrdersService {
+  private readonly logger = new Logger(PurchaseOrdersService.name);
   private readonly approvalThresholdKes: number;
 
   constructor(
@@ -175,6 +178,76 @@ export class PurchaseOrdersService {
     await this.eventBus.publish(EventRoutingKey.PURCHASE_ORDER_APPROVED, event);
 
     return approved;
+  }
+
+  /**
+   * FR-2.5 / D-6 — applies a GoodsReceived event to the PO it references:
+   * adds what arrived to each line's running total and moves the PO to
+   * PARTIALLY_RECEIVED, or CLOSED once every line is fully received.
+   * Idempotent per GRN, since the bus may redeliver. Only quantities are read
+   * from the event; Procurement still never handles the goods themselves.
+   */
+  async applyGoodsReceived(event: GoodsReceivedEvent): Promise<void> {
+    const po = await this.prisma.purchaseOrder.findUnique({
+      where: { poNumber: event.poNumber },
+      include: { lines: true },
+    });
+    if (!po) {
+      this.logger.warn(
+        `GoodsReceived ${event.grnNumber} references unknown PO ${event.poNumber} — skipping`,
+      );
+      return;
+    }
+
+    const arrivedBySku = new Map<string, number>();
+    for (const line of event.lines) {
+      arrivedBySku.set(
+        line.sku,
+        (arrivedBySku.get(line.sku) ?? 0) + line.quantityReceived,
+      );
+    }
+
+    const receivedAfter = po.lines.map((line) => ({
+      id: line.id,
+      quantityOrdered: line.quantityOrdered,
+      quantityReceived:
+        line.quantityReceived + (arrivedBySku.get(line.sku) ?? 0),
+    }));
+    const fullyReceived = receivedAfter.every(
+      (line) => line.quantityReceived >= line.quantityOrdered,
+    );
+    // A PO already CLOSED keeps its status; late overage only updates totals.
+    const nextStatus =
+      po.status === PurchaseOrderStatus.CLOSED
+        ? PurchaseOrderStatus.CLOSED
+        : fullyReceived
+          ? PurchaseOrderStatus.CLOSED
+          : PurchaseOrderStatus.PARTIALLY_RECEIVED;
+
+    try {
+      await this.prisma.$transaction([
+        // Unique on grnNumber: a redelivered event fails here and rolls back.
+        this.prisma.processedGoodsReceipt.create({
+          data: { grnNumber: event.grnNumber, poNumber: event.poNumber },
+        }),
+        ...receivedAfter.map((line) =>
+          this.prisma.purchaseOrderLine.update({
+            where: { id: line.id },
+            data: { quantityReceived: line.quantityReceived },
+          }),
+        ),
+        this.prisma.purchaseOrder.update({
+          where: { id: po.id },
+          data: { status: nextStatus },
+        }),
+      ]);
+    } catch (error) {
+      if ((error as { code?: string }).code === "P2002") {
+        this.logger.log(`GRN ${event.grnNumber} already applied to ${event.poNumber} — skipping`);
+        return;
+      }
+      throw error;
+    }
   }
 
   async markSent(id: string) {
