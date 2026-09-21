@@ -39,13 +39,17 @@ export const MODULE_FEATURE_ENV_VAR: Record<ModuleKey, string> = {
   [ModuleKey.FINANCIALS]: "FEATURE_FINANCIALS_ENABLED",
 };
 
-const PHASE_1_MODULES: ReadonlySet<ModuleKey> = new Set([
+const ENABLED_BY_DEFAULT_MODULES: ReadonlySet<ModuleKey> = new Set([
+  // Phase 1 — Foundation
   ModuleKey.VENDOR_MANAGEMENT,
   ModuleKey.PROCUREMENT,
   ModuleKey.INVENTORY,
+  // Phase 2 — Warehouse
+  ModuleKey.RECEIVING,
+  ModuleKey.WAREHOUSE_OPERATIONS,
 ]);
 
-/** Phase 1 modules default to enabled; every later-phase module defaults to disabled until explicitly flagged on. */
+/** Implemented phases (1–2) default to enabled; every later-phase module defaults to disabled until explicitly flagged on. */
 export function defaultEnabledFor(moduleKey: ModuleKey): boolean {
-  return PHASE_1_MODULES.has(moduleKey);
+  return ENABLED_BY_DEFAULT_MODULES.has(moduleKey);
 }
