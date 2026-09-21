@@ -4,6 +4,7 @@ import { PrismaService } from "../prisma/prisma.service";
 import { CreateSupplierDeliveryRecordDto } from "./dto/create-delivery-record.dto";
 import { CreateSupplierProductDto } from "./dto/create-supplier-product.dto";
 import { CreateSupplierDto } from "./dto/create-supplier.dto";
+import { PaginationQueryDto } from "./dto/pagination-query.dto";
 import { UpdateSupplierProductDto } from "./dto/update-supplier-product.dto";
 import { UpdateSupplierDto } from "./dto/update-supplier.dto";
 
@@ -11,11 +12,18 @@ import { UpdateSupplierDto } from "./dto/update-supplier.dto";
 export class SuppliersService {
   constructor(private readonly prisma: PrismaService) {}
 
-  list(status?: SupplierStatus) {
-    return this.prisma.supplier.findMany({
-      where: status ? { status } : undefined,
-      orderBy: { name: "asc" },
-    });
+  async list(status: SupplierStatus | undefined, { page, pageSize }: PaginationQueryDto) {
+    const where = status ? { status } : undefined;
+    const [items, total] = await Promise.all([
+      this.prisma.supplier.findMany({
+        where,
+        orderBy: { name: "asc" },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+      }),
+      this.prisma.supplier.count({ where }),
+    ]);
+    return { items, total, page, pageSize };
   }
 
   async create(dto: CreateSupplierDto) {
@@ -42,12 +50,12 @@ export class SuppliersService {
   }
 
   async update(id: string, dto: UpdateSupplierDto) {
-    await this.ensureExists(id);
+    await this.assertSupplierExistsOrThrow(id);
     return this.prisma.supplier.update({ where: { id }, data: dto });
   }
 
   async archive(id: string) {
-    await this.ensureExists(id);
+    await this.assertSupplierExistsOrThrow(id);
     return this.prisma.supplier.update({
       where: { id },
       data: { status: SupplierStatus.ARCHIVED },
@@ -55,7 +63,7 @@ export class SuppliersService {
   }
 
   async addProduct(supplierId: string, dto: CreateSupplierProductDto) {
-    await this.ensureExists(supplierId);
+    await this.assertSupplierExistsOrThrow(supplierId);
     return this.prisma.supplierProduct.create({
       data: { ...dto, supplierId },
     });
@@ -98,19 +106,26 @@ export class SuppliersService {
     }));
   }
 
-  async listDeliveryRecords(supplierId: string) {
-    await this.ensureExists(supplierId);
-    return this.prisma.supplierDeliveryRecord.findMany({
-      where: { supplierId },
-      orderBy: { actualDeliveryDate: "desc" },
-    });
+  async listDeliveryRecords(supplierId: string, { page, pageSize }: PaginationQueryDto) {
+    await this.assertSupplierExistsOrThrow(supplierId);
+    const where = { supplierId };
+    const [items, total] = await Promise.all([
+      this.prisma.supplierDeliveryRecord.findMany({
+        where,
+        orderBy: { actualDeliveryDate: "desc" },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+      }),
+      this.prisma.supplierDeliveryRecord.count({ where }),
+    ]);
+    return { items, total, page, pageSize };
   }
 
   async addDeliveryRecord(
     supplierId: string,
     dto: CreateSupplierDeliveryRecordDto,
   ) {
-    await this.ensureExists(supplierId);
+    await this.assertSupplierExistsOrThrow(supplierId);
     const expectedDate = new Date(dto.expectedDate);
     const actualDeliveryDate = new Date(dto.actualDeliveryDate);
 
@@ -125,7 +140,7 @@ export class SuppliersService {
     });
   }
 
-  private async ensureExists(id: string): Promise<void> {
+  private async assertSupplierExistsOrThrow(id: string): Promise<void> {
     const count = await this.prisma.supplier.count({ where: { id } });
     if (count === 0) {
       throw new NotFoundException(`Supplier ${id} not found`);

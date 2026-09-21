@@ -14,6 +14,7 @@ import { CreateSupplierProductDto } from "./dto/create-supplier-product.dto";
 import { CreateSupplierDto } from "./dto/create-supplier.dto";
 import { UpdateSupplierProductDto } from "./dto/update-supplier-product.dto";
 import { UpdateSupplierDto } from "./dto/update-supplier.dto";
+import { PaginationQueryDto } from "./dto/pagination-query.dto";
 import { SuppliersService } from "./suppliers.service";
 
 @ApiTags("suppliers")
@@ -22,8 +23,11 @@ export class SuppliersController {
   constructor(private readonly suppliers: SuppliersService) {}
 
   @Get("suppliers")
-  list(@Query("status") status?: SupplierStatus) {
-    return this.suppliers.list(status);
+  list(
+    @Query("status") status: SupplierStatus | undefined,
+    @Query() pagination: PaginationQueryDto,
+  ) {
+    return this.suppliers.list(status, pagination);
   }
 
   @Post("suppliers")
@@ -69,8 +73,11 @@ export class SuppliersController {
   }
 
   @Get("suppliers/:id/delivery-records")
-  listDeliveryRecords(@Param("id") id: string) {
-    return this.suppliers.listDeliveryRecords(id);
+  listDeliveryRecords(
+    @Param("id") id: string,
+    @Query() pagination: PaginationQueryDto,
+  ) {
+    return this.suppliers.listDeliveryRecords(id, pagination);
   }
 
   @Post("suppliers/:id/delivery-records")

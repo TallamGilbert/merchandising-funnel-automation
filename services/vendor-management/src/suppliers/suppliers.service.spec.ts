@@ -29,6 +29,7 @@ describe("SuppliersService", () => {
       supplierDeliveryRecord: {
         findMany: jest.fn(),
         create: jest.fn(),
+        count: jest.fn(),
       },
     };
     service = new SuppliersService(prisma as unknown as PrismaService);
@@ -46,6 +47,51 @@ describe("SuppliersService", () => {
 
     expect(prisma.supplier.create).toHaveBeenCalledWith({ data: dto });
     expect(result).toEqual({ id: "s1", ...dto });
+  });
+
+  it("paginates the supplier list and returns the total", async () => {
+    prisma.supplier.findMany.mockResolvedValue([{ id: "s3" }]);
+    prisma.supplier.count.mockResolvedValue(41);
+
+    const result = await service.list(SupplierStatus.ACTIVE, {
+      page: 3,
+      pageSize: 20,
+    });
+
+    expect(prisma.supplier.findMany).toHaveBeenCalledWith({
+      where: { status: SupplierStatus.ACTIVE },
+      orderBy: { name: "asc" },
+      skip: 40,
+      take: 20,
+    });
+    expect(prisma.supplier.count).toHaveBeenCalledWith({
+      where: { status: SupplierStatus.ACTIVE },
+    });
+    expect(result).toEqual({
+      items: [{ id: "s3" }],
+      total: 41,
+      page: 3,
+      pageSize: 20,
+    });
+  });
+
+  it("paginates delivery records for a supplier", async () => {
+    prisma.supplier.count.mockResolvedValue(1);
+    prisma.supplierDeliveryRecord.findMany.mockResolvedValue([]);
+    prisma.supplierDeliveryRecord.count.mockResolvedValue(0);
+
+    const result = await service.listDeliveryRecords("s1", {
+      page: 2,
+      pageSize: 10,
+    });
+
+    expect(prisma.supplierDeliveryRecord.findMany).toHaveBeenCalledWith({
+      where: { supplierId: "s1" },
+      orderBy: { actualDeliveryDate: "desc" },
+      skip: 10,
+      take: 10,
+    });
+    expect(result).toEqual({ items: [], total: 0, page: 2, pageSize: 10 });
   });
 
   it("throws NotFoundException when archiving a missing supplier", async () => {

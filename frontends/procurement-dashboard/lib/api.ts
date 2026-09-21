@@ -122,8 +122,13 @@ export const api = {
   // Vendor Management is read directly to populate the supplier/SKU pickers
   // when building a PO — Procurement's own backend only prices a PO once
   // supplierId + lines are already chosen.
-  listActiveSuppliers: () =>
-    request<SupplierSummary[]>(VENDOR_MANAGEMENT_URL, "/suppliers?status=ACTIVE"),
+  listActiveSuppliers: async () => {
+    const res = await request<{ items: SupplierSummary[] }>(
+      VENDOR_MANAGEMENT_URL,
+      "/suppliers?status=ACTIVE&pageSize=100",
+    );
+    return res.items;
+  },
 
   getSupplierProducts: (supplierId: string) =>
     request<{ products: SupplierOfferedProduct[] }>(

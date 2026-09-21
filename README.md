@@ -133,7 +133,7 @@ done
 docker compose up --build
 
 # 5. (separately) run any frontend you need
-cd frontends/vendor-management-portal && cp .env.example .env.local && pnpm dev
+cd frontends/procurement-dashboard && cp .env.example .env.local && pnpm dev
 ```
 
 Once up:

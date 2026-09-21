@@ -58,8 +58,12 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const api = {
-  listSuppliers: (status?: SupplierStatus) =>
-    request<Supplier[]>(`/suppliers${status ? `?status=${status}` : ""}`),
+  listSuppliers: async (status?: SupplierStatus) => {
+    const query = new URLSearchParams({ pageSize: "100" });
+    if (status) query.set("status", status);
+    const res = await request<{ items: Supplier[] }>(`/suppliers?${query}`);
+    return res.items;
+  },
 
   createSupplier: (data: {
     name: string;
@@ -106,8 +110,12 @@ export const api = {
       body: JSON.stringify(data),
     }),
 
-  listDeliveryRecords: (supplierId: string) =>
-    request<SupplierDeliveryRecord[]>(`/suppliers/${supplierId}/delivery-records`),
+  listDeliveryRecords: async (supplierId: string) => {
+    const res = await request<{ items: SupplierDeliveryRecord[] }>(
+      `/suppliers/${supplierId}/delivery-records?pageSize=100`,
+    );
+    return res.items;
+  },
 
   addDeliveryRecord: (
     supplierId: string,
