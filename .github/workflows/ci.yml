@@ -1,0 +1,150 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+env:
+  NODE_VERSION: "20.17.0"
+  PNPM_VERSION: "9"
+  SERVICES: "vendor-management procurement inventory receiving warehouse-operations retail-sales sales-audit financials"
+
+jobs:
+  # Fast gate: install, generate Prisma clients, lint, build, and run unit
+  # tests (no external services required). This is the PR merge gate per
+  # CONTRIBUTING.md — must be green before requesting review.
+  lint-build-unit-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma clients
+        run: |
+          for svc in $SERVICES; do
+            pnpm --filter "@mms/${svc}" exec prisma generate
+          done
+
+      - name: Lint
+        run: pnpm run lint
+
+      - name: Build
+        run: pnpm run build
+
+      - name: Unit tests
+        run: pnpm run test
+
+  # Slower gate: spins up real Postgres + RabbitMQ (mirroring
+  # docker-compose.yml) and runs each service's integration/e2e suite
+  # against them. Reuses docker/postgres-init/init-databases.sh so CI
+  # exercises the exact same per-service DB-isolation setup as local dev.
+  integration-test:
+    runs-on: ubuntu-latest
+    needs: lint-build-unit-test
+    env:
+      POSTGRES_USER: mms_root
+      POSTGRES_PASSWORD: mms_root_ci_password
+      VENDOR_MANAGEMENT_DB_PASSWORD: vendor_management_ci_password
+      PROCUREMENT_DB_PASSWORD: procurement_ci_password
+      INVENTORY_DB_PASSWORD: inventory_ci_password
+      RECEIVING_DB_PASSWORD: receiving_ci_password
+      WAREHOUSE_OPERATIONS_DB_PASSWORD: warehouse_operations_ci_password
+      RETAIL_SALES_DB_PASSWORD: retail_sales_ci_password
+      SALES_AUDIT_DB_PASSWORD: sales_audit_ci_password
+      FINANCIALS_DB_PASSWORD: financials_ci_password
+      PGHOST: localhost
+      PGPORT: 5432
+      RABBITMQ_USER: mms
+      RABBITMQ_PASSWORD: mms_ci_password
+      RABBITMQ_HOST: localhost
+      RABBITMQ_PORT: 5672
+      RABBITMQ_EXCHANGE: mms.events
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: mms_root
+          POSTGRES_PASSWORD: mms_root_ci_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U mms_root"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      rabbitmq:
+        image: rabbitmq:3.13-management-alpine
+        env:
+          RABBITMQ_DEFAULT_USER: mms
+          RABBITMQ_DEFAULT_PASS: mms_ci_password
+        ports:
+          - 5672:5672
+        options: >-
+          --health-cmd "rabbitmq-diagnostics -q ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install postgresql-client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+
+      - name: Generate Prisma clients
+        run: |
+          for svc in $SERVICES; do
+            pnpm --filter "@mms/${svc}" exec prisma generate
+          done
+
+      - name: Build @mms/shared
+        run: pnpm --filter @mms/shared run build
+
+      - name: Create per-service databases and roles (NFR-1 isolation)
+        env:
+          PGPASSWORD: ${{ env.POSTGRES_PASSWORD }}
+        run: bash docker/postgres-init/init-databases.sh
+
+      - name: Push Prisma schemas and run integration tests
+        run: |
+          set -e
+          declare -A DB_URL=(
+            [vendor-management]="postgresql://vendor_management_svc:${VENDOR_MANAGEMENT_DB_PASSWORD}@localhost:5432/vendor_management?schema=public"
+            [procurement]="postgresql://procurement_svc:${PROCUREMENT_DB_PASSWORD}@localhost:5432/procurement?schema=public"
+            [inventory]="postgresql://inventory_svc:${INVENTORY_DB_PASSWORD}@localhost:5432/inventory?schema=public"
+            [receiving]="postgresql://receiving_svc:${RECEIVING_DB_PASSWORD}@localhost:5432/receiving?schema=public"
+            [warehouse-operations]="postgresql://warehouse_operations_svc:${WAREHOUSE_OPERATIONS_DB_PASSWORD}@localhost:5432/warehouse_operations?schema=public"
+            [retail-sales]="postgresql://retail_sales_svc:${RETAIL_SALES_DB_PASSWORD}@localhost:5432/retail_sales?schema=public"
+            [sales-audit]="postgresql://sales_audit_svc:${SALES_AUDIT_DB_PASSWORD}@localhost:5432/sales_audit?schema=public"
+            [financials]="postgresql://financials_svc:${FINANCIALS_DB_PASSWORD}@localhost:5432/financials?schema=public"
+          )
+          for svc in $SERVICES; do
+            echo "--- ${svc}: prisma db push ---"
+            DATABASE_URL="${DB_URL[$svc]}" pnpm --filter "@mms/${svc}" exec prisma db push --skip-generate --accept-data-loss
+            echo "--- ${svc}: test:e2e ---"
+            DATABASE_URL="${DB_URL[$svc]}" pnpm --filter "@mms/${svc}" run test:e2e
+          done

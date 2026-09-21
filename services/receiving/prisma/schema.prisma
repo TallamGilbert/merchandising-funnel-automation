@@ -1,0 +1,24 @@
+// Scaffold-only schema. This service is not implemented in this pass — see
+// the root README's module status table for its phase. Replace this stub
+// with the service's real domain models when its phase begins; keep the
+// datasource/generator blocks as-is (DATABASE_URL points at this service's
+// own isolated database — see docker/postgres-init/init-databases.sh).
+
+generator client {
+  provider = "prisma-client-js"
+  // Custom output — pnpm dedups identical @prisma/client versions into one
+  // physical store location, so without this every service's `prisma
+  // generate` would overwrite the same shared client. This keeps each
+  // service's generated client (and its schema-specific types) isolated.
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Placeholder {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+}

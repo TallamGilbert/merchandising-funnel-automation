@@ -1,0 +1,44 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build output
+dist/
+build/
+.next/
+out/
+*.tsbuildinfo
+
+# Generated code
+libs/shared/src/grpc/generated/
+# Each service generates its own isolated Prisma Client here (see the
+# `output` path in each services/*/prisma/schema.prisma) — run
+# `pnpm --filter @mms/<service> exec prisma generate` after install.
+services/*/src/generated/
+
+# Env files
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Prisma
+services/*/prisma/migrations/dev/
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# Testing
+coverage/
+
+# IDE / OS
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db
+
+# Docker
+docker/postgres-data/

@@ -1,0 +1,304 @@
+openapi: 3.0.3
+info:
+  title: Vendor Management Service
+  description: >
+    Authoritative record of approved suppliers, their terms, and the
+    products they're authorized to supply. Implements FR-1.1–FR-1.6 of the
+    PRD. Owns its own Postgres database; no other service may query it
+    directly. This spec is the contract-first source of truth (NFR-4) and
+    is also served live from the running service at /docs (Swagger UI) and
+    /docs-json, generated from the same @nestjs/swagger decorators.
+  version: 0.1.0
+servers:
+  - url: http://localhost:3001
+tags:
+  - name: health
+  - name: suppliers
+  - name: supplier-products
+  - name: delivery-records
+paths:
+  /health:
+    get:
+      tags: [health]
+      summary: Liveness/readiness probe. Always reachable regardless of feature flag state.
+      responses:
+        "200":
+          description: Service is up.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, example: ok }
+                  service: { type: string, example: vendor-management }
+                  timestamp: { type: string, format: date-time }
+  /suppliers:
+    get:
+      tags: [suppliers]
+      summary: List suppliers (FR-1.1)
+      parameters:
+        - in: query
+          name: status
+          schema: { $ref: "#/components/schemas/SupplierStatus" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Supplier" }
+    post:
+      tags: [suppliers]
+      summary: Add a supplier (Vendor Management Portal)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateSupplierDto" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Supplier" }
+  /suppliers/{id}:
+    get:
+      tags: [suppliers]
+      summary: Get a supplier profile, including its products and reliability summary
+      parameters:
+        - $ref: "#/components/parameters/SupplierId"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SupplierDetail" }
+        "404": { description: Not found }
+    patch:
+      tags: [suppliers]
+      summary: Edit a supplier profile
+      parameters:
+        - $ref: "#/components/parameters/SupplierId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateSupplierDto" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Supplier" }
+  /suppliers/{id}/archive:
+    post:
+      tags: [suppliers]
+      summary: Archive a supplier (soft delete — Vendor Management Portal "archive" action)
+      parameters:
+        - $ref: "#/components/parameters/SupplierId"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Supplier" }
+  /suppliers/{id}/products:
+    post:
+      tags: [supplier-products]
+      summary: Authorize a supplier to provide a product, at a given cost (FR-1.2)
+      parameters:
+        - $ref: "#/components/parameters/SupplierId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateSupplierProductDto" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SupplierProduct" }
+  /suppliers/{id}/products/{productId}:
+    patch:
+      tags: [supplier-products]
+      summary: Update a supplier's authorized product (e.g. revise cost)
+      parameters:
+        - $ref: "#/components/parameters/SupplierId"
+        - in: path
+          name: productId
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateSupplierProductDto" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SupplierProduct" }
+  /suppliers/by-sku/{sku}:
+    get:
+      tags: [supplier-products]
+      summary: >
+        FR-1.5 — Procurement's lookup: every supplier approved to provide
+        this SKU, with current cost and payment terms, so a buyer can pick
+        one when creating a PO.
+      parameters:
+        - in: path
+          name: sku
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/SupplierOfferForSku" }
+  /suppliers/{id}/delivery-records:
+    get:
+      tags: [delivery-records]
+      summary: Supplier reliability history (FR-1.4)
+      parameters:
+        - $ref: "#/components/parameters/SupplierId"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/SupplierDeliveryRecord" }
+    post:
+      tags: [delivery-records]
+      summary: Record a delivery outcome against this supplier (on-time / late)
+      parameters:
+        - $ref: "#/components/parameters/SupplierId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSupplierDeliveryRecordDto"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SupplierDeliveryRecord" }
+components:
+  parameters:
+    SupplierId:
+      in: path
+      name: id
+      required: true
+      schema: { type: string, format: uuid }
+  schemas:
+    SupplierStatus:
+      type: string
+      enum: [ACTIVE, ARCHIVED]
+    Supplier:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        contactName: { type: string }
+        email: { type: string, format: email }
+        phone: { type: string }
+        address: { type: string }
+        paymentTermsDays: { type: integer, example: 30 }
+        status: { $ref: "#/components/schemas/SupplierStatus" }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    SupplierDetail:
+      allOf:
+        - $ref: "#/components/schemas/Supplier"
+        - type: object
+          properties:
+            products:
+              type: array
+              items: { $ref: "#/components/schemas/SupplierProduct" }
+            onTimeDeliveryRate:
+              type: number
+              format: float
+              description: Fraction (0–1) of recorded deliveries that were on time.
+    CreateSupplierDto:
+      type: object
+      required: [name, email, paymentTermsDays]
+      properties:
+        name: { type: string }
+        contactName: { type: string }
+        email: { type: string, format: email }
+        phone: { type: string }
+        address: { type: string }
+        paymentTermsDays: { type: integer }
+    UpdateSupplierDto:
+      type: object
+      properties:
+        name: { type: string }
+        contactName: { type: string }
+        email: { type: string, format: email }
+        phone: { type: string }
+        address: { type: string }
+        paymentTermsDays: { type: integer }
+    SupplierProduct:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        supplierId: { type: string, format: uuid }
+        sku: { type: string }
+        productName: { type: string }
+        unitCost: { type: number, format: float }
+        currency: { type: string, example: KES }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    CreateSupplierProductDto:
+      type: object
+      required: [sku, productName, unitCost, currency]
+      properties:
+        sku: { type: string }
+        productName: { type: string }
+        unitCost: { type: number, format: float }
+        currency: { type: string }
+    UpdateSupplierProductDto:
+      type: object
+      properties:
+        productName: { type: string }
+        unitCost: { type: number, format: float }
+        currency: { type: string }
+    SupplierOfferForSku:
+      type: object
+      properties:
+        supplierId: { type: string, format: uuid }
+        supplierName: { type: string }
+        sku: { type: string }
+        productName: { type: string }
+        unitCost: { type: number, format: float }
+        currency: { type: string }
+        paymentTermsDays: { type: integer }
+        leadTimeDays:
+          type: integer
+          description: Not yet a distinct field in v1 — see SupplierDeliveryRecord for historical timing.
+    SupplierDeliveryRecord:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        supplierId: { type: string, format: uuid }
+        poReference: { type: string }
+        expectedDate: { type: string, format: date }
+        actualDeliveryDate: { type: string, format: date }
+        onTime: { type: boolean }
+        createdAt: { type: string, format: date-time }
+    CreateSupplierDeliveryRecordDto:
+      type: object
+      required: [poReference, expectedDate, actualDeliveryDate]
+      properties:
+        poReference: { type: string }
+        expectedDate: { type: string, format: date }
+        actualDeliveryDate: { type: string, format: date }
