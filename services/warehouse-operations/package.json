@@ -1,7 +1,7 @@
 {
   "name": "@mms/warehouse-operations",
   "version": "0.1.0",
-  "description": "Directs putaway, picking, and stock transfers within the warehouse (FR-5.x). Phase 2 scaffold.",
+  "description": "Directs putaway, picking, and stock transfers within the warehouse (FR-5.x).",
   "private": true,
   "scripts": {
     "build": "nest build",
@@ -9,7 +9,7 @@
     "dev": "nest start --watch",
     "start:prod": "node dist/main.js",
     "lint": "eslint \"src/**/*.ts\" \"test/**/*.ts\"",
-    "test": "jest --passWithNoTests",
+    "test": "jest",
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
     "test:e2e": "jest --config ./test/jest-e2e.json",
