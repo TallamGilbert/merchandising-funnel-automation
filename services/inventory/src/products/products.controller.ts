@@ -1,6 +1,7 @@
-import { Body, Controller, Get, Param, Patch, Post } from "@nestjs/common";
+import { Body, Controller, Get, Param, Patch, Post, Put } from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
 import { CreateProductDto } from "./dto/create-product.dto";
+import { SetBinLocationDto } from "./dto/set-bin-location.dto";
 import { StockAdjustmentDto } from "./dto/stock-adjustment.dto";
 import { UpdateProductDto } from "./dto/update-product.dto";
 import { ProductsService } from "./products.service";
@@ -28,6 +29,16 @@ export class ProductsController {
   @Patch(":sku")
   update(@Param("sku") sku: string, @Body() dto: UpdateProductDto) {
     return this.products.update(sku, dto);
+  }
+
+  /** FR-5.7 — Warehouse Operations confirms the final bin location after putaway. */
+  @Put(":sku/bin-locations/:binCode")
+  setBinLocation(
+    @Param("sku") sku: string,
+    @Param("binCode") binCode: string,
+    @Body() dto: SetBinLocationDto,
+  ) {
+    return this.products.setBinLocation(sku, binCode, dto);
   }
 
   @Post(":sku/adjustments")
