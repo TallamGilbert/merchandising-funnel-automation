@@ -30,6 +30,7 @@ export class EventBusService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(EventBusService.name);
   private connection!: AmqpConnectionManager;
   private publishChannel!: ChannelWrapper;
+  private ready?: Promise<void>;
   private readonly exchange: string;
 
   constructor() {
@@ -37,6 +38,27 @@ export class EventBusService implements OnModuleInit, OnModuleDestroy {
   }
 
   async onModuleInit(): Promise<void> {
+    await this.connect();
+  }
+
+  async onModuleDestroy(): Promise<void> {
+    await this.publishChannel?.close();
+    await this.connection?.close();
+  }
+
+  /**
+   * Connects once and shares the result. Consumers call `subscribe()` from
+   * their own `onModuleInit`, and Nest orders those hooks by module distance
+   * — which ties (and so is arbitrary) whenever a service's graph lets a
+   * consumer's module sit at the same depth as this one. Every entry point
+   * therefore awaits this instead of assuming our own init hook already ran.
+   */
+  private connect(): Promise<void> {
+    this.ready ??= this.openConnection();
+    return this.ready;
+  }
+
+  private async openConnection(): Promise<void> {
     const { url } = loadRabbitMqConfig();
     this.connection = amqp.connect([url]);
     this.connection.on("connect", () =>
@@ -54,13 +76,9 @@ export class EventBusService implements OnModuleInit, OnModuleDestroy {
     await this.publishChannel.waitForConnect();
   }
 
-  async onModuleDestroy(): Promise<void> {
-    await this.publishChannel?.close();
-    await this.connection?.close();
-  }
-
   /** Publish a domain event onto the shared topic exchange. Never blocks on consumers. */
   async publish<T>(routingKey: EventRoutingKey, payload: T): Promise<void> {
+    await this.connect();
     await this.publishChannel.publish(
       this.exchange,
       routingKey,
@@ -79,6 +97,7 @@ export class EventBusService implements OnModuleInit, OnModuleDestroy {
     routingKeys: EventRoutingKey[],
     handler: EventHandler<T>,
   ): Promise<void> {
+    await this.connect();
     const consumeChannel = this.connection.createChannel({
       json: false,
       setup: async (channel: import("amqplib").ConfirmChannel) => {
