@@ -1,9 +1,15 @@
+import { randomUUID } from "crypto";
 import {
   BadRequestException,
   Injectable,
   Logger,
   NotFoundException,
 } from "@nestjs/common";
+import {
+  EventBusService,
+  EventRoutingKey,
+  StockTransferredEvent,
+} from "@mms/shared";
 import { PickTaskStatus, TransferStatus } from "../generated/prisma";
 import { InventoryClientService } from "../inventory-client/inventory-client.service";
 import { PrismaService } from "../prisma/prisma.service";
@@ -17,6 +23,7 @@ export class TransfersService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly inventory: InventoryClientService,
+    private readonly eventBus: EventBusService,
   ) {}
 
   list(status?: TransferStatus) {
@@ -121,7 +128,11 @@ export class TransfersService {
   /**
    * FR-5.3 — picker confirms a pick. Removes the quantity from the bin,
    * frees its reserved capacity, and completes the transfer once its last
-   * pick is in.
+   * pick is in (publishing StockTransferred so Inventory moves the stock, D-7).
+   *
+   * Calling this again for an already-PICKED pick is a retry of a failed
+   * completion: if the transfer is still open with nothing left to pick, it
+   * finishes the transfer instead of rejecting the call.
    */
   async completePick(id: string, dto: CompletePickDto) {
     const pick = await this.prisma.pickTask.findUnique({
@@ -130,6 +141,11 @@ export class TransfersService {
     });
     if (!pick) throw new NotFoundException(`Pick task ${id} not found`);
     if (pick.status !== PickTaskStatus.PENDING) {
+      const transfer = await this.findOne(pick.transferId);
+      if (transfer.status === TransferStatus.PICKING) {
+        await this.completeTransferIfAllPicked(pick.transferId);
+        return this.findOne(pick.transferId);
+      }
       throw new BadRequestException(`Pick is already ${pick.status}`);
     }
     if (dto.scannedBinCode !== pick.bin.code) {
@@ -169,16 +185,6 @@ export class TransfersService {
       }),
     ]);
 
-    const stillPending = await this.prisma.pickTask.count({
-      where: { transferId: pick.transferId, status: PickTaskStatus.PENDING },
-    });
-    if (stillPending === 0) {
-      await this.prisma.transfer.update({
-        where: { id: pick.transferId },
-        data: { status: TransferStatus.COMPLETED, completedAt: new Date() },
-      });
-    }
-
     // Best effort: the pick is physically done either way, so a failed call
     // must not block the floor. Inventory's bin record is corrected by the
     // next putaway into this bin, which re-sends the absolute quantity.
@@ -193,6 +199,39 @@ export class TransfersService {
       );
     }
 
+    await this.completeTransferIfAllPicked(pick.transferId);
     return this.findOne(pick.transferId);
+  }
+
+  /**
+   * D-7 — once no pick is pending, publish StockTransferred *before* marking
+   * the transfer COMPLETED. If publishing fails the transfer stays open and
+   * the picker's retry re-attempts it; Inventory applies each transferNumber
+   * at most once, so a duplicate publish is harmless.
+   */
+  private async completeTransferIfAllPicked(transferId: string): Promise<void> {
+    const transfer = await this.prisma.transfer.findUnique({
+      where: { id: transferId },
+      include: { picks: true },
+    });
+    if (!transfer || transfer.status !== TransferStatus.PICKING) return;
+    if (transfer.picks.some((pick) => pick.status === PickTaskStatus.PENDING)) return;
+
+    // Physical facts only — no cost, no bin codes (Inventory never places stock).
+    const event: StockTransferredEvent = {
+      eventId: randomUUID(),
+      occurredAt: new Date().toISOString(),
+      transferNumber: transfer.transferNumber,
+      sku: transfer.sku,
+      quantity: transfer.quantity,
+      fromLocationCode: transfer.fromLocationCode,
+      toLocationCode: transfer.toLocationCode,
+    };
+    await this.eventBus.publish(EventRoutingKey.STOCK_TRANSFERRED, event);
+
+    await this.prisma.transfer.update({
+      where: { id: transferId },
+      data: { status: TransferStatus.COMPLETED, completedAt: new Date() },
+    });
   }
 }

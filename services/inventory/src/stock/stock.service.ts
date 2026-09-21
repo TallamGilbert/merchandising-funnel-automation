@@ -1,7 +1,13 @@
 import { randomUUID } from "crypto";
 import { Injectable, Logger, NotFoundException } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import { EventBusService, EventRoutingKey, GoodsReceivedEvent, StockLowEvent } from "@mms/shared";
+import {
+  EventBusService,
+  EventRoutingKey,
+  GoodsReceivedEvent,
+  StockLowEvent,
+  StockTransferredEvent,
+} from "@mms/shared";
 import {
   InventoryTransactionType,
   Product,
@@ -121,6 +127,93 @@ export class StockService {
         event.grnNumber,
       );
     }
+  }
+
+  /**
+   * FR-4.1 / D-7 — moves On Hand between locations when Warehouse Operations
+   * reports a completed transfer (e.g. warehouse -> showroom), so the
+   * destination's stock is real for Retail Sales' checkout check. Applied at
+   * most once per transferNumber, since the bus may redeliver. Stock that has
+   * physically moved is always recorded, even if the source count had drifted
+   * below the quantity — it is flagged in the log instead of being rejected.
+   */
+  async applyStockTransfer(event: StockTransferredEvent): Promise<void> {
+    const alreadyApplied = await this.prisma.inventoryTransaction.findFirst({
+      where: { referenceType: "TRANSFER", referenceId: event.transferNumber },
+    });
+    if (alreadyApplied) {
+      this.logger.log(`Transfer ${event.transferNumber} already applied — skipping`);
+      return;
+    }
+
+    const product = await this.prisma.product.findUnique({
+      where: { sku: event.sku },
+    });
+    if (!product) {
+      this.logger.warn(
+        `StockTransferred ${event.transferNumber} for unknown SKU ${event.sku} — no product master record, skipping`,
+      );
+      return;
+    }
+
+    await this.upsertLevel(product.id, event.fromLocationCode, product.unitCost);
+    await this.upsertLevel(product.id, event.toLocationCode, product.unitCost);
+
+    const source = await this.prisma.stockLevel.findUnique({
+      where: {
+        productId_locationCode: {
+          productId: product.id,
+          locationCode: event.fromLocationCode,
+        },
+      },
+    });
+    if (source && source.onHand - source.allocated < event.quantity) {
+      this.logger.warn(
+        `Transfer ${event.transferNumber} moves ${event.quantity} × ${event.sku} out of ${event.fromLocationCode}, which only shows ${source.onHand - source.allocated} available — recording it anyway`,
+      );
+    }
+
+    const referenceType = "TRANSFER";
+    await this.prisma.$transaction([
+      this.prisma.stockLevel.update({
+        where: {
+          productId_locationCode: {
+            productId: product.id,
+            locationCode: event.fromLocationCode,
+          },
+        },
+        data: { onHand: { decrement: event.quantity } },
+      }),
+      this.prisma.stockLevel.update({
+        where: {
+          productId_locationCode: {
+            productId: product.id,
+            locationCode: event.toLocationCode,
+          },
+        },
+        data: { onHand: { increment: event.quantity } },
+      }),
+      this.prisma.inventoryTransaction.create({
+        data: {
+          productId: product.id,
+          locationCode: event.fromLocationCode,
+          type: InventoryTransactionType.TRANSFER_OUT,
+          quantityDelta: -event.quantity,
+          referenceType,
+          referenceId: event.transferNumber,
+        },
+      }),
+      this.prisma.inventoryTransaction.create({
+        data: {
+          productId: product.id,
+          locationCode: event.toLocationCode,
+          type: InventoryTransactionType.TRANSFER_IN,
+          quantityDelta: event.quantity,
+          referenceType,
+          referenceId: event.transferNumber,
+        },
+      }),
+    ]);
   }
 
   /** FR-4.5 / FR-6.2 / NFR-5 — the gRPC checkout stock check + reservation. */

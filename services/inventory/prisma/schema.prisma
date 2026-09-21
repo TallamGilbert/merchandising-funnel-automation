@@ -19,6 +19,11 @@ enum InventoryTransactionType {
   ADJUSTMENT
   RESERVATION
   RELEASE
+  /// Stock leaving a location / arriving at another because of a
+  /// Warehouse Operations transfer (StockTransferred, D-7). Always written
+  /// as a pair sharing the same transferNumber reference.
+  TRANSFER_OUT
+  TRANSFER_IN
 }
 
 enum ReservationStatus {

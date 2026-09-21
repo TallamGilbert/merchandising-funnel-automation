@@ -1,5 +1,6 @@
 import { BadRequestException } from "@nestjs/common";
-import { PickTaskStatus } from "../generated/prisma";
+import { EventBusService, EventRoutingKey } from "@mms/shared";
+import { PickTaskStatus, TransferStatus } from "../generated/prisma";
 import { InventoryClientService } from "../inventory-client/inventory-client.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { TransfersService } from "./transfers.service";
@@ -15,6 +16,7 @@ describe("TransfersService", () => {
     $transaction: jest.Mock;
   };
   let inventory: { confirmBinLocation: jest.Mock };
+  let eventBus: { publish: jest.Mock };
 
   const dto = {
     sku: "SKU-1",
@@ -41,7 +43,6 @@ describe("TransfersService", () => {
         findMany: jest.fn().mockResolvedValue([]),
         findUnique: jest.fn(),
         update: jest.fn().mockReturnValue("pick-update"),
-        count: jest.fn(),
       },
       binStock: {
         findMany: jest.fn(),
@@ -53,9 +54,11 @@ describe("TransfersService", () => {
       $transaction: jest.fn(),
     };
     inventory = { confirmBinLocation: jest.fn() };
+    eventBus = { publish: jest.fn() };
     service = new TransfersService(
       prisma as unknown as PrismaService,
       inventory as unknown as InventoryClientService,
+      eventBus as unknown as EventBusService,
     );
   });
 
@@ -122,10 +125,24 @@ describe("TransfersService", () => {
     };
     const binStock = { id: "stock-A", quantity: 10, unitVolumeCm3: "180000", unitWeightKg: "8" };
 
+    const transferWith = (
+      picks: { status: PickTaskStatus }[],
+      status: TransferStatus = TransferStatus.PICKING,
+    ) => ({
+      id: "tr-1",
+      transferNumber: "TRF-1001",
+      sku: "SKU-1",
+      quantity: 10,
+      fromLocationCode: "WH-MAIN",
+      toLocationCode: "STORE-1",
+      status,
+      picks,
+    });
+
     beforeEach(() => {
       prisma.pickTask.findUnique.mockResolvedValue(pick);
       prisma.binStock.findUnique.mockResolvedValue(binStock);
-      prisma.transfer.findUnique.mockResolvedValue({ id: "tr-1", picks: [] });
+      prisma.transfer.findUnique.mockResolvedValue(transferWith([{ status: PickTaskStatus.PICKED }]));
     });
 
     it("rejects a scan of the wrong bin", async () => {
@@ -135,9 +152,7 @@ describe("TransfersService", () => {
       expect(prisma.$transaction).not.toHaveBeenCalled();
     });
 
-    it("removes stock, frees the bin's capacity, and completes the transfer on its last pick", async () => {
-      prisma.pickTask.count.mockResolvedValue(0);
-
+    it("removes stock and frees the bin's capacity", async () => {
       await service.completePick("p1", { pickedById: "w1", scannedBinCode: "A-01" });
 
       expect(prisma.binStock.update).toHaveBeenCalledWith({
@@ -151,22 +166,75 @@ describe("TransfersService", () => {
           usedWeightKg: { decrement: 48 },
         },
       });
-      expect(prisma.transfer.update).toHaveBeenCalledWith({
-        where: { id: "tr-1" },
-        data: expect.objectContaining({ status: "COMPLETED" }),
-      });
     });
 
-    it("leaves the transfer open while other picks are pending", async () => {
-      prisma.pickTask.count.mockResolvedValue(1);
+    it("publishes StockTransferred, then completes the transfer, on its last pick (D-7)", async () => {
+      await service.completePick("p1", { pickedById: "w1", scannedBinCode: "A-01" });
+
+      expect(eventBus.publish).toHaveBeenCalledWith(
+        EventRoutingKey.STOCK_TRANSFERRED,
+        expect.objectContaining({
+          transferNumber: "TRF-1001",
+          sku: "SKU-1",
+          quantity: 10,
+          fromLocationCode: "WH-MAIN",
+          toLocationCode: "STORE-1",
+        }),
+      );
+      const event = eventBus.publish.mock.calls[0][1];
+      expect(JSON.stringify(event)).not.toMatch(/cost|price|bin/i);
+      expect(prisma.transfer.update).toHaveBeenCalledWith({
+        where: { id: "tr-1" },
+        data: expect.objectContaining({ status: TransferStatus.COMPLETED }),
+      });
+      expect(eventBus.publish.mock.invocationCallOrder[0]).toBeLessThan(
+        prisma.transfer.update.mock.invocationCallOrder[0],
+      );
+    });
+
+    it("leaves the transfer open, and publishes nothing, while other picks are pending", async () => {
+      prisma.transfer.findUnique.mockResolvedValue(
+        transferWith([{ status: PickTaskStatus.PICKED }, { status: PickTaskStatus.PENDING }]),
+      );
 
       await service.completePick("p1", { pickedById: "w1", scannedBinCode: "A-01" });
 
+      expect(eventBus.publish).not.toHaveBeenCalled();
       expect(prisma.transfer.update).not.toHaveBeenCalled();
     });
 
-    it("does not fail the pick when syncing Inventory fails", async () => {
-      prisma.pickTask.count.mockResolvedValue(1);
+    it("keeps the transfer open when publishing fails, so a retry can finish it", async () => {
+      eventBus.publish.mockRejectedValue(new Error("broker down"));
+
+      await expect(
+        service.completePick("p1", { pickedById: "w1", scannedBinCode: "A-01" }),
+      ).rejects.toThrow("broker down");
+      expect(prisma.transfer.update).not.toHaveBeenCalled();
+    });
+
+    it("finishes an all-picked transfer when the last pick is confirmed again", async () => {
+      prisma.pickTask.findUnique.mockResolvedValue({ ...pick, status: PickTaskStatus.PICKED });
+
+      await service.completePick("p1", { pickedById: "w1", scannedBinCode: "A-01" });
+
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+      expect(eventBus.publish).toHaveBeenCalledTimes(1);
+      expect(prisma.transfer.update).toHaveBeenCalled();
+    });
+
+    it("rejects re-confirming a pick once its transfer is already completed", async () => {
+      prisma.pickTask.findUnique.mockResolvedValue({ ...pick, status: PickTaskStatus.PICKED });
+      prisma.transfer.findUnique.mockResolvedValue(
+        transferWith([{ status: PickTaskStatus.PICKED }], TransferStatus.COMPLETED),
+      );
+
+      await expect(
+        service.completePick("p1", { pickedById: "w1", scannedBinCode: "A-01" }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(eventBus.publish).not.toHaveBeenCalled();
+    });
+
+    it("does not fail the pick when syncing Inventory's bin record fails", async () => {
       inventory.confirmBinLocation.mockRejectedValue(new Error("down"));
 
       await expect(

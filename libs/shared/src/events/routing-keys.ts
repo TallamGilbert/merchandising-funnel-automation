@@ -7,6 +7,7 @@ export const EventRoutingKey = {
   PURCHASE_ORDER_APPROVED: "purchase-order.approved",
   GOODS_RECEIVED: "goods-received",
   STOCK_LOW: "stock-low",
+  STOCK_TRANSFERRED: "stock-transferred",
   ITEM_SOLD: "item-sold",
   DAY_CLOSED: "day-closed",
 } as const;

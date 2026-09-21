@@ -5,8 +5,9 @@ info:
     The physical geography of the warehouse — where things go and how they
     move (FR-5.1–FR-5.8). Consumes GoodsReceived to create putaway tasks
     with a suggested bin (FR-5.1, FR-5.2, FR-5.6), directs picking for
-    transfers (FR-5.3, FR-5.4), tracks bin capacity and utilization
-    (FR-5.5), and confirms final bin locations back to Inventory (REST,
+    transfers (FR-5.3, FR-5.4) and publishes StockTransferred when one
+    completes so Inventory moves the stock (D-7), tracks bin capacity and
+    utilization (FR-5.5), and confirms final bin locations back to Inventory (REST,
     FR-5.7). Reads item dimensions, weight and sales velocity from Inventory
     (FR-4.7) and never sees or stores cost. Does not track overall stock
     quantity — that stays with Inventory. Owns its own Postgres database.
@@ -225,8 +226,10 @@ paths:
       tags: [transfers]
       summary: >
         Picker confirms a pick (FR-5.3). Removes the quantity from the bin
-        and frees its capacity; the transfer completes when its last pick is
-        confirmed.
+        and frees its capacity. When the last pick is confirmed the service
+        publishes StockTransferred (D-7) and marks the transfer COMPLETED. If
+        publishing fails the transfer stays open; confirming the same pick
+        again retries the completion.
       parameters:
         - in: path
           name: id
