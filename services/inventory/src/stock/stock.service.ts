@@ -93,19 +93,28 @@ export class StockService {
   /**
    * FR-4.2 — increase stock on GoodsReceived. Damaged lines are quarantined
    * upstream (FR-3.4) and are never added to sellable On Hand here.
+   *
+   * The event carries no unit cost (see GoodsReceivedEvent) and product
+   * master data is otherwise manually maintained via the Inventory Control
+   * Center — but the physical count itself must never be silently lost just
+   * because nobody has created the product master yet. If the SKU is
+   * unknown, a stub Product is created here (unitCost 0, flagged in the log)
+   * so the receipt is still recorded; a human fills in the real cost later.
    */
   async applyGoodsReceived(event: GoodsReceivedEvent): Promise<void> {
     for (const line of event.lines) {
       if (line.condition !== "GOOD" || line.quantityReceived <= 0) continue;
 
-      const product = await this.prisma.product.findUnique({
+      let product = await this.prisma.product.findUnique({
         where: { sku: line.sku },
       });
       if (!product) {
         this.logger.warn(
-          `GoodsReceived for unknown SKU ${line.sku} (GRN ${event.grnNumber}) — no product master record yet, skipping`,
+          `GoodsReceived for unknown SKU ${line.sku} (GRN ${event.grnNumber}) — no product master record yet, creating a stub with unitCost 0 so the receipt isn't lost; set its real unit cost in Inventory Control Center`,
         );
-        continue;
+        product = await this.prisma.product.create({
+          data: { sku: line.sku, name: line.productName, unitCost: 0 },
+        });
       }
 
       await this.upsertLevel(product.id, event.receivedAtLocation, product.unitCost);
