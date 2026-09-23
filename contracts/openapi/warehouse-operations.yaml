@@ -2,17 +2,23 @@ openapi: 3.0.3
 info:
   title: Warehouse Operations Service
   description: >
-    Scaffold only in this pass — Phase 2 — Warehouse per PRD Section 7. Routes
-    beyond /health are gated behind this module's feature flag and return
-    503 "not yet implemented" until the module is built. This file will be
-    expanded to the module's full contract (and regenerated from the live
-    /docs-json) when its phase begins, per NFR-4 (contract-first) and the
-    Definition of Done in CONTRIBUTING.md.
+    The physical geography of the warehouse — where things go and how they
+    move (FR-5.1–FR-5.8). Consumes GoodsReceived to create putaway tasks
+    with a suggested bin (FR-5.1, FR-5.2, FR-5.6), directs picking for
+    transfers (FR-5.3, FR-5.4) and publishes StockTransferred when one
+    completes so Inventory moves the stock (D-7), tracks bin capacity and
+    utilization (FR-5.5), and confirms final bin locations back to Inventory (REST,
+    FR-5.7). Reads item dimensions, weight and sales velocity from Inventory
+    (FR-4.7) and never sees or stores cost. Does not track overall stock
+    quantity — that stays with Inventory. Owns its own Postgres database.
   version: 0.1.0
 servers:
   - url: http://localhost:3005
 tags:
   - name: health
+  - name: bins
+  - name: putaway-tasks
+  - name: transfers
 paths:
   /health:
     get:
@@ -29,3 +35,356 @@ paths:
                   status: { type: string, example: ok }
                   service: { type: string, example: warehouse-operations }
                   timestamp: { type: string, format: date-time }
+  /bins:
+    get:
+      tags: [bins]
+      summary: List bins with their capacity and current usage
+      parameters:
+        - in: query
+          name: locationCode
+          schema: { type: string, example: WH-MAIN }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Bin" }
+    post:
+      tags: [bins]
+      summary: Define a bin/shelf (supervisor setup)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateBinDto" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Bin" }
+        "409": { description: A bin with that code already exists. }
+  /bins/utilization:
+    get:
+      tags: [bins]
+      summary: >
+        FR-5.5 — capacity and utilization per location and zone, by volume
+        and by weight.
+      parameters:
+        - in: query
+          name: locationCode
+          schema: { type: string }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/ZoneUtilization" }
+  /bins/{code}:
+    get:
+      tags: [bins]
+      summary: Get one bin and the SKUs currently in it
+      parameters:
+        - $ref: "#/components/parameters/BinCode"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Bin" }
+        "404": { description: Not found }
+  /putaway-tasks:
+    get:
+      tags: [putaway-tasks]
+      summary: List putaway tasks (Warehouse Floor App worklist)
+      parameters:
+        - in: query
+          name: status
+          schema: { $ref: "#/components/schemas/PutawayTaskStatus" }
+        - in: query
+          name: locationCode
+          schema: { type: string }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/PutawayTask" }
+  /putaway-tasks/{id}:
+    get:
+      tags: [putaway-tasks]
+      summary: Get a putaway task
+      parameters:
+        - $ref: "#/components/parameters/TaskId"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PutawayTask" }
+        "404": { description: Not found }
+  /putaway-tasks/{id}/assign:
+    post:
+      tags: [putaway-tasks]
+      summary: >
+        Assign (or re-assign) the bin for a pending task. Omit `binCode` to
+        re-run automatic selection — used when no bin had room, or Inventory
+        was unreachable, when the task was created. Supply `binCode` for a
+        supervisor override. Reserves the bin's capacity.
+      parameters:
+        - $ref: "#/components/parameters/TaskId"
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AssignBinDto" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PutawayTask" }
+        "400": { description: Task already completed, bin in another location, or no bin has room. }
+        "404": { description: Task or bin not found. }
+  /putaway-tasks/{id}/complete:
+    post:
+      tags: [putaway-tasks]
+      summary: >
+        Worker confirms the stock is in the bin (FR-5.2). The scanned bin
+        must match the directed bin. Confirms the final bin location back to
+        Inventory (REST, FR-5.7) before the task is marked complete, so a
+        failed Inventory call leaves the task retryable.
+      parameters:
+        - $ref: "#/components/parameters/TaskId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CompletePutawayDto" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PutawayTask" }
+        "400": { description: Already completed, no bin assigned, or scanned bin does not match. }
+        "503": { description: Inventory is unreachable. }
+  /transfers:
+    get:
+      tags: [transfers]
+      summary: List stock transfers
+      parameters:
+        - in: query
+          name: status
+          schema: { $ref: "#/components/schemas/TransferStatus" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Transfer" }
+    post:
+      tags: [transfers]
+      summary: >
+        Request a transfer between locations, e.g. warehouse -> showroom
+        (FR-5.4). Generates pick tasks against the bins in the source
+        location that hold the SKU (FR-5.3), nearest-to-dispatch first.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateTransferDto" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Transfer" }
+        "400": { description: Not enough of the SKU in the source location's bins. }
+  /transfers/{id}:
+    get:
+      tags: [transfers]
+      summary: Get a transfer and its pick tasks
+      parameters:
+        - $ref: "#/components/parameters/TransferId"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Transfer" }
+        "404": { description: Not found }
+  /pick-tasks/{id}/complete:
+    post:
+      tags: [transfers]
+      summary: >
+        Picker confirms a pick (FR-5.3). Removes the quantity from the bin
+        and frees its capacity. When the last pick is confirmed the service
+        publishes StockTransferred (D-7) and marks the transfer COMPLETED. If
+        publishing fails the transfer stays open; confirming the same pick
+        again retries the completion.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CompletePickDto" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Transfer" }
+        "400": { description: Pick already completed or scanned bin does not match. }
+        "404": { description: Not found }
+components:
+  parameters:
+    BinCode:
+      in: path
+      name: code
+      required: true
+      schema: { type: string, example: A-01-03 }
+    TaskId:
+      in: path
+      name: id
+      required: true
+      schema: { type: string, format: uuid }
+    TransferId:
+      in: path
+      name: id
+      required: true
+      schema: { type: string, format: uuid }
+  schemas:
+    PutawayTaskStatus:
+      type: string
+      enum: [PENDING, COMPLETED]
+    TransferStatus:
+      type: string
+      enum: [PICKING, COMPLETED]
+    PickTaskStatus:
+      type: string
+      enum: [PENDING, PICKED]
+    Bin:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        code: { type: string, example: A-01-03 }
+        locationCode: { type: string, example: WH-MAIN }
+        zone: { type: string, example: FAST-PICK }
+        pickPriority:
+          type: integer
+          description: Lower = closer to dispatch. High-velocity items are steered to low numbers.
+        capacityVolumeCm3: { type: number }
+        maxWeightKg: { type: number }
+        usedVolumeCm3: { type: number }
+        usedWeightKg: { type: number }
+        stock:
+          type: array
+          items:
+            type: object
+            properties:
+              sku: { type: string }
+              quantity: { type: integer }
+    CreateBinDto:
+      type: object
+      required: [code, locationCode, zone, capacityVolumeCm3, maxWeightKg]
+      properties:
+        code: { type: string }
+        locationCode: { type: string }
+        zone: { type: string }
+        pickPriority: { type: integer, default: 100 }
+        capacityVolumeCm3: { type: number, minimum: 0 }
+        maxWeightKg: { type: number, minimum: 0 }
+    ZoneUtilization:
+      type: object
+      properties:
+        locationCode: { type: string }
+        zone: { type: string }
+        binCount: { type: integer }
+        capacityVolumeCm3: { type: number }
+        usedVolumeCm3: { type: number }
+        volumeUtilizationPct: { type: number }
+        maxWeightKg: { type: number }
+        usedWeightKg: { type: number }
+        weightUtilizationPct: { type: number }
+    PutawayTask:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        goodsReceivedNoteNumber: { type: string }
+        poNumber: { type: string }
+        sku: { type: string }
+        productName: { type: string }
+        quantity: { type: integer }
+        locationCode: { type: string }
+        status: { $ref: "#/components/schemas/PutawayTaskStatus" }
+        bin:
+          nullable: true
+          description: The directed bin. Null while PENDING with no bin assigned.
+          allOf:
+            - $ref: "#/components/schemas/Bin"
+        completedById: { type: string, nullable: true }
+        completedAt: { type: string, format: date-time, nullable: true }
+        createdAt: { type: string, format: date-time }
+    AssignBinDto:
+      type: object
+      properties:
+        binCode: { type: string, description: Omit to run automatic selection. }
+    CompletePutawayDto:
+      type: object
+      required: [completedById, scannedBinCode]
+      properties:
+        completedById: { type: string }
+        scannedBinCode: { type: string }
+    CreateTransferDto:
+      type: object
+      required: [sku, quantity, fromLocationCode, toLocationCode, requestedById]
+      properties:
+        sku: { type: string }
+        quantity: { type: integer, minimum: 1 }
+        fromLocationCode: { type: string, example: WH-MAIN }
+        toLocationCode: { type: string, example: STORE-1 }
+        requestedById: { type: string }
+    Transfer:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        transferNumber: { type: string, example: TRF-1001 }
+        sku: { type: string }
+        quantity: { type: integer }
+        fromLocationCode: { type: string }
+        toLocationCode: { type: string }
+        status: { $ref: "#/components/schemas/TransferStatus" }
+        requestedById: { type: string }
+        completedAt: { type: string, format: date-time, nullable: true }
+        createdAt: { type: string, format: date-time }
+        picks:
+          type: array
+          items: { $ref: "#/components/schemas/PickTask" }
+    PickTask:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        sku: { type: string }
+        quantity: { type: integer }
+        status: { $ref: "#/components/schemas/PickTaskStatus" }
+        binCode: { type: string }
+        pickedById: { type: string, nullable: true }
+        pickedAt: { type: string, format: date-time, nullable: true }
+    CompletePickDto:
+      type: object
+      required: [pickedById, scannedBinCode]
+      properties:
+        pickedById: { type: string }
+        scannedBinCode: { type: string }

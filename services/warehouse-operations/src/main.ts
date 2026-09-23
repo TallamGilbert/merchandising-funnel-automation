@@ -14,7 +14,7 @@ async function bootstrap() {
 
   const config = new DocumentBuilder()
     .setTitle("Warehouse Operations Service")
-    .setDescription("Phase 2 scaffold. Directs putaway, picking, and stock transfers (FR-5.x).")
+    .setDescription("Directs putaway, picking, and stock transfers (FR-5.x).")
     .setVersion("0.1.0")
     .build();
   const document = SwaggerModule.createDocument(app, config);

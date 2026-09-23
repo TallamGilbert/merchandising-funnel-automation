@@ -89,6 +89,32 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Product" }
+  /products/{sku}/bin-locations/{binCode}:
+    put:
+      tags: [products]
+      summary: >
+        FR-5.7 — Warehouse Operations confirms the final bin location once
+        putaway completes. Inventory only records the bin; it never decides
+        placement. Sets the bin's absolute quantity for this SKU, so retries
+        are idempotent; a quantity of 0 removes the record.
+      parameters:
+        - $ref: "#/components/parameters/Sku"
+        - in: path
+          name: binCode
+          required: true
+          schema: { type: string, example: A-01-03 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SetBinLocationDto" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BinLocation" }
+        "404": { description: Product not found }
   /products/{sku}/adjustments:
     post:
       tags: [stock-levels]
@@ -165,6 +191,10 @@ components:
               type: array
               items: { $ref: "#/components/schemas/StockLevel" }
             salesVelocity: { $ref: "#/components/schemas/SalesVelocity" }
+            binLocations:
+              type: array
+              description: Bin locations confirmed by Warehouse Operations (FR-5.7).
+              items: { $ref: "#/components/schemas/BinLocation" }
     CreateProductDto:
       type: object
       required: [sku, name, unitCost]
@@ -209,6 +239,21 @@ components:
           type: integer
           description: Positive to increase On Hand, negative to decrease.
         reason: { type: string }
+    SetBinLocationDto:
+      type: object
+      required: [locationCode, quantity]
+      properties:
+        locationCode: { type: string, example: WH-MAIN }
+        quantity:
+          type: integer
+          minimum: 0
+          description: Absolute number of units of this SKU in the bin — not a delta.
+    BinLocation:
+      type: object
+      properties:
+        binCode: { type: string }
+        locationCode: { type: string }
+        quantity: { type: integer }
     SalesVelocity:
       type: object
       properties:

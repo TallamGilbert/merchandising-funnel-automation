@@ -16,7 +16,7 @@
 export interface GoodsReceivedEvent {
   eventId: string;
   occurredAt: string;
-  grnNumber: string;
+  goodsReceivedNoteNumber: string;
   poNumber: string;
   supplierId: string;
   receivedAtLocation: string;

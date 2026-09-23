@@ -19,6 +19,11 @@ enum InventoryTransactionType {
   ADJUSTMENT
   RESERVATION
   RELEASE
+  /// Stock leaving a location / arriving at another because of a
+  /// Warehouse Operations transfer (StockTransferred, D-7). Always written
+  /// as a pair sharing the same transferNumber reference.
+  TRANSFER_OUT
+  TRANSFER_IN
 }
 
 enum ReservationStatus {
@@ -51,6 +56,7 @@ model Product {
   salesVelocity  SalesVelocity[]
   transactions   InventoryTransaction[]
   reservations   Reservation[]
+  binLocations   BinLocation[]
 }
 
 /// On Hand / Allocated / Available per product per location (FR-4.1, FR-4.3).
@@ -123,4 +129,21 @@ model Reservation {
 
   @@index([status])
   @@index([transactionReference])
+}
+
+/// Where a product physically sits, as confirmed by Warehouse Operations once
+/// putaway completes (FR-5.7). Inventory only *records* the bin — it never
+/// decides placement (that is Warehouse Operations' job). `quantity` is the
+/// bin's absolute count as reported, so repeated confirmations are idempotent.
+model BinLocation {
+  id           String   @id @default(uuid())
+  productId    String
+  product      Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  locationCode String
+  binCode      String
+  quantity     Int
+  updatedAt    DateTime @updatedAt
+
+  @@unique([productId, binCode])
+  @@index([locationCode])
 }

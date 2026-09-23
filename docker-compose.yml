@@ -127,6 +127,7 @@ services:
       <<: *common-service-env
       PORT: ${RECEIVING_PORT:-3004}
       DATABASE_URL: postgresql://receiving_svc:${RECEIVING_DB_PASSWORD}@postgres:5432/receiving?schema=public
+      PROCUREMENT_URL: http://procurement:${PROCUREMENT_PORT:-3002}
     ports:
       - "${RECEIVING_PORT:-3004}:${RECEIVING_PORT:-3004}"
     working_dir: /workspace/services/receiving
@@ -141,6 +142,8 @@ services:
       <<: *common-service-env
       PORT: ${WAREHOUSE_OPERATIONS_PORT:-3005}
       DATABASE_URL: postgresql://warehouse_operations_svc:${WAREHOUSE_OPERATIONS_DB_PASSWORD}@postgres:5432/warehouse_operations?schema=public
+      INVENTORY_URL: http://inventory:${INVENTORY_PORT:-3003}
+      HIGH_VELOCITY_UNITS_PER_DAY: ${HIGH_VELOCITY_UNITS_PER_DAY:-5}
     ports:
       - "${WAREHOUSE_OPERATIONS_PORT:-3005}:${WAREHOUSE_OPERATIONS_PORT:-3005}"
     working_dir: /workspace/services/warehouse-operations

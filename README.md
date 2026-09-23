@@ -41,7 +41,9 @@ flowchart TB
     PR -. "event: PurchaseOrderApproved" .-> RC
     RC -. "event: GoodsReceived" .-> INV
     RC -. "event: GoodsReceived" .-> WO
+    RC -. "event: GoodsReceived" .-> PR
     RC -. "event: GoodsReceived" .-> FI
+    WO -. "event: StockTransferred" .-> INV
     INV -. "event: StockLow" .-> PR
     RS -. "event: ItemSold" .-> INV
     RS -. "event: ItemSold" .-> SA
@@ -67,8 +69,8 @@ Solid arrows are synchronous request/reply (REST, or gRPC on the one latency-sen
 | Vendor Management | [`services/vendor-management`](services/vendor-management) | Authoritative supplier record: contacts, terms, product catalogs, reliability history | 1 — Foundation | ✅ Implemented |
 | Procurement | [`services/procurement`](services/procurement) | PO lifecycle, value-based approval workflow, reorder suggestions | 1 — Foundation | ✅ Implemented |
 | Inventory | [`services/inventory`](services/inventory) | Stock levels (On Hand/Allocated/Available), valuation, checkout stock-check (gRPC) | 1 — Foundation | ✅ Implemented |
-| Receiving | [`services/receiving`](services/receiving) | Match deliveries to POs, flag discrepancies, generate GRNs | 2 — Warehouse | 🚧 Scaffold only |
-| Warehouse Operations | [`services/warehouse-operations`](services/warehouse-operations) | Putaway/picking direction, transfers, space utilization | 2 — Warehouse | 🚧 Scaffold only |
+| Receiving | [`services/receiving`](services/receiving) | Match deliveries to POs, flag discrepancies, generate GRNs | 2 — Warehouse | ✅ Implemented |
+| Warehouse Operations | [`services/warehouse-operations`](services/warehouse-operations) | Putaway/picking direction, transfers, space utilization | 2 — Warehouse | ✅ Implemented |
 | Retail Sales (POS) | [`services/retail-sales`](services/retail-sales) | Checkout, pricing/promotions, returns, payment capture | 3 — Retail | 🚧 Scaffold only |
 | Sales Audit | [`services/sales-audit`](services/sales-audit) | Store-level cash reconciliation, discrepancy sign-off | 3 — Retail | 🚧 Scaffold only |
 | Financials | [`services/financials`](services/financials) | Automated ledger entries, AP, revenue/gross-profit reporting | 4 — Accounting | 🚧 Scaffold only |
@@ -141,7 +143,9 @@ Once up:
 - Vendor Management — REST http://localhost:3001, Swagger UI at `/docs`
 - Procurement — REST http://localhost:3002, Swagger UI at `/docs`
 - Inventory — REST http://localhost:3003 (`/docs`), gRPC on `:5003`
-- Receiving / Warehouse Ops / Retail Sales / Sales Audit / Financials — REST on `:3004`–`:3008`, `/health` only until their phase ships
+- Receiving — REST http://localhost:3004 (`/docs`)
+- Warehouse Operations — REST http://localhost:3005 (`/docs`)
+- Retail Sales / Sales Audit / Financials — REST on `:3006`–`:3008`, `/health` only until their phase ships
 - RabbitMQ management UI — http://localhost:15672 (see `.env.example` for credentials)
 - Frontends — `:3101`–`:3108` (see each app's own port in `.env.example`)
 
@@ -162,8 +166,8 @@ Every module — service and frontend — is gated by an env-var feature flag, d
 | `FEATURE_VENDOR_MANAGEMENT_ENABLED` | `true` | 1 |
 | `FEATURE_PROCUREMENT_ENABLED` | `true` | 1 |
 | `FEATURE_INVENTORY_ENABLED` | `true` | 1 |
-| `FEATURE_RECEIVING_ENABLED` | `false` | 2 |
-| `FEATURE_WAREHOUSE_OPERATIONS_ENABLED` | `false` | 2 |
+| `FEATURE_RECEIVING_ENABLED` | `true` | 2 |
+| `FEATURE_WAREHOUSE_OPERATIONS_ENABLED` | `true` | 2 |
 | `FEATURE_RETAIL_SALES_ENABLED` | `false` | 3 |
 | `FEATURE_SALES_AUDIT_ENABLED` | `false` | 3 |
 | `FEATURE_FINANCIALS_ENABLED` | `false` | 4 |

@@ -1,7 +1,7 @@
 {
   "name": "@mms/receiving",
   "version": "0.1.0",
-  "description": "Validates inbound goods against approved POs and produces GRNs (FR-3.x). Phase 2 scaffold.",
+  "description": "Validates inbound goods against approved POs and produces GRNs (FR-3.x)..",
   "private": true,
   "scripts": {
     "build": "nest build",
@@ -9,7 +9,7 @@
     "dev": "nest start --watch",
     "start:prod": "node dist/main.js",
     "lint": "eslint \"src/**/*.ts\" \"test/**/*.ts\"",
-    "test": "jest --passWithNoTests",
+    "test": "jest",
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
     "test:e2e": "jest --config ./test/jest-e2e.json",
