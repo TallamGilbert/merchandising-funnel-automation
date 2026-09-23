@@ -45,7 +45,7 @@ export default function Page() {
       (t) =>
         t.sku.toLowerCase().includes(q) ||
         t.productName.toLowerCase().includes(q) ||
-        t.grnNumber.toLowerCase().includes(q),
+        t.goodsReceivedNoteNumber.toLowerCase().includes(q),
     );
   }, [tasks, search]);
 
@@ -133,7 +133,7 @@ function PutawayCard({ task, onChanged }: { task: PutawayTask; onChanged: () => 
             {task.quantity} × <code>{task.sku}</code> — {task.productName}
           </h3>
           <p className="muted" style={{ margin: "0.25rem 0 0" }}>
-            {task.grnNumber} · PO {task.poNumber} · arrived at {task.locationCode}
+            {task.goodsReceivedNoteNumber} · PO {task.poNumber} · arrived at {task.locationCode}
           </p>
         </div>
         <span className={`badge${task.status === "COMPLETED" ? " ok" : ""}`}>{task.status}</span>

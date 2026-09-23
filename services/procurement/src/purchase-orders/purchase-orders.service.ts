@@ -194,7 +194,7 @@ export class PurchaseOrdersService {
     });
     if (!po) {
       this.logger.warn(
-        `GoodsReceived ${event.grnNumber} references unknown PO ${event.poNumber} — skipping`,
+        `GoodsReceived ${event.goodsReceivedNoteNumber} references unknown PO ${event.poNumber} — skipping`,
       );
       return;
     }
@@ -226,9 +226,9 @@ export class PurchaseOrdersService {
 
     try {
       await this.prisma.$transaction([
-        // Unique on grnNumber: a redelivered event fails here and rolls back.
+        // Unique on goodsReceivedNoteNumber: a redelivered event fails here and rolls back.
         this.prisma.processedGoodsReceipt.create({
-          data: { grnNumber: event.grnNumber, poNumber: event.poNumber },
+          data: { goodsReceivedNoteNumber: event.goodsReceivedNoteNumber, poNumber: event.poNumber },
         }),
         ...receivedAfter.map((line) =>
           this.prisma.purchaseOrderLine.update({
@@ -243,7 +243,7 @@ export class PurchaseOrdersService {
       ]);
     } catch (error) {
       if ((error as { code?: string }).code === "P2002") {
-        this.logger.log(`GRN ${event.grnNumber} already applied to ${event.poNumber} — skipping`);
+        this.logger.log(`GRN ${event.goodsReceivedNoteNumber} already applied to ${event.poNumber} — skipping`);
         return;
       }
       throw error;

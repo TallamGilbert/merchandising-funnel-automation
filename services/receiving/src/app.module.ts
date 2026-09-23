@@ -1,7 +1,7 @@
 import { Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
 import { ExpectedDeliveriesModule } from "./expected-deliveries/expected-deliveries.module";
-import { GrnsModule } from "./grns/grns.module";
+import { GoodsReceivedNotesModule } from "./goods-received-notes/goods-received-notes.module";
 import { HealthModule } from "./health/health.module";
 import { PrismaModule } from "./prisma/prisma.module";
 
@@ -11,7 +11,7 @@ import { PrismaModule } from "./prisma/prisma.module";
     PrismaModule,
     HealthModule,
     ExpectedDeliveriesModule,
-    GrnsModule,
+    GoodsReceivedNotesModule,
   ],
 })
 export class AppModule {}

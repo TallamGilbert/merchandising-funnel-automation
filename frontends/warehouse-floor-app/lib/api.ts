@@ -37,7 +37,7 @@ export interface ZoneUtilization {
 
 export interface PutawayTask {
   id: string;
-  grnNumber: string;
+  goodsReceivedNoteNumber: string;
   poNumber: string;
   sku: string;
   productName: string;

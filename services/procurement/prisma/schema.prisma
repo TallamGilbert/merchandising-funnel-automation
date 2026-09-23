@@ -97,10 +97,10 @@ model ReorderSuggestion {
 /// One row per GoodsReceived event already applied to a PO, keyed by GRN
 /// number, so a redelivered event cannot add the same quantities twice (D-6).
 model ProcessedGoodsReceipt {
-  id          String   @id @default(uuid())
-  grnNumber   String   @unique
-  poNumber    String
-  processedAt DateTime @default(now())
+  id                      String   @id @default(uuid())
+  goodsReceivedNoteNumber String   @unique
+  poNumber                String
+  processedAt             DateTime @default(now())
 
   @@index([poNumber])
 }

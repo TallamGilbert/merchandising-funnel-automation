@@ -1,46 +1,46 @@
 import { BadRequestException, NotFoundException } from "@nestjs/common";
 import { EventBusService, EventRoutingKey } from "@mms/shared";
-import { GrnCondition, GrnDiscrepancyType, GrnStatus } from "../generated/prisma";
+import { GoodsReceivedNoteCondition, GoodsReceivedNoteDiscrepancyType, GoodsReceivedNoteStatus } from "../generated/prisma";
 import { ExpectedDeliveriesService } from "../expected-deliveries/expected-deliveries.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { ProcurementClientService } from "../procurement-client/procurement-client.service";
 import { discrepancyFor } from "./discrepancy";
-import { GrnsService } from "./grns.service";
+import { GoodsReceivedNotesService } from "./goods-received-notes.service";
 
 describe("discrepancyFor", () => {
   const line = (
-    condition: GrnCondition,
+    condition: GoodsReceivedNoteCondition,
     quantityOrdered: number,
     quantityReceived: number,
   ) => ({ sku: "SKU-1", condition, quantityOrdered, quantityReceived });
 
   it("flags a shortage when less arrived than ordered", () => {
-    const lines = [line(GrnCondition.GOOD, 10, 7)];
-    expect(discrepancyFor(lines[0], lines)).toBe(GrnDiscrepancyType.SHORTAGE);
+    const lines = [line(GoodsReceivedNoteCondition.GOOD, 10, 7)];
+    expect(discrepancyFor(lines[0], lines)).toBe(GoodsReceivedNoteDiscrepancyType.SHORTAGE);
   });
 
   it("flags an overage when more arrived than ordered", () => {
-    const lines = [line(GrnCondition.GOOD, 10, 12)];
-    expect(discrepancyFor(lines[0], lines)).toBe(GrnDiscrepancyType.OVERAGE);
+    const lines = [line(GoodsReceivedNoteCondition.GOOD, 10, 12)];
+    expect(discrepancyFor(lines[0], lines)).toBe(GoodsReceivedNoteDiscrepancyType.OVERAGE);
   });
 
   it("flags damage on the DAMAGED line without also reporting a shortage on the GOOD line", () => {
-    const lines = [line(GrnCondition.GOOD, 10, 8), line(GrnCondition.DAMAGED, 0, 2)];
-    expect(discrepancyFor(lines[0], lines)).toBe(GrnDiscrepancyType.NONE);
-    expect(discrepancyFor(lines[1], lines)).toBe(GrnDiscrepancyType.DAMAGE);
+    const lines = [line(GoodsReceivedNoteCondition.GOOD, 10, 8), line(GoodsReceivedNoteCondition.DAMAGED, 0, 2)];
+    expect(discrepancyFor(lines[0], lines)).toBe(GoodsReceivedNoteDiscrepancyType.NONE);
+    expect(discrepancyFor(lines[1], lines)).toBe(GoodsReceivedNoteDiscrepancyType.DAMAGE);
   });
 
   it("reports NONE when the delivery matches the order", () => {
-    const lines = [line(GrnCondition.GOOD, 10, 10)];
-    expect(discrepancyFor(lines[0], lines)).toBe(GrnDiscrepancyType.NONE);
+    const lines = [line(GoodsReceivedNoteCondition.GOOD, 10, 10)];
+    expect(discrepancyFor(lines[0], lines)).toBe(GoodsReceivedNoteDiscrepancyType.NONE);
   });
 });
 
-describe("GrnsService", () => {
-  let service: GrnsService;
+describe("GoodsReceivedNotesService", () => {
+  let service: GoodsReceivedNotesService;
   let prisma: {
-    grn: Record<string, jest.Mock>;
-    grnLine: Record<string, jest.Mock>;
+    goodsReceivedNote: Record<string, jest.Mock>;
+    goodsReceivedNoteLine: Record<string, jest.Mock>;
     expectedDeliveryLine: Record<string, jest.Mock>;
     expectedDelivery: Record<string, jest.Mock>;
     $queryRaw: jest.Mock;
@@ -65,13 +65,13 @@ describe("GrnsService", () => {
 
   beforeEach(() => {
     prisma = {
-      grn: {
+      goodsReceivedNote: {
         findMany: jest.fn(),
         findUnique: jest.fn(),
         create: jest.fn(),
         update: jest.fn().mockReturnValue("grn-update"),
       },
-      grnLine: {
+      goodsReceivedNoteLine: {
         upsert: jest.fn(),
         update: jest.fn().mockReturnValue("line-update"),
       },
@@ -94,7 +94,7 @@ describe("GrnsService", () => {
     };
     eventBus = { publish: jest.fn() };
 
-    service = new GrnsService(
+    service = new GoodsReceivedNotesService(
       prisma as unknown as PrismaService,
       procurement as unknown as ProcurementClientService,
       expectedDeliveries as unknown as ExpectedDeliveriesService,
@@ -106,14 +106,14 @@ describe("GrnsService", () => {
     const dto = { poNumber: "PO-1001", receivedAtLocation: "WH-MAIN", receivedById: "dock-1" };
 
     it("opens a draft GRN pre-populated with the outstanding quantity per SKU", async () => {
-      prisma.grn.create.mockResolvedValue({ id: "grn-1" });
+      prisma.goodsReceivedNote.create.mockResolvedValue({ id: "grn-1" });
 
       await service.create(dto);
 
-      expect(prisma.grn.create).toHaveBeenCalledWith(
+      expect(prisma.goodsReceivedNote.create).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
-            grnNumber: "GRN-1001",
+            goodsReceivedNoteNumber: "GRN-1001",
             poNumber: "PO-1001",
             supplierId: "supplier-1",
             receivedAtLocation: "WH-MAIN",
@@ -123,7 +123,7 @@ describe("GrnsService", () => {
                   sku: "SKU-1",
                   productName: "Oak Chair",
                   quantityOrdered: 10,
-                  condition: GrnCondition.GOOD,
+                  condition: GoodsReceivedNoteCondition.GOOD,
                 },
               ],
             },
@@ -137,11 +137,11 @@ describe("GrnsService", () => {
         ...expected,
         lines: [{ ...expected.lines[0], quantityReceived: 4 }],
       });
-      prisma.grn.create.mockResolvedValue({ id: "grn-2" });
+      prisma.goodsReceivedNote.create.mockResolvedValue({ id: "grn-2" });
 
       await service.create(dto);
 
-      const data = prisma.grn.create.mock.calls[0][0].data;
+      const data = prisma.goodsReceivedNote.create.mock.calls[0][0].data;
       expect(data.lines.create[0].quantityOrdered).toBe(6);
     });
 
@@ -152,43 +152,43 @@ describe("GrnsService", () => {
       });
 
       await expect(service.create(dto)).rejects.toBeInstanceOf(BadRequestException);
-      expect(prisma.grn.create).not.toHaveBeenCalled();
+      expect(prisma.goodsReceivedNote.create).not.toHaveBeenCalled();
     });
 
     it("propagates Procurement's 404 when no open PO exists", async () => {
       procurement.findOpenPo.mockRejectedValue(new NotFoundException());
 
       await expect(service.create(dto)).rejects.toBeInstanceOf(NotFoundException);
-      expect(prisma.grn.create).not.toHaveBeenCalled();
+      expect(prisma.goodsReceivedNote.create).not.toHaveBeenCalled();
     });
   });
 
   describe("recordScan", () => {
     const draft = (lines: object[]) => ({
       id: "grn-1",
-      status: GrnStatus.DRAFT,
+      status: GoodsReceivedNoteStatus.DRAFT,
       lines,
     });
 
     it("accumulates a DAMAGED scan onto a quarantined line", async () => {
       const goodLine = {
         id: "l1", sku: "SKU-1", productName: "Oak Chair",
-        quantityOrdered: 10, quantityReceived: 8, condition: GrnCondition.GOOD,
+        quantityOrdered: 10, quantityReceived: 8, condition: GoodsReceivedNoteCondition.GOOD,
       };
       const damagedLine = {
         id: "l2", sku: "SKU-1", productName: "Oak Chair",
-        quantityOrdered: 0, quantityReceived: 2, condition: GrnCondition.DAMAGED,
+        quantityOrdered: 0, quantityReceived: 2, condition: GoodsReceivedNoteCondition.DAMAGED,
       };
-      prisma.grn.findUnique
+      prisma.goodsReceivedNote.findUnique
         .mockResolvedValueOnce(draft([goodLine]))
         .mockResolvedValueOnce(draft([goodLine, damagedLine]))
         .mockResolvedValueOnce(draft([goodLine, damagedLine]));
 
       await service.recordScan("grn-1", {
-        sku: "SKU-1", quantity: 2, condition: GrnCondition.DAMAGED,
+        sku: "SKU-1", quantity: 2, condition: GoodsReceivedNoteCondition.DAMAGED,
       });
 
-      expect(prisma.grnLine.upsert).toHaveBeenCalledWith(
+      expect(prisma.goodsReceivedNoteLine.upsert).toHaveBeenCalledWith(
         expect.objectContaining({
           create: expect.objectContaining({
             productName: "Oak Chair",
@@ -199,55 +199,55 @@ describe("GrnsService", () => {
           update: { quantityReceived: { increment: 2 } },
         }),
       );
-      expect(prisma.grnLine.update).toHaveBeenCalledWith({
+      expect(prisma.goodsReceivedNoteLine.update).toHaveBeenCalledWith({
         where: { id: "l2" },
-        data: { discrepancyType: GrnDiscrepancyType.DAMAGE },
+        data: { discrepancyType: GoodsReceivedNoteDiscrepancyType.DAMAGE },
       });
-      expect(prisma.grnLine.update).toHaveBeenCalledWith({
+      expect(prisma.goodsReceivedNoteLine.update).toHaveBeenCalledWith({
         where: { id: "l1" },
-        data: { discrepancyType: GrnDiscrepancyType.NONE },
+        data: { discrepancyType: GoodsReceivedNoteDiscrepancyType.NONE },
       });
     });
 
     it("refuses to scan against a finalized GRN", async () => {
-      prisma.grn.findUnique.mockResolvedValue({
-        id: "grn-1", status: GrnStatus.FINALIZED, lines: [],
+      prisma.goodsReceivedNote.findUnique.mockResolvedValue({
+        id: "grn-1", status: GoodsReceivedNoteStatus.FINALIZED, lines: [],
       });
 
       await expect(
-        service.recordScan("grn-1", { sku: "SKU-1", quantity: 1, condition: GrnCondition.GOOD }),
+        service.recordScan("grn-1", { sku: "SKU-1", quantity: 1, condition: GoodsReceivedNoteCondition.GOOD }),
       ).rejects.toBeInstanceOf(BadRequestException);
-      expect(prisma.grnLine.upsert).not.toHaveBeenCalled();
+      expect(prisma.goodsReceivedNoteLine.upsert).not.toHaveBeenCalled();
     });
   });
 
   describe("finalize", () => {
-    const grn = (quantityReceived: number) => ({
+    const goodsReceivedNote = (quantityReceived: number) => ({
       id: "grn-1",
-      grnNumber: "GRN-1001",
+      goodsReceivedNoteNumber: "GRN-1001",
       poNumber: "PO-1001",
       supplierId: "supplier-1",
       receivedAtLocation: "WH-MAIN",
-      status: GrnStatus.DRAFT,
+      status: GoodsReceivedNoteStatus.DRAFT,
       lines: [
         {
           id: "l1", sku: "SKU-1", productName: "Oak Chair",
-          quantityOrdered: 10, quantityReceived, condition: GrnCondition.GOOD,
-          discrepancyType: GrnDiscrepancyType.NONE,
+          quantityOrdered: 10, quantityReceived, condition: GoodsReceivedNoteCondition.GOOD,
+          discrepancyType: GoodsReceivedNoteDiscrepancyType.NONE,
         },
       ],
     });
 
     it("rejects a GRN with nothing scanned", async () => {
-      prisma.grn.findUnique.mockResolvedValue(grn(0));
+      prisma.goodsReceivedNote.findUnique.mockResolvedValue(goodsReceivedNote(0));
 
       await expect(service.finalize("grn-1")).rejects.toBeInstanceOf(BadRequestException);
       expect(eventBus.publish).not.toHaveBeenCalled();
     });
 
     it("publishes GoodsReceived with physical facts only and marks a partial delivery", async () => {
-      prisma.grn.findUnique.mockResolvedValue(grn(7));
-      prisma.$transaction.mockResolvedValue([{ id: "grn-1", status: GrnStatus.FINALIZED }]);
+      prisma.goodsReceivedNote.findUnique.mockResolvedValue(goodsReceivedNote(7));
+      prisma.$transaction.mockResolvedValue([{ id: "grn-1", status: GoodsReceivedNoteStatus.FINALIZED }]);
 
       await service.finalize("grn-1");
 
@@ -263,7 +263,7 @@ describe("GrnsService", () => {
       expect(eventBus.publish).toHaveBeenCalledWith(
         EventRoutingKey.GOODS_RECEIVED,
         expect.objectContaining({
-          grnNumber: "GRN-1001",
+          goodsReceivedNoteNumber: "GRN-1001",
           poNumber: "PO-1001",
           supplierId: "supplier-1",
           receivedAtLocation: "WH-MAIN",
@@ -273,8 +273,8 @@ describe("GrnsService", () => {
               productName: "Oak Chair",
               quantityOrdered: 10,
               quantityReceived: 7,
-              condition: GrnCondition.GOOD,
-              discrepancyType: GrnDiscrepancyType.SHORTAGE,
+              condition: GoodsReceivedNoteCondition.GOOD,
+              discrepancyType: GoodsReceivedNoteDiscrepancyType.SHORTAGE,
             },
           ],
         }),
@@ -284,7 +284,7 @@ describe("GrnsService", () => {
     });
 
     it("marks the expected delivery RECEIVED once everything has arrived", async () => {
-      prisma.grn.findUnique.mockResolvedValue(grn(10));
+      prisma.goodsReceivedNote.findUnique.mockResolvedValue(goodsReceivedNote(10));
       prisma.$transaction.mockResolvedValue([{ id: "grn-1" }]);
 
       await service.finalize("grn-1");

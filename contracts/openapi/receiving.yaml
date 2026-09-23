@@ -16,7 +16,7 @@ servers:
 tags:
   - name: health
   - name: expected-deliveries
-  - name: grns
+  - name: goods-received-notes
 paths:
   /health:
     get:
@@ -64,14 +64,14 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/ExpectedDelivery" }
         "404": { description: No expected delivery for that PO number. }
-  /grns:
+  /goods-received-notes:
     get:
-      tags: [grns]
+      tags: [goods-received-notes]
       summary: List Goods Received Notes
       parameters:
         - in: query
           name: status
-          schema: { $ref: "#/components/schemas/GrnStatus" }
+          schema: { $ref: "#/components/schemas/GoodsReceivedNoteStatus" }
       responses:
         "200":
           description: OK
@@ -79,9 +79,9 @@ paths:
             application/json:
               schema:
                 type: array
-                items: { $ref: "#/components/schemas/Grn" }
+                items: { $ref: "#/components/schemas/GoodsReceivedNote" }
     post:
-      tags: [grns]
+      tags: [goods-received-notes]
       summary: >
         Open a draft GRN when a truck arrives (FR-3.1). Calls Procurement
         (REST) to confirm an open, approved PO exists, then pre-populates one
@@ -90,31 +90,31 @@ paths:
         required: true
         content:
           application/json:
-            schema: { $ref: "#/components/schemas/CreateGrnDto" }
+            schema: { $ref: "#/components/schemas/CreateGoodsReceivedNoteDto" }
       responses:
         "201":
           description: Created
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/Grn" }
+              schema: { $ref: "#/components/schemas/GoodsReceivedNote" }
         "404": { description: Procurement has no open approved PO with that number. }
         "503": { description: Procurement is unreachable. }
-  /grns/{id}:
+  /goods-received-notes/{id}:
     get:
-      tags: [grns]
+      tags: [goods-received-notes]
       summary: Get a GRN and its lines
       parameters:
-        - $ref: "#/components/parameters/GrnId"
+        - $ref: "#/components/parameters/GoodsReceivedNoteId"
       responses:
         "200":
           description: OK
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/Grn" }
+              schema: { $ref: "#/components/schemas/GoodsReceivedNote" }
         "404": { description: Not found }
-  /grns/{id}/scans:
+  /goods-received-notes/{id}/scans:
     post:
-      tags: [grns]
+      tags: [goods-received-notes]
       summary: >
         Record a barcode scan against a draft GRN (FR-3.2, FR-3.8).
         Quantities accumulate per (sku, condition). The response's
@@ -123,7 +123,7 @@ paths:
         DAMAGED lines are quarantined (FR-3.4). A SKU that is not on the PO
         is accepted and flagged OVERAGE.
       parameters:
-        - $ref: "#/components/parameters/GrnId"
+        - $ref: "#/components/parameters/GoodsReceivedNoteId"
       requestBody:
         required: true
         content:
@@ -134,25 +134,25 @@ paths:
           description: Scan recorded; returns the updated GRN.
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/Grn" }
+              schema: { $ref: "#/components/schemas/GoodsReceivedNote" }
         "400": { description: GRN is already finalized. }
         "404": { description: Not found }
-  /grns/{id}/finalize:
+  /goods-received-notes/{id}/finalize:
     post:
-      tags: [grns]
+      tags: [goods-received-notes]
       summary: >
         Finalize a draft GRN (FR-3.5) — it becomes the immutable
         system-of-record for possession. Updates the expected delivery's
         received quantities and publishes GoodsReceived (FR-3.6). The event
         carries physical facts only — never unit cost.
       parameters:
-        - $ref: "#/components/parameters/GrnId"
+        - $ref: "#/components/parameters/GoodsReceivedNoteId"
       responses:
         "200":
           description: OK
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/Grn" }
+              schema: { $ref: "#/components/schemas/GoodsReceivedNote" }
         "400": { description: GRN is already finalized, or nothing was scanned. }
         "404": { description: Not found }
 components:
@@ -162,7 +162,7 @@ components:
       name: poNumber
       required: true
       schema: { type: string, example: PO-1001 }
-    GrnId:
+    GoodsReceivedNoteId:
       in: path
       name: id
       required: true
@@ -171,13 +171,13 @@ components:
     ExpectedDeliveryStatus:
       type: string
       enum: [EXPECTED, PARTIALLY_RECEIVED, RECEIVED]
-    GrnStatus:
+    GoodsReceivedNoteStatus:
       type: string
       enum: [DRAFT, FINALIZED]
-    GrnCondition:
+    GoodsReceivedNoteCondition:
       type: string
       enum: [GOOD, DAMAGED]
-    GrnDiscrepancyType:
+    GoodsReceivedNoteDiscrepancyType:
       type: string
       enum: [NONE, SHORTAGE, OVERAGE, DAMAGE]
     ExpectedDelivery:
@@ -202,7 +202,7 @@ components:
         productName: { type: string }
         quantityOrdered: { type: integer }
         quantityReceived: { type: integer }
-    CreateGrnDto:
+    CreateGoodsReceivedNoteDto:
       type: object
       required: [poNumber, receivedAtLocation, receivedById]
       properties:
@@ -218,25 +218,25 @@ components:
       properties:
         sku: { type: string }
         quantity: { type: integer, minimum: 1 }
-        condition: { $ref: "#/components/schemas/GrnCondition" }
+        condition: { $ref: "#/components/schemas/GoodsReceivedNoteCondition" }
         notes: { type: string }
-    Grn:
+    GoodsReceivedNote:
       type: object
       properties:
         id: { type: string, format: uuid }
-        grnNumber: { type: string, example: GRN-1001 }
+        goodsReceivedNoteNumber: { type: string, example: GRN-1001 }
         poNumber: { type: string }
         supplierId: { type: string }
         receivedAtLocation: { type: string }
         receivedById: { type: string }
-        status: { $ref: "#/components/schemas/GrnStatus" }
+        status: { $ref: "#/components/schemas/GoodsReceivedNoteStatus" }
         finalizedAt: { type: string, format: date-time, nullable: true }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
         lines:
           type: array
-          items: { $ref: "#/components/schemas/GrnLine" }
-    GrnLine:
+          items: { $ref: "#/components/schemas/GoodsReceivedNoteLine" }
+    GoodsReceivedNoteLine:
       type: object
       properties:
         id: { type: string, format: uuid }
@@ -246,8 +246,8 @@ components:
           type: integer
           description: Outstanding quantity on the PO when the GRN was opened. 0 on DAMAGED lines and on SKUs not on the PO.
         quantityReceived: { type: integer }
-        condition: { $ref: "#/components/schemas/GrnCondition" }
-        discrepancyType: { $ref: "#/components/schemas/GrnDiscrepancyType" }
+        condition: { $ref: "#/components/schemas/GoodsReceivedNoteCondition" }
+        discrepancyType: { $ref: "#/components/schemas/GoodsReceivedNoteDiscrepancyType" }
         quarantined:
           type: boolean
           description: True for DAMAGED lines (FR-3.4). Terminal flag only in v1 (D-2).

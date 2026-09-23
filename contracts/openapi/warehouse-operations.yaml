@@ -322,7 +322,7 @@ components:
       type: object
       properties:
         id: { type: string, format: uuid }
-        grnNumber: { type: string }
+        goodsReceivedNoteNumber: { type: string }
         poNumber: { type: string }
         sku: { type: string }
         productName: { type: string }

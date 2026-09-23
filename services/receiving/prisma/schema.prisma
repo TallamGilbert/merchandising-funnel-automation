@@ -18,17 +18,17 @@ enum ExpectedDeliveryStatus {
   RECEIVED
 }
 
-enum GrnStatus {
+enum GoodsReceivedNoteStatus {
   DRAFT
   FINALIZED
 }
 
-enum GrnCondition {
+enum GoodsReceivedNoteCondition {
   GOOD
   DAMAGED
 }
 
-enum GrnDiscrepancyType {
+enum GoodsReceivedNoteDiscrepancyType {
   NONE
   SHORTAGE
   OVERAGE
@@ -70,21 +70,21 @@ model ExpectedDeliveryLine {
 
 /// Goods Received Note — the system-of-record for possession (FR-3.5).
 /// Immutable once FINALIZED.
-model Grn {
-  id                 String    @id @default(uuid())
-  /// Human-readable sequence backing grnNumber generation (e.g. GRN-1001).
-  sequence           Int       @default(autoincrement())
-  grnNumber          String    @unique
+model GoodsReceivedNote {
+  id                 String                  @id @default(uuid())
+  /// Human-readable sequence backing goodsReceivedNoteNumber generation (e.g. GRN-1001).
+  sequence           Int                     @default(autoincrement())
+  goodsReceivedNoteNumber String             @unique
   poNumber           String
   supplierId         String
   receivedAtLocation String
   receivedById       String
-  status             GrnStatus @default(DRAFT)
+  status             GoodsReceivedNoteStatus @default(DRAFT)
   finalizedAt        DateTime?
-  createdAt          DateTime  @default(now())
-  updatedAt          DateTime  @updatedAt
+  createdAt          DateTime                @default(now())
+  updatedAt          DateTime                @updatedAt
 
-  lines GrnLine[]
+  lines GoodsReceivedNoteLine[]
 
   @@index([status])
   @@index([poNumber])
@@ -94,23 +94,23 @@ model Grn {
 /// Discrepancies are recomputed on every scan so dock staff see them at time
 /// of scan (FR-3.3); DAMAGED rows are flagged `quarantined` (FR-3.4, D-2 —
 /// flag only, no return/write-off workflow in v1).
-model GrnLine {
-  id               String             @id @default(uuid())
-  grnId            String
-  grn              Grn                @relation(fields: [grnId], references: [id], onDelete: Cascade)
-  sku              String
-  productName      String
+model GoodsReceivedNoteLine {
+  id                  String                            @id @default(uuid())
+  goodsReceivedNoteId String
+  goodsReceivedNote   GoodsReceivedNote                 @relation(fields: [goodsReceivedNoteId], references: [id], onDelete: Cascade)
+  sku                 String
+  productName         String
   /// Outstanding quantity on the PO when the GRN was opened. 0 on DAMAGED
   /// rows and on SKUs that were not on the PO.
-  quantityOrdered  Int
-  quantityReceived Int                @default(0)
-  condition        GrnCondition
-  discrepancyType  GrnDiscrepancyType @default(NONE)
-  quarantined      Boolean            @default(false)
-  notes            String?
-  createdAt        DateTime           @default(now())
-  updatedAt        DateTime           @updatedAt
+  quantityOrdered     Int
+  quantityReceived    Int                               @default(0)
+  condition           GoodsReceivedNoteCondition
+  discrepancyType     GoodsReceivedNoteDiscrepancyType  @default(NONE)
+  quarantined         Boolean                           @default(false)
+  notes               String?
+  createdAt           DateTime                          @default(now())
+  updatedAt           DateTime                          @updatedAt
 
-  @@unique([grnId, sku, condition])
-  @@index([grnId])
+  @@unique([goodsReceivedNoteId, sku, condition])
+  @@index([goodsReceivedNoteId])
 }

@@ -2,12 +2,12 @@ import { Module } from "@nestjs/common";
 import { EventBusModule } from "@mms/shared";
 import { ExpectedDeliveriesModule } from "../expected-deliveries/expected-deliveries.module";
 import { ProcurementClientModule } from "../procurement-client/procurement-client.module";
-import { GrnsController } from "./grns.controller";
-import { GrnsService } from "./grns.service";
+import { GoodsReceivedNotesController } from "./goods-received-notes.controller";
+import { GoodsReceivedNotesService } from "./goods-received-notes.service";
 
 @Module({
   imports: [ExpectedDeliveriesModule, ProcurementClientModule, EventBusModule],
-  controllers: [GrnsController],
-  providers: [GrnsService],
+  controllers: [GoodsReceivedNotesController],
+  providers: [GoodsReceivedNotesService],
 })
-export class GrnsModule {}
+export class GoodsReceivedNotesModule {}

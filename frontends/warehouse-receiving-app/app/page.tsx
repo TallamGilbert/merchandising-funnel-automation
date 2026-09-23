@@ -13,7 +13,7 @@ const NAV: NavSection[] = [
     label: "Main menu",
     items: [
       { label: "Expected deliveries", href: "/", icon: <PackageIcon /> },
-      { label: "Goods received notes", href: "/grns", icon: <ClipboardListIcon /> },
+      { label: "Goods received notes", href: "/goods-received-notes", icon: <ClipboardListIcon /> },
     ],
   },
 ];
@@ -172,12 +172,12 @@ function StartReceivingForm({
     setSubmitting(true);
     setError(null);
     try {
-      const grn = await api.createGrn({
+      const goodsReceivedNote = await api.createGoodsReceivedNote({
         poNumber: delivery.poNumber,
         receivedAtLocation,
         receivedById,
       });
-      router.push(`/grns/${grn.id}`);
+      router.push(`/goods-received-notes/${goodsReceivedNote.id}`);
     } catch (err) {
       setError((err as Error).message);
       setSubmitting(false);

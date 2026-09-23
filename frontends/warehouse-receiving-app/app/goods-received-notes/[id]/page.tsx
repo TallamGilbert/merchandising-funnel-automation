@@ -6,9 +6,9 @@ import { AppShell, type NavSection } from "../../../components/AppShell";
 import { ClipboardListIcon, PackageIcon } from "../../../components/icons";
 import {
   api,
-  type Grn,
-  type GrnCondition,
-  type GrnDiscrepancyType,
+  type GoodsReceivedNote,
+  type GoodsReceivedNoteCondition,
+  type GoodsReceivedNoteDiscrepancyType,
 } from "../../../lib/api";
 
 const NAV: NavSection[] = [
@@ -16,12 +16,12 @@ const NAV: NavSection[] = [
     label: "Main menu",
     items: [
       { label: "Expected deliveries", href: "/", icon: <PackageIcon /> },
-      { label: "Goods received notes", href: "/grns", icon: <ClipboardListIcon /> },
+      { label: "Goods received notes", href: "/goods-received-notes", icon: <ClipboardListIcon /> },
     ],
   },
 ];
 
-const DISCREPANCY_BADGE: Record<GrnDiscrepancyType, string> = {
+const DISCREPANCY_BADGE: Record<GoodsReceivedNoteDiscrepancyType, string> = {
   NONE: "badge ok",
   SHORTAGE: "badge warn",
   OVERAGE: "badge warn",
@@ -29,8 +29,8 @@ const DISCREPANCY_BADGE: Record<GrnDiscrepancyType, string> = {
 };
 
 /** FR-3.3 — plain-language flag shown straight after a scan. */
-function describeScan(grn: Grn, sku: string): string {
-  const lines = grn.lines.filter((l) => l.sku === sku);
+function describeScan(goodsReceivedNote: GoodsReceivedNote, sku: string): string {
+  const lines = goodsReceivedNote.lines.filter((l) => l.sku === sku);
   const good = lines.find((l) => l.condition === "GOOD");
   const damaged = lines.find((l) => l.condition === "DAMAGED");
   const arrived = lines.reduce((sum, l) => sum + l.quantityReceived, 0);
@@ -48,9 +48,9 @@ function describeScan(grn: Grn, sku: string): string {
   return parts.join(" · ");
 }
 
-export default function GrnPage({ params }: { params: Promise<{ id: string }> }) {
+export default function GoodsReceivedNotePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
-  const [grn, setGrn] = useState<Grn | null>(null);
+  const [goodsReceivedNote, setGoodsReceivedNote] = useState<GoodsReceivedNote | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -58,13 +58,13 @@ export default function GrnPage({ params }: { params: Promise<{ id: string }> })
 
   const [sku, setSku] = useState("");
   const [quantity, setQuantity] = useState(1);
-  const [condition, setCondition] = useState<GrnCondition>("GOOD");
+  const [condition, setCondition] = useState<GoodsReceivedNoteCondition>("GOOD");
   const [confirmingFinalize, setConfirmingFinalize] = useState(false);
   const skuInput = useRef<HTMLInputElement>(null);
 
   const load = () => {
     setError(null);
-    api.getGrn(id).then(setGrn).catch((err: Error) => setError(err.message));
+    api.getGoodsReceivedNote(id).then(setGoodsReceivedNote).catch((err: Error) => setError(err.message));
   };
 
   useEffect(load, [id]);
@@ -73,12 +73,12 @@ export default function GrnPage({ params }: { params: Promise<{ id: string }> })
     return (
       <AppShell brandName="Receiving" nav={NAV} title="GRN not found">
         <p className="error">{error}</p>
-        <Link href="/grns">&larr; Back to GRNs</Link>
+        <Link href="/goods-received-notes">&larr; Back to GRNs</Link>
       </AppShell>
     );
   }
 
-  if (!grn) {
+  if (!goodsReceivedNote) {
     return (
       <AppShell brandName="Receiving" nav={NAV} title="Loading…">
         <p className="muted">Loading…</p>
@@ -86,9 +86,9 @@ export default function GrnPage({ params }: { params: Promise<{ id: string }> })
     );
   }
 
-  const isDraft = grn.status === "DRAFT";
-  const flagged = grn.lines.filter((l) => l.discrepancyType !== "NONE");
-  const anyScanned = grn.lines.some((l) => l.quantityReceived > 0);
+  const isDraft = goodsReceivedNote.status === "DRAFT";
+  const flagged = goodsReceivedNote.lines.filter((l) => l.discrepancyType !== "NONE");
+  const anyScanned = goodsReceivedNote.lines.some((l) => l.quantityReceived > 0);
 
   // Barcode scanners type the code then press Enter, so submitting the form
   // is the whole scan gesture: the field is cleared and refocused for the next item.
@@ -99,8 +99,8 @@ export default function GrnPage({ params }: { params: Promise<{ id: string }> })
     setBusy(true);
     setActionError(null);
     try {
-      const updated = await api.recordScan(grn.id, { sku: code, quantity, condition });
-      setGrn(updated);
+      const updated = await api.recordScan(goodsReceivedNote.id, { sku: code, quantity, condition });
+      setGoodsReceivedNote(updated);
       setLastScan(
         `${quantity} × ${code} (${condition === "GOOD" ? "good" : "damaged"}) — ${describeScan(updated, code)}`,
       );
@@ -118,7 +118,7 @@ export default function GrnPage({ params }: { params: Promise<{ id: string }> })
     setBusy(true);
     setActionError(null);
     try {
-      setGrn(await api.finalizeGrn(grn.id));
+      setGoodsReceivedNote(await api.finalizeGoodsReceivedNote(goodsReceivedNote.id));
       setConfirmingFinalize(false);
       setLastScan(null);
     } catch (err) {
@@ -132,7 +132,7 @@ export default function GrnPage({ params }: { params: Promise<{ id: string }> })
     <AppShell
       brandName="Receiving"
       nav={NAV}
-      title={grn.grnNumber}
+      title={goodsReceivedNote.goodsReceivedNoteNumber}
       actions={
         isDraft &&
         (confirmingFinalize ? (
@@ -153,10 +153,10 @@ export default function GrnPage({ params }: { params: Promise<{ id: string }> })
         ))
       }
     >
-      <Link href="/grns">&larr; Back to GRNs</Link>
+      <Link href="/goods-received-notes">&larr; Back to GRNs</Link>
 
       <div className="row-between" style={{ marginTop: "-0.5rem" }}>
-        <span className={`badge${grn.status === "FINALIZED" ? " ok" : ""}`}>{grn.status}</span>
+        <span className={`badge${goodsReceivedNote.status === "FINALIZED" ? " ok" : ""}`}>{goodsReceivedNote.status}</span>
       </div>
 
       {confirmingFinalize && (
@@ -174,15 +174,15 @@ export default function GrnPage({ params }: { params: Promise<{ id: string }> })
       <div className="card">
         <dl style={{ display: "grid", gridTemplateColumns: "160px 1fr", gap: "0.5rem 1rem", margin: 0 }}>
           <dt className="muted">Purchase order</dt>
-          <dd style={{ margin: 0 }}>{grn.poNumber}</dd>
+          <dd style={{ margin: 0 }}>{goodsReceivedNote.poNumber}</dd>
           <dt className="muted">Dock location</dt>
-          <dd style={{ margin: 0 }}>{grn.receivedAtLocation}</dd>
+          <dd style={{ margin: 0 }}>{goodsReceivedNote.receivedAtLocation}</dd>
           <dt className="muted">Received by</dt>
-          <dd style={{ margin: 0 }}>{grn.receivedById}</dd>
-          {grn.finalizedAt && (
+          <dd style={{ margin: 0 }}>{goodsReceivedNote.receivedById}</dd>
+          {goodsReceivedNote.finalizedAt && (
             <>
               <dt className="muted">Finalized</dt>
-              <dd style={{ margin: 0 }}>{new Date(grn.finalizedAt).toLocaleString()}</dd>
+              <dd style={{ margin: 0 }}>{new Date(goodsReceivedNote.finalizedAt).toLocaleString()}</dd>
             </>
           )}
         </dl>
@@ -260,7 +260,7 @@ export default function GrnPage({ params }: { params: Promise<{ id: string }> })
             </tr>
           </thead>
           <tbody>
-            {grn.lines.map((line) => (
+            {goodsReceivedNote.lines.map((line) => (
               <tr key={line.id}>
                 <td>
                   <code>{line.sku}</code>

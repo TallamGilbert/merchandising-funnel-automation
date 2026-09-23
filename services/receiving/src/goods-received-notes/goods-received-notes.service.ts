@@ -11,18 +11,18 @@ import {
 } from "@mms/shared";
 import {
   ExpectedDeliveryStatus,
-  GrnCondition,
-  GrnStatus,
+  GoodsReceivedNoteCondition,
+  GoodsReceivedNoteStatus,
 } from "../generated/prisma";
 import { ExpectedDeliveriesService } from "../expected-deliveries/expected-deliveries.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { ProcurementClientService } from "../procurement-client/procurement-client.service";
-import { CreateGrnDto } from "./dto/create-grn.dto";
+import { CreateGoodsReceivedNoteDto } from "./dto/create-goods-received-note.dto";
 import { RecordScanDto } from "./dto/record-scan.dto";
 import { discrepancyFor } from "./discrepancy";
 
 @Injectable()
-export class GrnsService {
+export class GoodsReceivedNotesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly procurement: ProcurementClientService,
@@ -30,8 +30,8 @@ export class GrnsService {
     private readonly eventBus: EventBusService,
   ) {}
 
-  list(status?: GrnStatus) {
-    return this.prisma.grn.findMany({
+  list(status?: GoodsReceivedNoteStatus) {
+    return this.prisma.goodsReceivedNote.findMany({
       where: status ? { status } : undefined,
       include: { lines: true },
       orderBy: { createdAt: "desc" },
@@ -39,12 +39,12 @@ export class GrnsService {
   }
 
   async findOne(id: string) {
-    const grn = await this.prisma.grn.findUnique({
+    const goodsReceivedNote = await this.prisma.goodsReceivedNote.findUnique({
       where: { id },
       include: { lines: true },
     });
-    if (!grn) throw new NotFoundException(`GRN ${id} not found`);
-    return grn;
+    if (!goodsReceivedNote) throw new NotFoundException(`GRN ${id} not found`);
+    return goodsReceivedNote;
   }
 
   /**
@@ -53,7 +53,7 @@ export class GrnsService {
    * line per SKU still outstanding, using Receiving's own running totals
    * (Procurement does not track received quantity).
    */
-  async create(dto: CreateGrnDto) {
+  async create(dto: CreateGoodsReceivedNoteDto) {
     const po = await this.procurement.findOpenPo(dto.poNumber);
     const expected = await this.expectedDeliveries.recordFromProcurement(po);
 
@@ -66,17 +66,18 @@ export class GrnsService {
       );
     }
 
-    // Pull the next value of the same Postgres sequence backing Grn.sequence
-    // so grnNumber can be set in a single insert.
+    // Pull the next value of the same Postgres sequence backing
+    // GoodsReceivedNote.sequence so goodsReceivedNoteNumber can be set in a
+    // single insert.
     const [{ nextval }] = await this.prisma.$queryRaw<{ nextval: bigint }[]>`
-      SELECT nextval(pg_get_serial_sequence('"Grn"', 'sequence')) AS nextval
+      SELECT nextval(pg_get_serial_sequence('"GoodsReceivedNote"', 'sequence')) AS nextval
     `;
     const sequence = Number(nextval);
 
-    return this.prisma.grn.create({
+    return this.prisma.goodsReceivedNote.create({
       data: {
         sequence,
-        grnNumber: `GRN-${1000 + sequence}`,
+        goodsReceivedNoteNumber: `GRN-${1000 + sequence}`,
         poNumber: po.poNumber,
         supplierId: po.supplierId,
         receivedAtLocation: dto.receivedAtLocation,
@@ -86,7 +87,7 @@ export class GrnsService {
             sku: line.sku,
             productName: line.productName,
             quantityOrdered: line.quantityOrdered - line.quantityReceived,
-            condition: GrnCondition.GOOD,
+            condition: GoodsReceivedNoteCondition.GOOD,
           })),
         },
       },
@@ -101,19 +102,23 @@ export class GrnsService {
    * quarantined line and never count towards sellable stock.
    */
   async recordScan(id: string, dto: RecordScanDto) {
-    const grn = await this.findOne(id);
-    this.assertDraft(grn);
+    const goodsReceivedNote = await this.findOne(id);
+    this.assertDraft(goodsReceivedNote);
 
-    const skuLines = grn.lines.filter((line) => line.sku === dto.sku);
+    const skuLines = goodsReceivedNote.lines.filter((line) => line.sku === dto.sku);
     const productName = skuLines[0]?.productName ?? dto.sku;
-    const isDamaged = dto.condition === GrnCondition.DAMAGED;
+    const isDamaged = dto.condition === GoodsReceivedNoteCondition.DAMAGED;
 
-    await this.prisma.grnLine.upsert({
+    await this.prisma.goodsReceivedNoteLine.upsert({
       where: {
-        grnId_sku_condition: { grnId: id, sku: dto.sku, condition: dto.condition },
+        goodsReceivedNoteId_sku_condition: {
+          goodsReceivedNoteId: id,
+          sku: dto.sku,
+          condition: dto.condition,
+        },
       },
       create: {
-        grnId: id,
+        goodsReceivedNoteId: id,
         sku: dto.sku,
         productName,
         // Only the GOOD line carries the ordered quantity; a DAMAGED line or a
@@ -135,7 +140,7 @@ export class GrnsService {
       refreshed.lines
         .filter((line) => line.sku === dto.sku)
         .map((line) =>
-          this.prisma.grnLine.update({
+          this.prisma.goodsReceivedNoteLine.update({
             where: { id: line.id },
             data: { discrepancyType: discrepancyFor(line, refreshed.lines) },
           }),
@@ -147,15 +152,15 @@ export class GrnsService {
 
   /** FR-3.5/3.6 — freezes the GRN, updates running totals, publishes GoodsReceived. */
   async finalize(id: string) {
-    const grn = await this.findOne(id);
-    this.assertDraft(grn);
-    if (!grn.lines.some((line) => line.quantityReceived > 0)) {
+    const goodsReceivedNote = await this.findOne(id);
+    this.assertDraft(goodsReceivedNote);
+    if (!goodsReceivedNote.lines.some((line) => line.quantityReceived > 0)) {
       throw new BadRequestException("Nothing has been scanned on this GRN yet");
     }
 
-    const expected = await this.expectedDeliveries.findByPoNumber(grn.poNumber);
+    const expected = await this.expectedDeliveries.findByPoNumber(goodsReceivedNote.poNumber);
     const arrivedBySku = new Map<string, number>();
-    for (const line of grn.lines) {
+    for (const line of goodsReceivedNote.lines) {
       arrivedBySku.set(
         line.sku,
         (arrivedBySku.get(line.sku) ?? 0) + line.quantityReceived,
@@ -171,19 +176,19 @@ export class GrnsService {
       (line) => line.quantityReceived >= line.quantityOrdered,
     );
 
-    const finalizedLines = grn.lines.map((line) => ({
+    const finalizedLines = goodsReceivedNote.lines.map((line) => ({
       ...line,
-      discrepancyType: discrepancyFor(line, grn.lines),
+      discrepancyType: discrepancyFor(line, goodsReceivedNote.lines),
     }));
 
     const [finalized] = await this.prisma.$transaction([
-      this.prisma.grn.update({
+      this.prisma.goodsReceivedNote.update({
         where: { id },
-        data: { status: GrnStatus.FINALIZED, finalizedAt: new Date() },
+        data: { status: GoodsReceivedNoteStatus.FINALIZED, finalizedAt: new Date() },
         include: { lines: true },
       }),
       ...finalizedLines.map((line) =>
-        this.prisma.grnLine.update({
+        this.prisma.goodsReceivedNoteLine.update({
           where: { id: line.id },
           data: { discrepancyType: line.discrepancyType },
         }),
@@ -209,10 +214,10 @@ export class GrnsService {
     const event: GoodsReceivedEvent = {
       eventId: randomUUID(),
       occurredAt: new Date().toISOString(),
-      grnNumber: grn.grnNumber,
-      poNumber: grn.poNumber,
-      supplierId: grn.supplierId,
-      receivedAtLocation: grn.receivedAtLocation,
+      goodsReceivedNoteNumber: goodsReceivedNote.goodsReceivedNoteNumber,
+      poNumber: goodsReceivedNote.poNumber,
+      supplierId: goodsReceivedNote.supplierId,
+      receivedAtLocation: goodsReceivedNote.receivedAtLocation,
       lines: finalizedLines.map((line) => ({
         sku: line.sku,
         productName: line.productName,
@@ -227,10 +232,10 @@ export class GrnsService {
     return { ...finalized, lines: finalizedLines };
   }
 
-  private assertDraft(grn: { status: GrnStatus }): void {
-    if (grn.status !== GrnStatus.DRAFT) {
+  private assertDraft(goodsReceivedNote: { status: GoodsReceivedNoteStatus }): void {
+    if (goodsReceivedNote.status !== GoodsReceivedNoteStatus.DRAFT) {
       throw new BadRequestException(
-        `GRN is ${grn.status} and can no longer be changed`,
+        `GRN is ${goodsReceivedNote.status} and can no longer be changed`,
       );
     }
   }

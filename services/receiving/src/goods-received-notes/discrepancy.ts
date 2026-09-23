@@ -1,8 +1,8 @@
-import { GrnCondition, GrnDiscrepancyType } from "../generated/prisma";
+import { GoodsReceivedNoteCondition, GoodsReceivedNoteDiscrepancyType } from "../generated/prisma";
 
 export interface DiscrepancyInput {
   sku: string;
-  condition: GrnCondition;
+  condition: GoodsReceivedNoteCondition;
   quantityOrdered: number;
   quantityReceived: number;
 }
@@ -16,18 +16,18 @@ export interface DiscrepancyInput {
 export function discrepancyFor(
   line: DiscrepancyInput,
   allLines: DiscrepancyInput[],
-): GrnDiscrepancyType {
-  if (line.condition === GrnCondition.DAMAGED) {
+): GoodsReceivedNoteDiscrepancyType {
+  if (line.condition === GoodsReceivedNoteCondition.DAMAGED) {
     return line.quantityReceived > 0
-      ? GrnDiscrepancyType.DAMAGE
-      : GrnDiscrepancyType.NONE;
+      ? GoodsReceivedNoteDiscrepancyType.DAMAGE
+      : GoodsReceivedNoteDiscrepancyType.NONE;
   }
 
   const totalArrived = allLines
     .filter((other) => other.sku === line.sku)
     .reduce((sum, other) => sum + other.quantityReceived, 0);
 
-  if (totalArrived < line.quantityOrdered) return GrnDiscrepancyType.SHORTAGE;
-  if (totalArrived > line.quantityOrdered) return GrnDiscrepancyType.OVERAGE;
-  return GrnDiscrepancyType.NONE;
+  if (totalArrived < line.quantityOrdered) return GoodsReceivedNoteDiscrepancyType.SHORTAGE;
+  if (totalArrived > line.quantityOrdered) return GoodsReceivedNoteDiscrepancyType.OVERAGE;
+  return GoodsReceivedNoteDiscrepancyType.NONE;
 }

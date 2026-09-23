@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { IsEnum, IsInt, IsOptional, IsString, Min } from "class-validator";
-import { GrnCondition } from "../../generated/prisma";
+import { GoodsReceivedNoteCondition } from "../../generated/prisma";
 
 export class RecordScanDto {
   @ApiProperty()
@@ -12,9 +12,9 @@ export class RecordScanDto {
   @Min(1)
   quantity!: number;
 
-  @ApiProperty({ enum: GrnCondition })
-  @IsEnum(GrnCondition)
-  condition!: GrnCondition;
+  @ApiProperty({ enum: GoodsReceivedNoteCondition })
+  @IsEnum(GoodsReceivedNoteCondition)
+  condition!: GoodsReceivedNoteCondition;
 
   @ApiPropertyOptional()
   @IsOptional()

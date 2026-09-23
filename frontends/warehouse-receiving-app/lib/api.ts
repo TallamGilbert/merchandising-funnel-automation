@@ -1,9 +1,9 @@
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3004";
 
 export type ExpectedDeliveryStatus = "EXPECTED" | "PARTIALLY_RECEIVED" | "RECEIVED";
-export type GrnStatus = "DRAFT" | "FINALIZED";
-export type GrnCondition = "GOOD" | "DAMAGED";
-export type GrnDiscrepancyType = "NONE" | "SHORTAGE" | "OVERAGE" | "DAMAGE";
+export type GoodsReceivedNoteStatus = "DRAFT" | "FINALIZED";
+export type GoodsReceivedNoteCondition = "GOOD" | "DAMAGED";
+export type GoodsReceivedNoteDiscrepancyType = "NONE" | "SHORTAGE" | "OVERAGE" | "DAMAGE";
 
 export interface ExpectedDeliveryLine {
   id: string;
@@ -24,30 +24,30 @@ export interface ExpectedDelivery {
   lines: ExpectedDeliveryLine[];
 }
 
-export interface GrnLine {
+export interface GoodsReceivedNoteLine {
   id: string;
   sku: string;
   productName: string;
   quantityOrdered: number;
   quantityReceived: number;
-  condition: GrnCondition;
-  discrepancyType: GrnDiscrepancyType;
+  condition: GoodsReceivedNoteCondition;
+  discrepancyType: GoodsReceivedNoteDiscrepancyType;
   quarantined: boolean;
   notes: string | null;
 }
 
-export interface Grn {
+export interface GoodsReceivedNote {
   id: string;
-  grnNumber: string;
+  goodsReceivedNoteNumber: string;
   poNumber: string;
   supplierId: string;
   receivedAtLocation: string;
   receivedById: string;
-  status: GrnStatus;
+  status: GoodsReceivedNoteStatus;
   finalizedAt: string | null;
   createdAt: string;
   updatedAt: string;
-  lines: GrnLine[];
+  lines: GoodsReceivedNoteLine[];
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -70,18 +70,19 @@ export const api = {
   listExpectedDeliveries: (status?: ExpectedDeliveryStatus) =>
     request<ExpectedDelivery[]>(`/expected-deliveries${status ? `?status=${status}` : ""}`),
 
-  listGrns: (status?: GrnStatus) =>
-    request<Grn[]>(`/grns${status ? `?status=${status}` : ""}`),
+  listGoodsReceivedNotes: (status?: GoodsReceivedNoteStatus) =>
+    request<GoodsReceivedNote[]>(`/goods-received-notes${status ? `?status=${status}` : ""}`),
 
-  getGrn: (id: string) => request<Grn>(`/grns/${id}`),
+  getGoodsReceivedNote: (id: string) => request<GoodsReceivedNote>(`/goods-received-notes/${id}`),
 
-  createGrn: (data: { poNumber: string; receivedAtLocation: string; receivedById: string }) =>
-    request<Grn>("/grns", { method: "POST", body: JSON.stringify(data) }),
+  createGoodsReceivedNote: (data: { poNumber: string; receivedAtLocation: string; receivedById: string }) =>
+    request<GoodsReceivedNote>("/goods-received-notes", { method: "POST", body: JSON.stringify(data) }),
 
   recordScan: (
     id: string,
-    data: { sku: string; quantity: number; condition: GrnCondition; notes?: string },
-  ) => request<Grn>(`/grns/${id}/scans`, { method: "POST", body: JSON.stringify(data) }),
+    data: { sku: string; quantity: number; condition: GoodsReceivedNoteCondition; notes?: string },
+  ) => request<GoodsReceivedNote>(`/goods-received-notes/${id}/scans`, { method: "POST", body: JSON.stringify(data) }),
 
-  finalizeGrn: (id: string) => request<Grn>(`/grns/${id}/finalize`, { method: "POST" }),
+  finalizeGoodsReceivedNote: (id: string) =>
+    request<GoodsReceivedNote>(`/goods-received-notes/${id}/finalize`, { method: "POST" }),
 };

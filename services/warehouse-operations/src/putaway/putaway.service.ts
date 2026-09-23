@@ -74,13 +74,18 @@ export class PutawayService {
       if (line.condition !== "GOOD" || line.quantityReceived <= 0) continue;
 
       const existing = await this.prisma.putawayTask.findUnique({
-        where: { grnNumber_sku: { grnNumber: event.grnNumber, sku: line.sku } },
+        where: {
+          goodsReceivedNoteNumber_sku: {
+            goodsReceivedNoteNumber: event.goodsReceivedNoteNumber,
+            sku: line.sku,
+          },
+        },
       });
       if (existing) continue; // event redelivered
 
       const task = await this.prisma.putawayTask.create({
         data: {
-          grnNumber: event.grnNumber,
+          goodsReceivedNoteNumber: event.goodsReceivedNoteNumber,
           poNumber: event.poNumber,
           sku: line.sku,
           productName: line.productName,
@@ -93,7 +98,7 @@ export class PutawayService {
         await this.assignBin(task);
       } catch (error) {
         this.logger.warn(
-          `Putaway task ${task.id} (GRN ${event.grnNumber}, ${line.sku}) left unassigned: ${(error as Error).message}`,
+          `Putaway task ${task.id} (GRN ${event.goodsReceivedNoteNumber}, ${line.sku}) left unassigned: ${(error as Error).message}`,
         );
       }
     }

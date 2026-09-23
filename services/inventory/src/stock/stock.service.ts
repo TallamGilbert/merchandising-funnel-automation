@@ -110,7 +110,7 @@ export class StockService {
       });
       if (!product) {
         this.logger.warn(
-          `GoodsReceived for unknown SKU ${line.sku} (GRN ${event.grnNumber}) — no product master record yet, creating a stub with unitCost 0 so the receipt isn't lost; set its real unit cost in Inventory Control Center`,
+          `GoodsReceived for unknown SKU ${line.sku} (GRN ${event.goodsReceivedNoteNumber}) — no product master record yet, creating a stub with unitCost 0 so the receipt isn't lost; set its real unit cost in Inventory Control Center`,
         );
         product = await this.prisma.product.create({
           data: { sku: line.sku, name: line.productName, unitCost: 0 },
@@ -133,7 +133,7 @@ export class StockService {
         InventoryTransactionType.RECEIPT,
         line.quantityReceived,
         "GRN",
-        event.grnNumber,
+        event.goodsReceivedNoteNumber,
       );
     }
   }

@@ -1,7 +1,7 @@
 import { ApiProperty } from "@nestjs/swagger";
 import { IsString } from "class-validator";
 
-export class CreateGrnDto {
+export class CreateGoodsReceivedNoteDto {
   @ApiProperty({ example: "PO-1001" })
   @IsString()
   poNumber!: string;

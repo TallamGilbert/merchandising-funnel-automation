@@ -145,7 +145,7 @@ describe("PurchaseOrdersService", () => {
     ): GoodsReceivedEvent => ({
       eventId: "e1",
       occurredAt: "2026-09-21T08:00:00.000Z",
-      grnNumber: "GRN-1001",
+      goodsReceivedNoteNumber: "GRN-1001",
       poNumber: "PO-1001",
       supplierId: "supplier-1",
       receivedAtLocation: "WH-MAIN",

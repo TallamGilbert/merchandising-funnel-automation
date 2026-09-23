@@ -4,28 +4,28 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { AppShell, type NavSection } from "../../components/AppShell";
 import { ClipboardListIcon, PackageIcon } from "../../components/icons";
-import { api, type Grn, type GrnStatus } from "../../lib/api";
+import { api, type GoodsReceivedNote, type GoodsReceivedNoteStatus } from "../../lib/api";
 
 const NAV: NavSection[] = [
   {
     label: "Main menu",
     items: [
       { label: "Expected deliveries", href: "/", icon: <PackageIcon /> },
-      { label: "Goods received notes", href: "/grns", icon: <ClipboardListIcon /> },
+      { label: "Goods received notes", href: "/goods-received-notes", icon: <ClipboardListIcon /> },
     ],
   },
 ];
 
-export default function GrnsPage() {
-  const [grns, setGrns] = useState<Grn[] | null>(null);
-  const [statusFilter, setStatusFilter] = useState<GrnStatus | "">("");
+export default function GoodsReceivedNotesPage() {
+  const [goodsReceivedNotes, setGoodsReceivedNotes] = useState<GoodsReceivedNote[] | null>(null);
+  const [statusFilter, setStatusFilter] = useState<GoodsReceivedNoteStatus | "">("");
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     setError(null);
     api
-      .listGrns(statusFilter || undefined)
-      .then(setGrns)
+      .listGoodsReceivedNotes(statusFilter || undefined)
+      .then(setGoodsReceivedNotes)
       .catch((err: Error) => setError(err.message));
   }, [statusFilter]);
 
@@ -43,7 +43,7 @@ export default function GrnsPage() {
           Status
           <select
             value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value as GrnStatus | "")}
+            onChange={(e) => setStatusFilter(e.target.value as GoodsReceivedNoteStatus | "")}
           >
             <option value="">All</option>
             <option value="DRAFT">Draft</option>
@@ -53,11 +53,11 @@ export default function GrnsPage() {
       </div>
 
       <div className="card" style={{ padding: 0 }}>
-        {grns === null ? (
+        {goodsReceivedNotes === null ? (
           <p className="muted" style={{ padding: "1.4rem" }}>
             Loading GRNs…
           </p>
-        ) : grns.length === 0 ? (
+        ) : goodsReceivedNotes.length === 0 ? (
           <p className="muted" style={{ padding: "1.4rem" }}>
             No GRNs found.
           </p>
@@ -74,16 +74,16 @@ export default function GrnsPage() {
               </tr>
             </thead>
             <tbody>
-              {grns.map((grn) => {
-                const flagged = grn.lines.filter((l) => l.discrepancyType !== "NONE").length;
+              {goodsReceivedNotes.map((goodsReceivedNote) => {
+                const flagged = goodsReceivedNote.lines.filter((l) => l.discrepancyType !== "NONE").length;
                 return (
-                  <tr key={grn.id}>
-                    <td>{grn.grnNumber}</td>
-                    <td>{grn.poNumber}</td>
-                    <td>{grn.receivedAtLocation}</td>
+                  <tr key={goodsReceivedNote.id}>
+                    <td>{goodsReceivedNote.goodsReceivedNoteNumber}</td>
+                    <td>{goodsReceivedNote.poNumber}</td>
+                    <td>{goodsReceivedNote.receivedAtLocation}</td>
                     <td>
-                      <span className={`badge${grn.status === "FINALIZED" ? " ok" : ""}`}>
-                        {grn.status}
+                      <span className={`badge${goodsReceivedNote.status === "FINALIZED" ? " ok" : ""}`}>
+                        {goodsReceivedNote.status}
                       </span>
                     </td>
                     <td>
@@ -94,7 +94,9 @@ export default function GrnsPage() {
                       )}
                     </td>
                     <td>
-                      <Link href={`/grns/${grn.id}`}>{grn.status === "DRAFT" ? "Continue" : "View"}</Link>
+                      <Link href={`/goods-received-notes/${goodsReceivedNote.id}`}>
+                        {goodsReceivedNote.status === "DRAFT" ? "Continue" : "View"}
+                      </Link>
                     </td>
                   </tr>
                 );

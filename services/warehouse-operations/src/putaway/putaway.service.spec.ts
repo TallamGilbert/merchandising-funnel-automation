@@ -39,7 +39,7 @@ describe("PutawayService", () => {
   const event: GoodsReceivedEvent = {
     eventId: "e1",
     occurredAt: "2026-09-21T08:00:00.000Z",
-    grnNumber: "GRN-1001",
+    goodsReceivedNoteNumber: "GRN-1001",
     poNumber: "PO-1001",
     supplierId: "supplier-1",
     receivedAtLocation: "WH-MAIN",
@@ -88,7 +88,7 @@ describe("PutawayService", () => {
       expect(prisma.putawayTask.create).toHaveBeenCalledTimes(1);
       expect(prisma.putawayTask.create).toHaveBeenCalledWith({
         data: {
-          grnNumber: "GRN-1001",
+          goodsReceivedNoteNumber: "GRN-1001",
           poNumber: "PO-1001",
           sku: "SKU-1",
           productName: "Oak Chair",
