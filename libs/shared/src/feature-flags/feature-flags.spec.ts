@@ -48,15 +48,16 @@ describe("isModuleEnabled", () => {
     "FEATURE_RECEIVING_ENABLED",
     "FEATURE_WAREHOUSE_OPERATIONS_ENABLED",
   ];
-  const PHASE_3_4_ENV_VARS = [
+  const PHASE_3_ENV_VARS = [
     "FEATURE_RETAIL_SALES_ENABLED",
     "FEATURE_SALES_AUDIT_ENABLED",
-    "FEATURE_FINANCIALS_ENABLED",
   ];
+  const PHASE_4_ENV_VARS = ["FEATURE_FINANCIALS_ENABLED"];
   const ALL_ENV_VARS = [
     ...PHASE_1_ENV_VARS,
     ...PHASE_2_ENV_VARS,
-    ...PHASE_3_4_ENV_VARS,
+    ...PHASE_3_ENV_VARS,
+    ...PHASE_4_ENV_VARS,
   ];
   const originalValues = Object.fromEntries(
     ALL_ENV_VARS.map((key) => [key, process.env[key]]),
@@ -88,13 +89,17 @@ describe("isModuleEnabled", () => {
     expect(isModuleEnabled(ModuleKey.WAREHOUSE_OPERATIONS)).toBe(true);
   });
 
-  it("defaults Phase 3-4 modules to disabled", () => {
+  it("defaults Phase 3 modules (retail-sales, sales-audit) to enabled", () => {
     delete process.env.FEATURE_RETAIL_SALES_ENABLED;
     delete process.env.FEATURE_SALES_AUDIT_ENABLED;
+
+    expect(isModuleEnabled(ModuleKey.RETAIL_SALES)).toBe(true);
+    expect(isModuleEnabled(ModuleKey.SALES_AUDIT)).toBe(true);
+  });
+
+  it("defaults Phase 4 modules to disabled", () => {
     delete process.env.FEATURE_FINANCIALS_ENABLED;
 
-    expect(isModuleEnabled(ModuleKey.RETAIL_SALES)).toBe(false);
-    expect(isModuleEnabled(ModuleKey.SALES_AUDIT)).toBe(false);
     expect(isModuleEnabled(ModuleKey.FINANCIALS)).toBe(false);
   });
 
@@ -104,8 +109,8 @@ describe("isModuleEnabled", () => {
   });
 
   it("lets an explicit env var override a later-phase module's default", () => {
-    process.env.FEATURE_RETAIL_SALES_ENABLED = "true";
-    expect(isModuleEnabled(ModuleKey.RETAIL_SALES)).toBe(true);
+    process.env.FEATURE_FINANCIALS_ENABLED = "true";
+    expect(isModuleEnabled(ModuleKey.FINANCIALS)).toBe(true);
   });
 
   it("lets an explicit env var switch off a Phase 2 module", () => {

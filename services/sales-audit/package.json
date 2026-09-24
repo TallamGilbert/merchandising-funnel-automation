@@ -1,7 +1,7 @@
 {
   "name": "@mms/sales-audit",
   "version": "0.1.0",
-  "description": "Cash-drawer reconciliation against POS transactions (FR-7.x). Phase 3 scaffold.",
+  "description": "Cash-drawer reconciliation against POS transactions (FR-7.x).",
   "private": true,
   "scripts": {
     "build": "nest build",
