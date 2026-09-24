@@ -201,4 +201,42 @@ describe("StockService", () => {
       expect(prisma.$transaction).not.toHaveBeenCalled();
     });
   });
+
+  describe("applyItemReturn (D-8)", () => {
+    it("adds the returned quantity back onto On Hand and records a RETURN transaction", async () => {
+      await service.applyItemReturn("SKU-1", "STORE-1", 2, "return-1");
+
+      expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+      expect(prisma.stockLevel.update).toHaveBeenCalledWith({
+        where: { productId_locationCode: { productId: "product-1", locationCode: "STORE-1" } },
+        data: { onHand: { increment: 2 } },
+      });
+      expect(prisma.inventoryTransaction.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          locationCode: "STORE-1",
+          type: InventoryTransactionType.RETURN,
+          quantityDelta: 2,
+          referenceType: "RETURN",
+          referenceId: "return-1",
+        }),
+      });
+    });
+
+    it("applies a redelivered return only once per product/location", async () => {
+      prisma.inventoryTransaction.findFirst.mockResolvedValue({ id: "txn-1" });
+
+      await service.applyItemReturn("SKU-1", "STORE-1", 2, "return-1");
+
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+      expect(prisma.stockLevel.update).not.toHaveBeenCalled();
+    });
+
+    it("skips a return for an unknown SKU", async () => {
+      prisma.product.findUnique.mockResolvedValue(null);
+
+      await service.applyItemReturn("SKU-1", "STORE-1", 2, "return-1");
+
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
+  });
 });
