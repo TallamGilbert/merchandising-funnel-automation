@@ -71,8 +71,8 @@ Solid arrows are synchronous request/reply (REST, or gRPC on the one latency-sen
 | Inventory | [`services/inventory`](services/inventory) | Stock levels (On Hand/Allocated/Available), valuation, checkout stock-check (gRPC) | 1 — Foundation | ✅ Implemented |
 | Receiving | [`services/receiving`](services/receiving) | Match deliveries to POs, flag discrepancies, generate GRNs | 2 — Warehouse | ✅ Implemented |
 | Warehouse Operations | [`services/warehouse-operations`](services/warehouse-operations) | Putaway/picking direction, transfers, space utilization | 2 — Warehouse | ✅ Implemented |
-| Retail Sales (POS) | [`services/retail-sales`](services/retail-sales) | Checkout, pricing/promotions, returns, payment capture | 3 — Retail | 🚧 Scaffold only |
-| Sales Audit | [`services/sales-audit`](services/sales-audit) | Store-level cash reconciliation, discrepancy sign-off | 3 — Retail | 🚧 Scaffold only |
+| Retail Sales (POS) | [`services/retail-sales`](services/retail-sales) | Checkout, pricing/promotions, returns, payment capture | 3 — Retail | ✅ Implemented |
+| Sales Audit | [`services/sales-audit`](services/sales-audit) | Store-level cash reconciliation, discrepancy sign-off | 3 — Retail | ✅ Implemented |
 | Financials | [`services/financials`](services/financials) | Automated ledger entries, AP, revenue/gross-profit reporting | 4 — Accounting | 🚧 Scaffold only |
 
 Each backend module pairs with a frontend under [`frontends/`](frontends), gated by the same phase flag:
@@ -145,7 +145,9 @@ Once up:
 - Inventory — REST http://localhost:3003 (`/docs`), gRPC on `:5003`
 - Receiving — REST http://localhost:3004 (`/docs`)
 - Warehouse Operations — REST http://localhost:3005 (`/docs`)
-- Retail Sales / Sales Audit / Financials — REST on `:3006`–`:3008`, `/health` only until their phase ships
+- Retail Sales — REST http://localhost:3006 (`/docs`)
+- Sales Audit — REST http://localhost:3007 (`/docs`)
+- Financials — REST on `:3008`, `/health` only until its phase ships
 - RabbitMQ management UI — http://localhost:15672 (see `.env.example` for credentials)
 - Frontends — `:3101`–`:3108` (see each app's own port in `.env.example`)
 
@@ -168,8 +170,8 @@ Every module — service and frontend — is gated by an env-var feature flag, d
 | `FEATURE_INVENTORY_ENABLED` | `true` | 1 |
 | `FEATURE_RECEIVING_ENABLED` | `true` | 2 |
 | `FEATURE_WAREHOUSE_OPERATIONS_ENABLED` | `true` | 2 |
-| `FEATURE_RETAIL_SALES_ENABLED` | `false` | 3 |
-| `FEATURE_SALES_AUDIT_ENABLED` | `false` | 3 |
+| `FEATURE_RETAIL_SALES_ENABLED` | `true` | 3 |
+| `FEATURE_SALES_AUDIT_ENABLED` | `true` | 3 |
 | `FEATURE_FINANCIALS_ENABLED` | `false` | 4 |
 
 **Backend:** each service applies `FeatureFlagGuard.forModule(ModuleKey.X)` globally in its `main.ts`. `/health` always responds (so orchestration/monitoring can see the container is up); every other route 503s with `{ message: "... not yet implemented" }` while the flag is off. Event consumers check `isModuleEnabled(...)` in their own `onModuleInit` before subscribing, so a disabled module doesn't drain events meant for it off the queue.
