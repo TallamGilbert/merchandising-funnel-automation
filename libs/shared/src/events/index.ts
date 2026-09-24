@@ -4,4 +4,5 @@ export * from "./goods-received.event";
 export * from "./stock-low.event";
 export * from "./stock-transferred.event";
 export * from "./item-sold.event";
+export * from "./item-returned.event";
 export * from "./day-closed.event";

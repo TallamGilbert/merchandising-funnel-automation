@@ -9,6 +9,7 @@ export const EventRoutingKey = {
   STOCK_LOW: "stock-low",
   STOCK_TRANSFERRED: "stock-transferred",
   ITEM_SOLD: "item-sold",
+  ITEM_RETURNED: "item-returned",
   DAY_CLOSED: "day-closed",
 } as const;
 
