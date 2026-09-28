@@ -1,0 +1,199 @@
+/*
+ * @mms/ui component styles. Built on each app's globals.css tokens
+ * (--surface, --border, --accent, …) so components match every app.
+ * Import once in the root layout: `import "@mms/ui/styles.css";`
+ */
+
+/* ---- Combobox ----------------------------------------------------- */
+
+.mms-combobox {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+.mms-combobox > input[role="combobox"] {
+  width: 100%;
+}
+
+/* Hidden but still focusable by native validation, so `required` works. */
+.mms-combobox-value {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 1px;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.mms-combobox-list {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 50;
+  margin: 0;
+  padding: 0.3rem;
+  list-style: none;
+  max-height: 280px;
+  overflow-y: auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 12px 32px rgba(16, 24, 40, 0.12);
+}
+
+.mms-combobox-option {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  padding: 0.5rem 0.6rem;
+  border-radius: 7px;
+  cursor: pointer;
+  color: var(--text);
+  font-size: 0.88rem;
+}
+
+.mms-combobox-option.active {
+  background: var(--accent-soft);
+}
+
+.mms-combobox-option[aria-selected="true"] {
+  font-weight: 600;
+}
+
+.mms-combobox-option.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.mms-combobox-desc {
+  font-size: 0.76rem;
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+.mms-combobox-empty {
+  padding: 0.6rem;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.mms-field-error {
+  font-size: 0.78rem;
+  color: var(--danger);
+}
+
+/* ---- Alerts ------------------------------------------------------- */
+
+.mms-flash-stack {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  width: min(380px, calc(100vw - 2rem));
+}
+
+.mms-alert {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.75rem 0.9rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+  font-size: 0.88rem;
+  color: var(--text);
+}
+
+.mms-alert.success {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+
+.mms-alert.error {
+  background: var(--danger-soft);
+  border-color: var(--danger);
+}
+
+.mms-alert.info {
+  background: var(--surface-muted);
+}
+
+.mms-alert-text {
+  flex: 1;
+}
+
+.mms-icon-btn {
+  border: none;
+  background: transparent;
+  padding: 0 0.25rem;
+  font-size: 1.2rem;
+  line-height: 1;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.mms-icon-btn:hover {
+  color: var(--text);
+  background: transparent;
+}
+
+/* ---- Modal -------------------------------------------------------- */
+
+.mms-modal {
+  border: none;
+  padding: 0;
+  border-radius: var(--radius-md);
+  box-shadow: 0 24px 64px rgba(16, 24, 40, 0.24);
+  width: min(460px, calc(100vw - 2rem));
+  background: var(--surface);
+  color: var(--text);
+}
+
+.mms-modal::backdrop {
+  background: rgba(17, 24, 39, 0.45);
+}
+
+.mms-modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1.25rem 1.4rem;
+}
+
+.mms-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.mms-modal-header h3 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.mms-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+/* ---- Money -------------------------------------------------------- */
+
+.num {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+td.num,
+th.num {
+  text-align: right;
+}

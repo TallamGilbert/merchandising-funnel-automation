@@ -2,7 +2,7 @@
   "name": "@mms/warehouse-receiving-app",
   "version": "0.1.0",
   "private": true,
-  "description": "Warehouse Receiving App — Scan and check off deliveries against approved POs.",
+  "description": "Warehouse Receiving App \u2014 Scan and check off deliveries against approved POs.",
   "scripts": {
     "dev": "next dev -p 3104",
     "build": "next build",
@@ -10,6 +10,7 @@
     "lint": "eslint \"app/**/*.{ts,tsx}\""
   },
   "dependencies": {
+    "@mms/ui": "workspace:*",
     "next": "^16.3.4",
     "react": "^19.3.0",
     "react-dom": "^19.3.0"

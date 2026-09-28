@@ -2,7 +2,7 @@
   "name": "@mms/vendor-management-portal",
   "version": "0.1.0",
   "private": true,
-  "description": "Vendor Management Portal — Browse, add, edit, and archive supplier records.",
+  "description": "Vendor Management Portal \u2014 Browse, add, edit, and archive supplier records.",
   "scripts": {
     "dev": "next dev -p 3101",
     "build": "next build",
@@ -10,6 +10,7 @@
     "lint": "eslint \"app/**/*.{ts,tsx}\""
   },
   "dependencies": {
+    "@mms/ui": "workspace:*",
     "next": "^16.3.4",
     "react": "^19.3.0",
     "react-dom": "^19.3.0"

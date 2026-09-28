@@ -2,7 +2,7 @@
   "name": "@mms/inventory-control-center",
   "version": "0.1.0",
   "private": true,
-  "description": "Inventory Control Center — Browse stock levels, perform adjustments, and view valuation.",
+  "description": "Inventory Control Center \u2014 Browse stock levels, perform adjustments, and view valuation.",
   "scripts": {
     "dev": "next dev -p 3103",
     "build": "next build",
@@ -10,6 +10,7 @@
     "lint": "eslint \"app/**/*.{ts,tsx}\""
   },
   "dependencies": {
+    "@mms/ui": "workspace:*",
     "next": "^16.3.4",
     "react": "^19.3.0",
     "react-dom": "^19.3.0"
