@@ -5,7 +5,7 @@
 # a service's role can reach ONLY its own database.
 #
 # This is what makes "database isolation" (NFR-1) an enforced Postgres
-# permission rather than an honor-system convention: even though all 8
+# permission rather than an honor-system convention: even though all 9
 # databases live in one container for local-dev convenience, no service's
 # credentials can open a connection to another service's database.
 set -euo pipefail
@@ -32,5 +32,6 @@ create_service_db "warehouse_operations"   "warehouse_operations_svc"   "${WAREH
 create_service_db "retail_sales"           "retail_sales_svc"           "${RETAIL_SALES_DB_PASSWORD}"
 create_service_db "sales_audit"            "sales_audit_svc"            "${SALES_AUDIT_DB_PASSWORD}"
 create_service_db "financials"             "financials_svc"             "${FINANCIALS_DB_PASSWORD}"
+create_service_db "directory"              "directory_svc"              "${DIRECTORY_DB_PASSWORD}"
 
-echo "init-databases.sh: created 8 isolated service roles/databases."
+echo "init-databases.sh: created 9 isolated service roles/databases."

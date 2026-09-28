@@ -1,0 +1,73 @@
+generator client {
+  provider = "prisma-client-js"
+  // Custom output — keeps this service's generated client isolated from the
+  // other services' clients in pnpm's shared store (see vendor-management).
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum LocationType {
+  STORE
+  WAREHOUSE
+}
+
+/// MANAGER and OWNER line up with Procurement's PO approver roles (D-1).
+enum StaffRole {
+  OWNER
+  MANAGER
+  CASHIER
+  WAREHOUSE_STAFF
+}
+
+/// A store or warehouse. `code` is the cross-service location identifier
+/// every other service already stores as an opaque string (e.g. Inventory's
+/// StockLevel.locationCode, Retail Sales' Transaction.storeId) — this is the
+/// directory of valid codes, not a foreign key target (NFR-1).
+model Location {
+  code      String       @id
+  name      String
+  type      LocationType
+  active    Boolean      @default(true)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  registers Register[]
+  staff     Staff[]
+
+  @@index([type])
+}
+
+/// A till in a store. `code` is unique within its store (REG-1 exists in
+/// every store), matching Retail Sales' Transaction.registerId.
+model Register {
+  id           String   @id @default(uuid())
+  locationCode String
+  location     Location @relation(fields: [locationCode], references: [code], onDelete: Cascade)
+  code         String
+  name         String
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+
+  @@unique([locationCode, code])
+}
+
+/// A person who operates the system. `id` is the human-readable identifier
+/// other services already record (cashierId, closedByManagerId, approvedById).
+model Staff {
+  id           String    @id
+  name         String
+  role         StaffRole
+  /// Home store/warehouse; null for roles that span locations (e.g. OWNER).
+  locationCode String?
+  location     Location? @relation(fields: [locationCode], references: [code], onDelete: SetNull)
+  active       Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([role])
+  @@index([locationCode])
+}

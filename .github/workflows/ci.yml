@@ -9,7 +9,7 @@ on:
 env:
   NODE_VERSION: "20.17.0"
   PNPM_VERSION: "9"
-  SERVICES: "vendor-management procurement inventory receiving warehouse-operations retail-sales sales-audit financials"
+  SERVICES: "vendor-management procurement inventory receiving warehouse-operations retail-sales sales-audit financials directory"
 
 jobs:
   # Fast gate: install, generate Prisma clients, lint, build, and run unit
@@ -65,6 +65,7 @@ jobs:
       RETAIL_SALES_DB_PASSWORD: retail_sales_ci_password
       SALES_AUDIT_DB_PASSWORD: sales_audit_ci_password
       FINANCIALS_DB_PASSWORD: financials_ci_password
+      DIRECTORY_DB_PASSWORD: directory_ci_password
       PGHOST: localhost
       PGPORT: 5432
       RABBITMQ_USER: mms
@@ -141,6 +142,7 @@ jobs:
             [retail-sales]="postgresql://retail_sales_svc:${RETAIL_SALES_DB_PASSWORD}@localhost:5432/retail_sales?schema=public"
             [sales-audit]="postgresql://sales_audit_svc:${SALES_AUDIT_DB_PASSWORD}@localhost:5432/sales_audit?schema=public"
             [financials]="postgresql://financials_svc:${FINANCIALS_DB_PASSWORD}@localhost:5432/financials?schema=public"
+            [directory]="postgresql://directory_svc:${DIRECTORY_DB_PASSWORD}@localhost:5432/directory?schema=public"
           )
           for svc in $SERVICES; do
             echo "--- ${svc}: prisma db push ---"

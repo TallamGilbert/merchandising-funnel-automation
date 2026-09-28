@@ -13,6 +13,7 @@ export const ModuleKey = {
   RETAIL_SALES: "retail-sales",
   SALES_AUDIT: "sales-audit",
   FINANCIALS: "financials",
+  DIRECTORY: "directory",
 } as const;
 
 export type ModuleKey = (typeof ModuleKey)[keyof typeof ModuleKey];
@@ -26,6 +27,8 @@ export const MODULE_PHASE: Record<ModuleKey, 1 | 2 | 3 | 4> = {
   [ModuleKey.RETAIL_SALES]: 3,
   [ModuleKey.SALES_AUDIT]: 3,
   [ModuleKey.FINANCIALS]: 4,
+  // Cross-cutting reference data (staff, stores, registers) — D-10.
+  [ModuleKey.DIRECTORY]: 1,
 };
 
 export const MODULE_FEATURE_ENV_VAR: Record<ModuleKey, string> = {
@@ -37,6 +40,7 @@ export const MODULE_FEATURE_ENV_VAR: Record<ModuleKey, string> = {
   [ModuleKey.RETAIL_SALES]: "FEATURE_RETAIL_SALES_ENABLED",
   [ModuleKey.SALES_AUDIT]: "FEATURE_SALES_AUDIT_ENABLED",
   [ModuleKey.FINANCIALS]: "FEATURE_FINANCIALS_ENABLED",
+  [ModuleKey.DIRECTORY]: "FEATURE_DIRECTORY_ENABLED",
 };
 
 const ENABLED_BY_DEFAULT_MODULES: ReadonlySet<ModuleKey> = new Set([
@@ -44,6 +48,7 @@ const ENABLED_BY_DEFAULT_MODULES: ReadonlySet<ModuleKey> = new Set([
   ModuleKey.VENDOR_MANAGEMENT,
   ModuleKey.PROCUREMENT,
   ModuleKey.INVENTORY,
+  ModuleKey.DIRECTORY,
   // Phase 2 — Warehouse
   ModuleKey.RECEIVING,
   ModuleKey.WAREHOUSE_OPERATIONS,

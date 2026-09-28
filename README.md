@@ -74,6 +74,7 @@ Solid arrows are synchronous request/reply (REST, or gRPC on the one latency-sen
 | Retail Sales (POS) | [`services/retail-sales`](services/retail-sales) | Checkout, pricing/promotions, returns, payment capture | 3 — Retail | ✅ Implemented |
 | Sales Audit | [`services/sales-audit`](services/sales-audit) | Store-level cash reconciliation, discrepancy sign-off | 3 — Retail | ✅ Implemented |
 | Financials | [`services/financials`](services/financials) | Automated ledger entries, AP, revenue/gross-profit reporting | 4 — Accounting | 🚧 Scaffold only |
+| Directory | [`services/directory`](services/directory) | Reference data: staff and their roles, stores/warehouses, registers ([D-10](docs/01-product-requirements.md#9-decisions-log)) | 1 — Foundation (cross-cutting) | ✅ Implemented |
 
 Each backend module pairs with a frontend under [`frontends/`](frontends), gated by the same phase flag:
 
@@ -148,8 +149,20 @@ Once up:
 - Retail Sales — REST http://localhost:3006 (`/docs`)
 - Sales Audit — REST http://localhost:3007 (`/docs`)
 - Financials — REST on `:3008`, `/health` only until its phase ships
+- Directory — REST http://localhost:3009 (`/docs`) — staff, stores/warehouses, registers; seeds demo data on an empty database
 - RabbitMQ management UI — http://localhost:15672 (see `.env.example` for credentials)
 - Frontends — `:3101`–`:3108` (see each app's own port in `.env.example`)
+
+**Adding the Directory to an existing local database:** `init-databases.sh` only runs on a fresh Postgres volume. If yours predates the Directory service, create its role and database once:
+
+```bash
+docker compose exec -T postgres psql -U mms_root -d postgres <<'SQL'
+CREATE ROLE directory_svc WITH LOGIN PASSWORD 'directory_dev_password';
+CREATE DATABASE directory OWNER directory_svc;
+REVOKE ALL PRIVILEGES ON DATABASE directory FROM PUBLIC;
+GRANT ALL PRIVILEGES ON DATABASE directory TO directory_svc;
+SQL
+```
 
 **Why `prisma generate` is a manual step, not baked into `pnpm install`:** every service generates its own **isolated** Prisma Client (`output = "../src/generated/prisma"` in each `prisma/schema.prisma`) instead of the package-default location. Without this, pnpm's dependency deduplication collapses all 8 services' identical `@prisma/client` version into one physical `node_modules` location, and the last service to run `prisma generate` silently overwrites every other service's generated client. Each service must generate its own.
 
