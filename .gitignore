@@ -16,6 +16,12 @@ libs/shared/src/grpc/generated/
 # `pnpm --filter @mms/<service> exec prisma generate` after install.
 services/*/src/generated/
 
+# Next.js regenerates these on every `next dev` / `next build`
+# (dev and build even write different import paths into next-env.d.ts).
+frontends/*/next-env.d.ts
+frontends/*/AGENTS.md
+frontends/*/CLAUDE.md
+
 # Env files
 .env
 .env.local
