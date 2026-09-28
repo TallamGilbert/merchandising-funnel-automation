@@ -18,6 +18,8 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "proto:generate": "bash scripts/generate-proto.sh",
+    "dev:services": "pnpm --parallel --filter @mms/vendor-management --filter @mms/procurement --filter @mms/inventory --filter @mms/receiving --filter @mms/warehouse-operations --filter @mms/retail-sales --filter @mms/sales-audit --filter @mms/directory run dev",
+    "dev:frontends": "pnpm --parallel --filter @mms/vendor-management-portal --filter @mms/procurement-dashboard --filter @mms/inventory-control-center --filter @mms/warehouse-receiving-app --filter @mms/warehouse-floor-app --filter @mms/pos-terminal-app --filter @mms/store-manager-dashboard run dev",
     "docker:up": "docker compose up -d",
     "docker:down": "docker compose down"
   },
