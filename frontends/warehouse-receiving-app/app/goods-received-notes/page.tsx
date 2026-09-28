@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { formatDateTime, useLocations } from "@mms/ui";
 import { AppShell, type NavSection } from "../../components/AppShell";
 import { ClipboardListIcon, PackageIcon } from "../../components/icons";
 import { api, type GoodsReceivedNote, type GoodsReceivedNoteStatus } from "../../lib/api";
@@ -17,6 +18,7 @@ const NAV: NavSection[] = [
 ];
 
 export default function GoodsReceivedNotesPage() {
+  const { data: locations } = useLocations();
   const [goodsReceivedNotes, setGoodsReceivedNotes] = useState<GoodsReceivedNote[] | null>(null);
   const [statusFilter, setStatusFilter] = useState<GoodsReceivedNoteStatus | "">("");
   const [error, setError] = useState<string | null>(null);
@@ -68,6 +70,7 @@ export default function GoodsReceivedNotesPage() {
                 <th>GRN</th>
                 <th>PO</th>
                 <th>Location</th>
+                <th>Opened</th>
                 <th>Status</th>
                 <th>Discrepancies</th>
                 <th />
@@ -80,7 +83,11 @@ export default function GoodsReceivedNotesPage() {
                   <tr key={goodsReceivedNote.id}>
                     <td>{goodsReceivedNote.goodsReceivedNoteNumber}</td>
                     <td>{goodsReceivedNote.poNumber}</td>
-                    <td>{goodsReceivedNote.receivedAtLocation}</td>
+                    <td>
+                      {locations.find((l) => l.code === goodsReceivedNote.receivedAtLocation)?.name ??
+                        goodsReceivedNote.receivedAtLocation}
+                    </td>
+                    <td>{formatDateTime(goodsReceivedNote.createdAt)}</td>
                     <td>
                       <span className={`badge${goodsReceivedNote.status === "FINALIZED" ? " ok" : ""}`}>
                         {goodsReceivedNote.status}

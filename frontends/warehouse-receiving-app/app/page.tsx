@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
+import { formatQuantity, LocationPicker, StaffPicker, useFlash } from "@mms/ui";
 import { AppShell, type NavSection } from "../components/AppShell";
 import { ClipboardListIcon, PackageIcon } from "../components/icons";
 import { api, type ExpectedDelivery, type ExpectedDeliveryStatus } from "../lib/api";
@@ -116,7 +117,7 @@ export default function Page() {
                 <th>PO number</th>
                 <th>Supplier</th>
                 <th>Status</th>
-                <th>Units outstanding</th>
+                <th className="num">Units outstanding</th>
                 <th />
               </tr>
             </thead>
@@ -135,7 +136,7 @@ export default function Page() {
                         {d.status.replaceAll("_", " ")}
                       </span>
                     </td>
-                    <td>{outstanding}</td>
+                    <td className="num">{formatQuantity(outstanding)}</td>
                     <td>
                       {d.status !== "RECEIVED" && (
                         <button className="primary" onClick={() => setReceiving(d)}>
@@ -162,7 +163,8 @@ function StartReceivingForm({
   onCancel: () => void;
 }) {
   const router = useRouter();
-  const [receivedAtLocation, setReceivedAtLocation] = useState("WH-MAIN");
+  const flash = useFlash();
+  const [receivedAtLocation, setReceivedAtLocation] = useState("");
   const [receivedById, setReceivedById] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -177,6 +179,7 @@ function StartReceivingForm({
         receivedAtLocation,
         receivedById,
       });
+      flash.success(`${goodsReceivedNote.goodsReceivedNoteNumber} opened — start scanning`);
       router.push(`/goods-received-notes/${goodsReceivedNote.id}`);
     } catch (err) {
       setError((err as Error).message);
@@ -194,21 +197,16 @@ function StartReceivingForm({
 
       <div className="field-row">
         <label>
-          Dock location code
-          <input
-            required
-            value={receivedAtLocation}
-            onChange={(e) => setReceivedAtLocation(e.target.value)}
-            placeholder="e.g. WH-MAIN"
-          />
+          Receiving warehouse
+          <LocationPicker type="WAREHOUSE" required value={receivedAtLocation} onChange={setReceivedAtLocation} />
         </label>
         <label>
-          Received by (user id)
-          <input
+          Received by
+          <StaffPicker
             required
+            roles={["WAREHOUSE_STAFF", "MANAGER"]}
             value={receivedById}
-            onChange={(e) => setReceivedById(e.target.value)}
-            placeholder="e.g. dock-james"
+            onChange={setReceivedById}
           />
         </label>
       </div>
