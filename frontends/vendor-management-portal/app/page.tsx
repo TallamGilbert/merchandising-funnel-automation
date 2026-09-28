@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { useFlash } from "@mms/ui";
 import { AppShell, type NavSection } from "../components/AppShell";
 import { PackageIcon } from "../components/icons";
 import { api, type Supplier, type SupplierStatus } from "../lib/api";
@@ -22,6 +23,7 @@ export default function Page() {
   const [search, setSearch] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
+  const flash = useFlash();
 
   const load = () => {
     setError(null);
@@ -81,8 +83,9 @@ export default function Page() {
     >
       {showForm && (
         <NewSupplierForm
-          onCreated={() => {
+          onCreated={(name) => {
             setShowForm(false);
+            flash.success(`Supplier ${name} created`);
             load();
           }}
         />
@@ -148,7 +151,7 @@ export default function Page() {
   );
 }
 
-function NewSupplierForm({ onCreated }: { onCreated: () => void }) {
+function NewSupplierForm({ onCreated }: { onCreated: (name: string) => void }) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [contactName, setContactName] = useState("");
@@ -171,7 +174,7 @@ function NewSupplierForm({ onCreated }: { onCreated: () => void }) {
         address: address || undefined,
         paymentTermsDays,
       });
-      onCreated();
+      onCreated(name);
     } catch (err) {
       setError((err as Error).message);
     } finally {

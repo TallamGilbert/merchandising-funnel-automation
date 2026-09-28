@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { use, useEffect, useRef, useState } from "react";
+import { formatDateTime, formatQuantity, useFlash, useLocations, useStaffNames } from "@mms/ui";
 import { AppShell, type NavSection } from "../../../components/AppShell";
 import { ClipboardListIcon, PackageIcon } from "../../../components/icons";
 import {
@@ -61,6 +62,9 @@ export default function GoodsReceivedNotePage({ params }: { params: Promise<{ id
   const [condition, setCondition] = useState<GoodsReceivedNoteCondition>("GOOD");
   const [confirmingFinalize, setConfirmingFinalize] = useState(false);
   const skuInput = useRef<HTMLInputElement>(null);
+  const flash = useFlash();
+  const nameOf = useStaffNames();
+  const { data: locations } = useLocations();
 
   const load = () => {
     setError(null);
@@ -118,7 +122,9 @@ export default function GoodsReceivedNotePage({ params }: { params: Promise<{ id
     setBusy(true);
     setActionError(null);
     try {
-      setGoodsReceivedNote(await api.finalizeGoodsReceivedNote(goodsReceivedNote.id));
+      const finalized = await api.finalizeGoodsReceivedNote(goodsReceivedNote.id);
+      setGoodsReceivedNote(finalized);
+      flash.success(`${finalized.goodsReceivedNoteNumber} finalized — stock is on its way to Inventory`);
       setConfirmingFinalize(false);
       setLastScan(null);
     } catch (err) {
@@ -176,13 +182,18 @@ export default function GoodsReceivedNotePage({ params }: { params: Promise<{ id
           <dt className="muted">Purchase order</dt>
           <dd style={{ margin: 0 }}>{goodsReceivedNote.poNumber}</dd>
           <dt className="muted">Dock location</dt>
-          <dd style={{ margin: 0 }}>{goodsReceivedNote.receivedAtLocation}</dd>
+          <dd style={{ margin: 0 }}>
+            {locations.find((l) => l.code === goodsReceivedNote.receivedAtLocation)?.name ??
+              goodsReceivedNote.receivedAtLocation}
+          </dd>
           <dt className="muted">Received by</dt>
-          <dd style={{ margin: 0 }}>{goodsReceivedNote.receivedById}</dd>
+          <dd style={{ margin: 0 }}>{nameOf(goodsReceivedNote.receivedById)}</dd>
+          <dt className="muted">Opened</dt>
+          <dd style={{ margin: 0 }}>{formatDateTime(goodsReceivedNote.createdAt)}</dd>
           {goodsReceivedNote.finalizedAt && (
             <>
               <dt className="muted">Finalized</dt>
-              <dd style={{ margin: 0 }}>{new Date(goodsReceivedNote.finalizedAt).toLocaleString()}</dd>
+              <dd style={{ margin: 0 }}>{formatDateTime(goodsReceivedNote.finalizedAt)}</dd>
             </>
           )}
         </dl>
@@ -200,11 +211,22 @@ export default function GoodsReceivedNotePage({ params }: { params: Promise<{ id
                 required
                 value={sku}
                 onChange={(e) => setSku(e.target.value)}
-                placeholder="Scan or type a SKU, then Enter"
+                placeholder="Scan, or start typing a product name or SKU"
                 style={{ fontSize: "1.15rem", padding: "0.8rem 0.9rem" }}
                 autoComplete="off"
                 inputMode="text"
+                list="expected-items"
               />
+              {/* Native suggestions keep the scanner's type-then-Enter gesture intact. */}
+              <datalist id="expected-items">
+                {goodsReceivedNote.lines
+                  .filter((l) => l.condition === "GOOD")
+                  .map((l) => (
+                    <option key={l.id} value={l.sku}>
+                      {l.productName}
+                    </option>
+                  ))}
+              </datalist>
             </label>
             <label style={{ maxWidth: 140 }}>
               Quantity
@@ -254,8 +276,8 @@ export default function GoodsReceivedNotePage({ params }: { params: Promise<{ id
               <th>SKU</th>
               <th>Product</th>
               <th>Condition</th>
-              <th>Ordered</th>
-              <th>Received</th>
+              <th className="num">Ordered</th>
+              <th className="num">Received</th>
               <th>Flag</th>
             </tr>
           </thead>
@@ -271,8 +293,8 @@ export default function GoodsReceivedNotePage({ params }: { params: Promise<{ id
                     {line.quarantined ? "Quarantined" : "Good"}
                   </span>
                 </td>
-                <td>{line.condition === "GOOD" ? line.quantityOrdered : "—"}</td>
-                <td>{line.quantityReceived}</td>
+                <td className="num">{line.condition === "GOOD" ? formatQuantity(line.quantityOrdered) : "—"}</td>
+                <td className="num">{formatQuantity(line.quantityReceived)}</td>
                 <td>
                   {line.discrepancyType === "NONE" ? (
                     <span className="muted">—</span>

@@ -35,6 +35,15 @@ export function ArrowUturnLeftIcon({ size = 18 }: IconProps) {
   );
 }
 
+export function TagIcon({ size = 18 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" {...base}>
+      <path d="M3 12V4h8l9.5 9.5a1.5 1.5 0 0 1 0 2.1l-5.9 5.9a1.5 1.5 0 0 1-2.1 0Z" />
+      <circle cx="7.5" cy="8.5" r="1.3" />
+    </svg>
+  );
+}
+
 export function SearchIcon({ size = 16 }: IconProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" {...base}>

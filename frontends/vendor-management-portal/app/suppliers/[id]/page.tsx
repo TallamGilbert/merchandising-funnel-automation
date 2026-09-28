@@ -2,12 +2,23 @@
 
 import Link from "next/link";
 import { use, useEffect, useState } from "react";
+import {
+  CurrencySelect,
+  DEFAULT_CURRENCY,
+  formatDate,
+  formatMoney,
+  Modal,
+  ProductPicker,
+  PurchaseOrderPicker,
+  useFlash,
+} from "@mms/ui";
 import { AppShell, type NavSection } from "../../../components/AppShell";
 import { PackageIcon } from "../../../components/icons";
 import {
   api,
   type SupplierDeliveryRecord,
   type SupplierDetail,
+  type SupplierProduct,
 } from "../../../lib/api";
 
 const NAV: NavSection[] = [
@@ -27,6 +38,7 @@ export default function SupplierPage({
   const [records, setRecords] = useState<SupplierDeliveryRecord[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
+  const flash = useFlash();
 
   const load = () => {
     setError(null);
@@ -59,8 +71,13 @@ export default function SupplierPage({
 
   const archive = async () => {
     if (!confirm(`Archive ${supplier.name}? This cannot be undone from here.`)) return;
-    await api.archiveSupplier(id);
-    load();
+    try {
+      await api.archiveSupplier(id);
+      flash.success(`${supplier.name} archived`);
+      load();
+    } catch (err) {
+      flash.error((err as Error).message);
+    }
   };
 
   return (
@@ -94,6 +111,7 @@ export default function SupplierPage({
           supplier={supplier}
           onSaved={() => {
             setEditing(false);
+            flash.success("Supplier details saved");
             load();
           }}
         />
@@ -236,11 +254,13 @@ function ProductsSection({
   products: SupplierDetail["products"];
   onChange: () => void;
 }) {
+  const flash = useFlash();
   const [showForm, setShowForm] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<SupplierProduct | null>(null);
   const [sku, setSku] = useState("");
   const [productName, setProductName] = useState("");
   const [unitCost, setUnitCost] = useState(0);
-  const [currency, setCurrency] = useState("KES");
+  const [currency, setCurrency] = useState<string>(DEFAULT_CURRENCY);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -250,9 +270,11 @@ function ProductsSection({
     setError(null);
     try {
       await api.addProduct(supplierId, { sku, productName, unitCost, currency });
+      flash.success(`${productName} added to this supplier's catalog`);
       setSku("");
       setProductName("");
       setUnitCost(0);
+      setCurrency(DEFAULT_CURRENCY);
       setShowForm(false);
       onChange();
     } catch (err) {
@@ -272,7 +294,8 @@ function ProductsSection({
             <tr>
               <th>SKU</th>
               <th>Product</th>
-              <th>Unit cost</th>
+              <th className="num">Unit cost</th>
+              <th />
             </tr>
           </thead>
           <tbody>
@@ -282,8 +305,9 @@ function ProductsSection({
                   <code>{p.sku}</code>
                 </td>
                 <td>{p.productName}</td>
-                <td>
-                  {p.currency} {Number(p.unitCost).toFixed(2)}
+                <td className="num">{formatMoney(p.unitCost, p.currency)}</td>
+                <td style={{ textAlign: "right" }}>
+                  <button onClick={() => setEditingProduct(p)}>Edit</button>
                 </td>
               </tr>
             ))}
@@ -291,15 +315,34 @@ function ProductsSection({
         </table>
       )}
 
+      {editingProduct && (
+        <EditProductModal
+          supplierId={supplierId}
+          product={editingProduct}
+          onClose={() => setEditingProduct(null)}
+          onSaved={(name) => {
+            setEditingProduct(null);
+            flash.success(`${name} updated`);
+            onChange();
+          }}
+        />
+      )}
+
       {showForm ? (
         <form className="card" onSubmit={submit}>
           <div className="field-row">
             <label>
-              SKU
-              <input required value={sku} onChange={(e) => setSku(e.target.value)} />
+              Product
+              <ProductPicker
+                required
+                value={sku}
+                excludeSkus={products.map((p) => p.sku)}
+                onChange={setSku}
+                onSelectProduct={(product) => setProductName(product?.name ?? "")}
+              />
             </label>
             <label>
-              Product name
+              Name on this supplier's catalog
               <input
                 required
                 value={productName}
@@ -321,7 +364,7 @@ function ProductsSection({
             </label>
             <label>
               Currency
-              <input value={currency} onChange={(e) => setCurrency(e.target.value)} />
+              <CurrencySelect value={currency} onChange={setCurrency} />
             </label>
           </div>
           {error && <p className="error">{error}</p>}
@@ -343,6 +386,75 @@ function ProductsSection({
   );
 }
 
+function EditProductModal({
+  supplierId,
+  product,
+  onClose,
+  onSaved,
+}: {
+  supplierId: string;
+  product: SupplierProduct;
+  onClose: () => void;
+  onSaved: (productName: string) => void;
+}) {
+  const [productName, setProductName] = useState(product.productName);
+  const [unitCost, setUnitCost] = useState(Number(product.unitCost));
+  const [currency, setCurrency] = useState(product.currency);
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmitting(true);
+    setError(null);
+    try {
+      await api.updateProduct(supplierId, product.id, { productName, unitCost, currency });
+      onSaved(productName);
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <Modal open title={`Edit ${product.sku}`} onClose={onClose}>
+      <form onSubmit={submit}>
+        <label>
+          Product name
+          <input required value={productName} onChange={(e) => setProductName(e.target.value)} />
+        </label>
+        <div className="field-row">
+          <label>
+            Unit cost
+            <input
+              required
+              type="number"
+              min={0}
+              step="0.01"
+              value={unitCost}
+              onChange={(e) => setUnitCost(Number(e.target.value))}
+            />
+          </label>
+          <label>
+            Currency
+            <CurrencySelect value={currency} onChange={setCurrency} />
+          </label>
+        </div>
+        {error && <p className="error">{error}</p>}
+        <div className="mms-modal-footer">
+          <button type="button" onClick={onClose}>
+            Cancel
+          </button>
+          <button className="primary" type="submit" disabled={submitting}>
+            {submitting ? "Saving…" : "Save changes"}
+          </button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
 function DeliveryRecordsSection({
   supplierId,
   records,
@@ -352,6 +464,7 @@ function DeliveryRecordsSection({
   records: SupplierDeliveryRecord[];
   onChange: () => void;
 }) {
+  const flash = useFlash();
   const [showForm, setShowForm] = useState(false);
   const [poReference, setPoReference] = useState("");
   const [expectedDate, setExpectedDate] = useState("");
@@ -369,6 +482,7 @@ function DeliveryRecordsSection({
         expectedDate,
         actualDeliveryDate,
       });
+      flash.success(`Delivery record for ${poReference} added`);
       setPoReference("");
       setExpectedDate("");
       setActualDeliveryDate("");
@@ -399,8 +513,8 @@ function DeliveryRecordsSection({
             {records.map((r) => (
               <tr key={r.id}>
                 <td>{r.poReference}</td>
-                <td>{new Date(r.expectedDate).toLocaleDateString()}</td>
-                <td>{new Date(r.actualDeliveryDate).toLocaleDateString()}</td>
+                <td>{formatDate(r.expectedDate.slice(0, 10))}</td>
+                <td>{formatDate(r.actualDeliveryDate.slice(0, 10))}</td>
                 <td>
                   <span className={`badge ${r.onTime ? "ok" : "warn"}`}>
                     {r.onTime ? "On time" : "Late"}
@@ -416,11 +530,12 @@ function DeliveryRecordsSection({
         <form className="card" onSubmit={submit}>
           <div className="field-row">
             <label>
-              PO reference
-              <input
+              Purchase order
+              <PurchaseOrderPicker
                 required
+                supplierId={supplierId}
                 value={poReference}
-                onChange={(e) => setPoReference(e.target.value)}
+                onChange={setPoReference}
               />
             </label>
           </div>

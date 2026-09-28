@@ -1,0 +1,440 @@
+/*
+ * @mms/ui component styles. Built on each app's globals.css tokens
+ * (--surface, --border, --accent, …) so components match every app.
+ * Import once in the root layout: `import "@mms/ui/styles.css";`
+ */
+
+/* ---- Combobox ----------------------------------------------------- */
+
+.mms-combobox {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+.mms-combobox > input[role="combobox"] {
+  width: 100%;
+}
+
+.mms-combobox.has-clear > input[role="combobox"] {
+  padding-right: 2rem;
+}
+
+.mms-combobox-clear {
+  position: absolute;
+  right: 0.4rem;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+/* Hidden but still focusable by native validation, so `required` works. */
+.mms-combobox-value {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 1px;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.mms-combobox-list {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 50;
+  margin: 0;
+  padding: 0.3rem;
+  list-style: none;
+  max-height: 280px;
+  overflow-y: auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 12px 32px rgba(16, 24, 40, 0.12);
+}
+
+.mms-combobox-option {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  padding: 0.5rem 0.6rem;
+  border-radius: 7px;
+  cursor: pointer;
+  color: var(--text);
+  font-size: 0.88rem;
+}
+
+.mms-combobox-option.active {
+  background: var(--accent-soft);
+}
+
+.mms-combobox-option[aria-selected="true"] {
+  font-weight: 600;
+}
+
+.mms-combobox-option.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.mms-combobox-desc {
+  font-size: 0.76rem;
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+.mms-combobox-empty {
+  padding: 0.6rem;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.mms-field-error {
+  font-size: 0.78rem;
+  color: var(--danger);
+}
+
+/* ---- Alerts ------------------------------------------------------- */
+
+.mms-flash-stack {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  width: min(380px, calc(100vw - 2rem));
+}
+
+.mms-alert {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.75rem 0.9rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+  font-size: 0.88rem;
+  color: var(--text);
+}
+
+.mms-alert.success {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+
+.mms-alert.error {
+  background: var(--danger-soft);
+  border-color: var(--danger);
+}
+
+.mms-alert.info {
+  background: var(--surface-muted);
+}
+
+.mms-alert-text {
+  flex: 1;
+}
+
+.mms-icon-btn {
+  border: none;
+  background: transparent;
+  padding: 0 0.25rem;
+  font-size: 1.2rem;
+  line-height: 1;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.mms-icon-btn:hover {
+  color: var(--text);
+  background: transparent;
+}
+
+/* ---- Modal -------------------------------------------------------- */
+
+.mms-modal {
+  border: none;
+  padding: 0;
+  border-radius: var(--radius-md);
+  box-shadow: 0 24px 64px rgba(16, 24, 40, 0.24);
+  width: min(460px, calc(100vw - 2rem));
+  background: var(--surface);
+  color: var(--text);
+}
+
+.mms-modal::backdrop {
+  background: rgba(17, 24, 39, 0.45);
+}
+
+.mms-modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1.25rem 1.4rem;
+}
+
+.mms-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.mms-modal-header h3 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.mms-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+/* ---- Money -------------------------------------------------------- */
+
+.num {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+td.num,
+th.num {
+  text-align: right;
+}
+
+/* ---- Charts ------------------------------------------------------- */
+/* Series colors come from charts/colors.ts; chrome stays recessive gray. */
+
+.mms-chart-card {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.mms-chart-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 360px), 1fr));
+  gap: 1rem;
+}
+
+.mms-link-btn {
+  border: none;
+  background: transparent;
+  color: var(--accent-hover);
+  padding: 0;
+  font-size: 0.82rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.mms-link-btn:hover {
+  background: transparent;
+  text-decoration: underline;
+}
+
+.mms-tooltip {
+  position: absolute;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 160px;
+  padding: 0.5rem 0.65rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(16, 24, 40, 0.12);
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.mms-tooltip strong {
+  color: var(--text);
+  font-size: 0.9rem;
+}
+
+.mms-tooltip-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+/* Horizontal bars */
+.mms-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.mms-bar-row {
+  display: grid;
+  grid-template-columns: minmax(90px, 30%) 1fr;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.2rem 0;
+  outline: none;
+}
+
+.mms-bar-label {
+  font-size: 0.84rem;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mms-bar-track {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 24px;
+}
+
+.mms-bar {
+  height: 16px;
+  background: #2a78d6;
+  border-radius: 0 4px 4px 0;
+  transition: filter 120ms;
+}
+
+.mms-bar-row.active .mms-bar,
+.mms-bar-row:focus-visible .mms-bar {
+  filter: brightness(1.12);
+}
+
+.mms-bar-value {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.mms-bar-track .mms-tooltip {
+  top: 22px;
+}
+
+/* Part-to-whole bar */
+.mms-share {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.mms-share-bar {
+  display: flex;
+  gap: 2px;
+  height: 24px;
+}
+
+.mms-share-seg {
+  position: relative;
+  min-width: 4px;
+  outline: none;
+}
+
+.mms-share-seg:first-child {
+  border-radius: 4px 0 0 4px;
+}
+
+.mms-share-seg:last-child {
+  border-radius: 0 4px 4px 0;
+}
+
+.mms-share-seg.active,
+.mms-share-seg:focus-visible {
+  filter: brightness(1.12);
+}
+
+.mms-share-seg .mms-tooltip {
+  top: 30px;
+}
+
+.mms-legend {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.84rem;
+  color: var(--text);
+}
+
+.mms-legend li {
+  display: grid;
+  grid-template-columns: 12px 1fr auto 3.5rem;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.mms-legend li .muted {
+  text-align: right;
+}
+
+.mms-legend.inline {
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.mms-legend.inline li {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.mms-swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+}
+
+.mms-line-key {
+  display: inline-block;
+  width: 14px;
+  height: 2px;
+  border-radius: 1px;
+}
+
+/* Time series */
+.mms-timeseries {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+}
+
+.mms-timeseries svg {
+  display: block;
+}
+
+.mms-grid {
+  stroke: #eceae4;
+  stroke-width: 1;
+}
+
+.mms-axis {
+  stroke: #c3c2b7;
+  stroke-width: 1;
+}
+
+.mms-crosshair {
+  stroke: #898781;
+  stroke-width: 1;
+}
+
+.mms-tick {
+  fill: #6b7280;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}

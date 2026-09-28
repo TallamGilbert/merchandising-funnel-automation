@@ -2,21 +2,14 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { AppShell, type NavSection } from "../components/AppShell";
-import { ClipboardCheckIcon, StoreIcon } from "../components/icons";
+import { formatDate, formatMoney, LocationPicker, useLocations, usePolling, useStaffNames } from "@mms/ui";
+import { AppShell } from "../components/AppShell";
+import { SalesAnalytics } from "../components/SalesAnalytics";
 import { api, type StoreDayLedger } from "../lib/api";
+import { NAV } from "../lib/nav";
+import { useSelectedStore } from "../lib/store";
 
 const FEATURE_ENABLED = process.env.NEXT_PUBLIC_FEATURE_SALES_AUDIT_ENABLED !== "false";
-
-const NAV: NavSection[] = [
-  {
-    label: "Main menu",
-    items: [
-      { label: "Overview", href: "/", icon: <StoreIcon /> },
-      { label: "Close register", href: "/close", icon: <ClipboardCheckIcon /> },
-    ],
-  },
-];
 
 function todayIso(): string {
   return new Date().toISOString().slice(0, 10);
@@ -24,21 +17,29 @@ function todayIso(): string {
 
 export default function Page() {
   const router = useRouter();
-  const [storeId, setStoreId] = useState("STORE-1");
+  const [storeId, setStoreId] = useSelectedStore();
+  const nameOf = useStaffNames();
+  const { data: stores } = useLocations("STORE");
+  const registerName = (code: string) =>
+    stores.find((s) => s.code === storeId)?.registers.find((r) => r.code === code)?.name ?? code;
   const [businessDate, setBusinessDate] = useState(todayIso());
   const [ledger, setLedger] = useState<StoreDayLedger | null | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
 
   const load = () => {
-    if (!FEATURE_ENABLED) return;
-    setError(null);
+    if (!FEATURE_ENABLED || !storeId) return;
     api
       .getLedger(storeId, businessDate)
-      .then(setLedger)
+      .then((result) => {
+        setLedger(result);
+        setError(null);
+      })
       .catch((err: Error) => setError(err.message));
   };
 
   useEffect(load, [storeId, businessDate]);
+  // The ledger grows with every ItemSold — keep the running total live.
+  usePolling(load, 10000, FEATURE_ENABLED && Boolean(storeId));
 
   if (!FEATURE_ENABLED) {
     return (
@@ -66,7 +67,7 @@ export default function Page() {
         <div className="field-row">
           <label>
             Store
-            <input value={storeId} onChange={(e) => setStoreId(e.target.value)} placeholder="e.g. STORE-1" />
+            <LocationPicker type="STORE" value={storeId} onChange={setStoreId} />
           </label>
           <label>
             Business date
@@ -78,28 +79,30 @@ export default function Page() {
       {error && <p className="error">{error}</p>}
 
       <div className="card">
-        {ledger === undefined ? (
+        {!storeId ? (
+          <p className="muted" style={{ margin: 0 }}>Choose a store to see its day.</p>
+        ) : ledger === undefined ? (
           <p className="muted" style={{ margin: 0 }}>Loading…</p>
         ) : ledger === null ? (
-          <p className="muted" style={{ margin: 0 }}>No sales recorded yet for {storeId} on {businessDate}.</p>
+          <p className="muted" style={{ margin: 0 }}>No sales recorded yet on {formatDate(businessDate)}.</p>
         ) : (
           <>
             <h3 style={{ margin: 0 }}>Expected total so far</h3>
-            <p style={{ fontSize: "2rem", margin: "0.5rem 0" }}>{ledger.expectedTotal}</p>
+            <p className="num" style={{ fontSize: "2rem", margin: "0.5rem 0" }}>{formatMoney(ledger.expectedTotal)}</p>
             <table>
               <thead>
                 <tr>
                   <th>Cashier</th>
                   <th>Register</th>
-                  <th>Expected</th>
+                  <th className="num">Expected</th>
                 </tr>
               </thead>
               <tbody>
                 {ledger.cashierLines.map((line) => (
                   <tr key={line.id}>
-                    <td>{line.cashierId}</td>
-                    <td>{line.registerId}</td>
-                    <td>{line.expectedAmount}</td>
+                    <td>{nameOf(line.cashierId)}</td>
+                    <td>{registerName(line.registerId)}</td>
+                    <td className="num">{formatMoney(line.expectedAmount)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -113,6 +116,8 @@ export default function Page() {
           Start close
         </button>
       </div>
+
+      {storeId && <SalesAnalytics storeId={storeId} endDate={businessDate} />}
     </AppShell>
   );
 }

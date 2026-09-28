@@ -2,6 +2,16 @@
 
 import Link from "next/link";
 import { use, useEffect, useState } from "react";
+import {
+  formatDateTime,
+  formatMoney,
+  Modal,
+  STAFF_ROLE_LABEL,
+  StaffPicker,
+  type StaffMember,
+  useFlash,
+  useStaffNames,
+} from "@mms/ui";
 import { AppShell, type NavSection } from "../../../components/AppShell";
 import { BellAlertIcon, ClipboardListIcon } from "../../../components/icons";
 import { api, type PurchaseOrder } from "../../../lib/api";
@@ -26,6 +36,8 @@ export default function PurchaseOrderPage({
   const [error, setError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const flash = useFlash();
+  const nameOf = useStaffNames();
 
   const load = () => {
     setError(null);
@@ -51,11 +63,12 @@ export default function PurchaseOrderPage({
     );
   }
 
-  const run = async (action: () => Promise<PurchaseOrder>) => {
+  const run = async (action: () => Promise<PurchaseOrder>, success: string) => {
     setBusy(true);
     setActionError(null);
     try {
       await action();
+      flash.success(success);
       load();
     } catch (err) {
       setActionError((err as Error).message);
@@ -72,7 +85,7 @@ export default function PurchaseOrderPage({
       actions={
         <>
           {po.status === "DRAFT" && (
-            <button className="primary" disabled={busy} onClick={() => run(() => api.submit(po.id))}>
+            <button className="primary" disabled={busy} onClick={() => run(() => api.submit(po.id), `${po.poNumber} submitted for approval`)}>
               Submit for approval
             </button>
           )}
@@ -80,12 +93,12 @@ export default function PurchaseOrderPage({
             <ApproveButton
               busy={busy}
               onApprove={(approvedById, approverRole) =>
-                run(() => api.approve(po.id, { approvedById, approverRole }))
+                run(() => api.approve(po.id, { approvedById, approverRole }), `${po.poNumber} approved`)
               }
             />
           )}
           {po.status === "APPROVED" && (
-            <button className="primary" disabled={busy} onClick={() => run(() => api.markSent(po.id))}>
+            <button className="primary" disabled={busy} onClick={() => run(() => api.markSent(po.id), `${po.poNumber} marked as sent`)}>
               Mark sent
             </button>
           )}
@@ -107,17 +120,16 @@ export default function PurchaseOrderPage({
           <dt className="muted">Payment terms</dt>
           <dd style={{ margin: 0 }}>Net {po.paymentTermsDays}</dd>
           <dt className="muted">Total</dt>
-          <dd style={{ margin: 0 }}>
-            {po.currency} {Number(po.totalAmount).toFixed(2)}
-          </dd>
+          <dd style={{ margin: 0 }}>{formatMoney(po.totalAmount, po.currency)}</dd>
+          <dt className="muted">Created</dt>
+          <dd style={{ margin: 0 }}>{formatDateTime(po.createdAt)}</dd>
           <dt className="muted">Requested by</dt>
-          <dd style={{ margin: 0 }}>{po.requestedById}</dd>
+          <dd style={{ margin: 0 }}>{nameOf(po.requestedById)}</dd>
           {po.approvedById && (
             <>
               <dt className="muted">Approved by</dt>
               <dd style={{ margin: 0 }}>
-                {po.approvedById} on{" "}
-                {po.approvedAt ? new Date(po.approvedAt).toLocaleString() : "—"}
+                {nameOf(po.approvedById)} on {formatDateTime(po.approvedAt)}
               </dd>
             </>
           )}
@@ -131,9 +143,10 @@ export default function PurchaseOrderPage({
             <tr>
               <th>SKU</th>
               <th>Product</th>
-              <th>Ordered</th>
-              <th>Received</th>
-              <th>Unit cost</th>
+              <th className="num">Ordered</th>
+              <th className="num">Received</th>
+              <th className="num">Unit cost</th>
+              <th className="num">Line total</th>
             </tr>
           </thead>
           <tbody>
@@ -143,11 +156,10 @@ export default function PurchaseOrderPage({
                   <code>{line.sku}</code>
                 </td>
                 <td>{line.productName}</td>
-                <td>{line.quantityOrdered}</td>
-                <td>{line.quantityReceived}</td>
-                <td>
-                  {po.currency} {Number(line.unitCost).toFixed(2)}
-                </td>
+                <td className="num">{line.quantityOrdered}</td>
+                <td className="num">{line.quantityReceived}</td>
+                <td className="num">{formatMoney(line.unitCost, po.currency)}</td>
+                <td className="num">{formatMoney(Number(line.unitCost) * line.quantityOrdered, po.currency)}</td>
               </tr>
             ))}
           </tbody>
@@ -164,52 +176,56 @@ function ApproveButton({
   busy: boolean;
   onApprove: (approvedById: string, approverRole: "MANAGER" | "OWNER") => void;
 }) {
-  const [showForm, setShowForm] = useState(false);
+  const [open, setOpen] = useState(false);
   const [approvedById, setApprovedById] = useState("");
-  const [approverRole, setApproverRole] = useState<"MANAGER" | "OWNER">("MANAGER");
+  const [approver, setApprover] = useState<StaffMember | null>(null);
+  // Only managers and owners are offered, so the role always fits D-1.
+  const approverRole = approver?.role === "OWNER" ? "OWNER" : "MANAGER";
 
-  if (!showForm) {
-    return (
-      <button className="primary" onClick={() => setShowForm(true)}>
-        Approve
-      </button>
-    );
-  }
+  const close = () => {
+    setOpen(false);
+    setApprovedById("");
+    setApprover(null);
+  };
 
   return (
-    <form
-      style={{ display: "flex", gap: "0.5rem", alignItems: "flex-end" }}
-      onSubmit={(e) => {
-        e.preventDefault();
-        onApprove(approvedById, approverRole);
-        setShowForm(false);
-      }}
-    >
-      <label>
-        Approver id
-        <input
-          required
-          value={approvedById}
-          onChange={(e) => setApprovedById(e.target.value)}
-          placeholder="e.g. mgr-sam"
-        />
-      </label>
-      <label>
-        Role
-        <select
-          value={approverRole}
-          onChange={(e) => setApproverRole(e.target.value as "MANAGER" | "OWNER")}
+    <>
+      <button className="primary" onClick={() => setOpen(true)}>
+        Approve
+      </button>
+      <Modal open={open} title="Approve purchase order" onClose={close}>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            onApprove(approvedById, approverRole);
+            close();
+          }}
         >
-          <option value="MANAGER">Manager</option>
-          <option value="OWNER">Owner</option>
-        </select>
-      </label>
-      <button className="primary" type="submit" disabled={busy}>
-        Confirm
-      </button>
-      <button type="button" onClick={() => setShowForm(false)}>
-        Cancel
-      </button>
-    </form>
+          <label>
+            Approver
+            <StaffPicker
+              required
+              roles={["MANAGER", "OWNER"]}
+              value={approvedById}
+              onChange={setApprovedById}
+              onSelectMember={setApprover}
+            />
+          </label>
+          <p className="muted" style={{ margin: 0 }}>
+            {approver
+              ? `Approving as ${STAFF_ROLE_LABEL[approver.role]}. Managers can approve orders below the approval limit; larger orders need an owner.`
+              : "Pick who is approving — their role comes from the staff directory."}
+          </p>
+          <div className="mms-modal-footer">
+            <button type="button" onClick={close}>
+              Cancel
+            </button>
+            <button className="primary" type="submit" disabled={busy || !approvedById}>
+              Approve
+            </button>
+          </div>
+        </form>
+      </Modal>
+    </>
   );
 }

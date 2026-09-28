@@ -3,6 +3,14 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import {
+  formatDateTime,
+  LocationPicker,
+  ProductPicker,
+  StaffPicker,
+  useFlash,
+  useLocations,
+} from "@mms/ui";
 import { AppShell, type NavSection } from "../../components/AppShell";
 import { BoxesIcon, LayersIcon, PackageIcon } from "../../components/icons";
 import { api, type Transfer, type TransferStatus } from "../../lib/api";
@@ -23,6 +31,8 @@ export default function TransfersPage() {
   const [statusFilter, setStatusFilter] = useState<TransferStatus | "">("");
   const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
+  const { data: locations } = useLocations();
+  const locationName = (code: string) => locations.find((l) => l.code === code)?.name ?? code;
 
   useEffect(() => {
     setError(null);
@@ -78,6 +88,7 @@ export default function TransfersPage() {
                 <th>Transfer</th>
                 <th>Item</th>
                 <th>Route</th>
+                <th>Requested</th>
                 <th>Status</th>
                 <th />
               </tr>
@@ -90,8 +101,9 @@ export default function TransfersPage() {
                     {t.quantity} × <code>{t.sku}</code>
                   </td>
                   <td>
-                    {t.fromLocationCode} → {t.toLocationCode}
+                    {locationName(t.fromLocationCode)} → {locationName(t.toLocationCode)}
                   </td>
+                  <td>{formatDateTime(t.createdAt)}</td>
                   <td>
                     <span className={`badge${t.status === "COMPLETED" ? " ok" : ""}`}>{t.status}</span>
                   </td>
@@ -110,9 +122,10 @@ export default function TransfersPage() {
 
 function NewTransferForm() {
   const router = useRouter();
+  const flash = useFlash();
   const [sku, setSku] = useState("");
   const [quantity, setQuantity] = useState(1);
-  const [fromLocationCode, setFromLocationCode] = useState("WH-MAIN");
+  const [fromLocationCode, setFromLocationCode] = useState("");
   const [toLocationCode, setToLocationCode] = useState("");
   const [requestedById, setRequestedById] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -120,6 +133,10 @@ function NewTransferForm() {
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (fromLocationCode === toLocationCode) {
+      setError("Choose two different locations");
+      return;
+    }
     setSubmitting(true);
     setError(null);
     try {
@@ -130,6 +147,7 @@ function NewTransferForm() {
         toLocationCode,
         requestedById,
       });
+      flash.success(`${transfer.transferNumber} created — picks are ready`);
       router.push(`/transfers/${transfer.id}`);
     } catch (err) {
       setError((err as Error).message);
@@ -143,8 +161,8 @@ function NewTransferForm() {
 
       <div className="field-row">
         <label>
-          SKU
-          <input required value={sku} onChange={(e) => setSku(e.target.value)} placeholder="e.g. CHAIR-OAK-01" />
+          Product
+          <ProductPicker required value={sku} onChange={setSku} />
         </label>
         <label style={{ maxWidth: 140 }}>
           Quantity
@@ -159,26 +177,16 @@ function NewTransferForm() {
       </div>
       <div className="field-row">
         <label>
-          From location
-          <input required value={fromLocationCode} onChange={(e) => setFromLocationCode(e.target.value)} />
+          From
+          <LocationPicker required value={fromLocationCode} onChange={setFromLocationCode} />
         </label>
         <label>
-          To location
-          <input
-            required
-            value={toLocationCode}
-            onChange={(e) => setToLocationCode(e.target.value)}
-            placeholder="e.g. STORE-1"
-          />
+          To
+          <LocationPicker required value={toLocationCode} onChange={setToLocationCode} />
         </label>
         <label>
-          Requested by (user id)
-          <input
-            required
-            value={requestedById}
-            onChange={(e) => setRequestedById(e.target.value)}
-            placeholder="e.g. sup-grace"
-          />
+          Requested by
+          <StaffPicker required roles={["MANAGER", "OWNER"]} value={requestedById} onChange={setRequestedById} />
         </label>
       </div>
 

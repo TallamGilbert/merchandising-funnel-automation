@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { use, useEffect, useState } from "react";
+import { formatMoney, formatQuantity, LocationPicker, useFlash, useLocations, usePolling } from "@mms/ui";
 import { AppShell, type NavSection } from "../../../components/AppShell";
 import { BoxesIcon, LayersIcon } from "../../../components/icons";
 import { api, type ProductDetail } from "../../../lib/api";
@@ -25,13 +26,21 @@ export default function ProductPage({
   const [product, setProduct] = useState<ProductDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
+  const flash = useFlash();
 
   const load = () => {
-    setError(null);
-    api.getProduct(sku).then(setProduct).catch((err: Error) => setError(err.message));
+    api
+      .getProduct(sku)
+      .then((p) => {
+        setProduct(p);
+        setError(null);
+      })
+      .catch((err: Error) => setError(err.message));
   };
 
   useEffect(load, [sku]);
+  // Keeps stock levels current as the POS sells this product.
+  usePolling(load, 5000, !editing);
 
   if (error) {
     return (
@@ -67,6 +76,7 @@ export default function ProductPage({
           product={product}
           onSaved={() => {
             setEditing(false);
+            flash.success("Product details saved");
             load();
           }}
         />
@@ -76,7 +86,7 @@ export default function ProductPage({
             <dt className="muted">Description</dt>
             <dd style={{ margin: 0 }}>{product.description ?? "—"}</dd>
             <dt className="muted">Unit cost</dt>
-            <dd style={{ margin: 0 }}>{Number(product.unitCost).toFixed(2)}</dd>
+            <dd style={{ margin: 0 }}>{formatMoney(product.unitCost)}</dd>
             <dt className="muted">Dimensions (L×W×H cm)</dt>
             <dd style={{ margin: 0 }}>
               {product.lengthCm ?? "—"} × {product.widthCm ?? "—"} × {product.heightCm ?? "—"}
@@ -143,7 +153,7 @@ function EditProductForm({
       </div>
       <div className="field-row">
         <label>
-          Unit cost
+          Unit cost (KES)
           <input
             required
             type="number"
@@ -183,6 +193,12 @@ function StockLevelsSection({
   stockLevels: ProductDetail["stockLevels"];
   onChange: () => void;
 }) {
+  const flash = useFlash();
+  const { data: directoryLocations } = useLocations();
+  const locationName = (code: string) => {
+    const location = directoryLocations.find((l) => l.code === code);
+    return location ? `${location.name} (${code})` : code;
+  };
   const [showForm, setShowForm] = useState(false);
   const [locationCode, setLocationCode] = useState("");
   const [quantityDelta, setQuantityDelta] = useState(0);
@@ -196,6 +212,9 @@ function StockLevelsSection({
     setError(null);
     try {
       await api.adjustStock(sku, { locationCode, quantityDelta, reason });
+      flash.success(
+        `Stock at ${locationName(locationCode)} ${quantityDelta >= 0 ? "increased" : "decreased"} by ${Math.abs(quantityDelta)}`,
+      );
       setLocationCode("");
       setQuantityDelta(0);
       setReason("");
@@ -217,18 +236,18 @@ function StockLevelsSection({
           <thead>
             <tr>
               <th>Location</th>
-              <th>On hand</th>
-              <th>Allocated</th>
-              <th>Available</th>
+              <th className="num">On hand</th>
+              <th className="num">Allocated</th>
+              <th className="num">Available</th>
             </tr>
           </thead>
           <tbody>
             {stockLevels.map((level) => (
               <tr key={level.id}>
-                <td>{level.locationCode}</td>
-                <td>{level.onHand}</td>
-                <td>{level.allocated}</td>
-                <td>{level.available}</td>
+                <td>{locationName(level.locationCode)}</td>
+                <td className="num">{formatQuantity(level.onHand)}</td>
+                <td className="num">{formatQuantity(level.allocated)}</td>
+                <td className="num">{formatQuantity(level.available)}</td>
               </tr>
             ))}
           </tbody>
@@ -240,13 +259,8 @@ function StockLevelsSection({
           <h3 style={{ margin: 0 }}>Adjust stock</h3>
           <div className="field-row">
             <label>
-              Location code
-              <input
-                required
-                value={locationCode}
-                onChange={(e) => setLocationCode(e.target.value)}
-                placeholder="e.g. WH-01"
-              />
+              Location
+              <LocationPicker required value={locationCode} onChange={setLocationCode} />
             </label>
             <label>
               Quantity delta

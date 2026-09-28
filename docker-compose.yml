@@ -15,6 +15,7 @@ x-common-service-env: &common-service-env
   FEATURE_RETAIL_SALES_ENABLED: ${FEATURE_RETAIL_SALES_ENABLED}
   FEATURE_SALES_AUDIT_ENABLED: ${FEATURE_SALES_AUDIT_ENABLED}
   FEATURE_FINANCIALS_ENABLED: ${FEATURE_FINANCIALS_ENABLED}
+  FEATURE_DIRECTORY_ENABLED: ${FEATURE_DIRECTORY_ENABLED:-true}
 
 x-depends-on-infra: &depends-on-infra
   postgres:
@@ -43,6 +44,7 @@ services:
       RETAIL_SALES_DB_PASSWORD: ${RETAIL_SALES_DB_PASSWORD}
       SALES_AUDIT_DB_PASSWORD: ${SALES_AUDIT_DB_PASSWORD}
       FINANCIALS_DB_PASSWORD: ${FINANCIALS_DB_PASSWORD}
+      DIRECTORY_DB_PASSWORD: ${DIRECTORY_DB_PASSWORD}
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
     volumes:
@@ -193,6 +195,23 @@ services:
     ports:
       - "${FINANCIALS_PORT:-3008}:${FINANCIALS_PORT:-3008}"
     working_dir: /workspace/services/financials
+    command: *migrate-and-start
+
+  # Staff, stores/warehouses and registers — reference data the other
+  # modules' frontends pick from (D-10). Seeds demo data on an empty DB.
+  directory:
+    build:
+      context: .
+      dockerfile: services/directory/Dockerfile
+    depends_on: *depends-on-infra
+    environment:
+      <<: *common-service-env
+      PORT: ${DIRECTORY_PORT:-3009}
+      DATABASE_URL: postgresql://directory_svc:${DIRECTORY_DB_PASSWORD}@postgres:5432/directory?schema=public
+      DIRECTORY_SEED_DEMO: ${DIRECTORY_SEED_DEMO:-true}
+    ports:
+      - "${DIRECTORY_PORT:-3009}:${DIRECTORY_PORT:-3009}"
+    working_dir: /workspace/services/directory
     command: *migrate-and-start
 
 volumes:

@@ -7,6 +7,7 @@ import { InventoryGrpcClientModule } from "./inventory-grpc-client/inventory-grp
 import { PrismaModule } from "./prisma/prisma.module";
 import { ProductsModule } from "./products/products.module";
 import { ReturnsModule } from "./returns/returns.module";
+import { SalesSummaryModule } from "./sales-summary/sales-summary.module";
 import { TransactionsModule } from "./transactions/transactions.module";
 
 @Module({
@@ -20,6 +21,7 @@ import { TransactionsModule } from "./transactions/transactions.module";
     ReturnsModule,
     ExpectedTotalModule,
     TransactionsModule,
+    SalesSummaryModule,
   ],
 })
 export class AppModule {}

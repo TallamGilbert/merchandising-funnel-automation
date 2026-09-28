@@ -43,6 +43,7 @@ describe("isModuleEnabled", () => {
     "FEATURE_VENDOR_MANAGEMENT_ENABLED",
     "FEATURE_PROCUREMENT_ENABLED",
     "FEATURE_INVENTORY_ENABLED",
+    "FEATURE_DIRECTORY_ENABLED",
   ];
   const PHASE_2_ENV_VARS = [
     "FEATURE_RECEIVING_ENABLED",
@@ -71,14 +72,16 @@ describe("isModuleEnabled", () => {
     }
   });
 
-  it("defaults Phase 1 modules (vendor-management, procurement, inventory) to enabled", () => {
+  it("defaults Phase 1 modules (vendor-management, procurement, inventory, directory) to enabled", () => {
     delete process.env.FEATURE_VENDOR_MANAGEMENT_ENABLED;
     delete process.env.FEATURE_PROCUREMENT_ENABLED;
     delete process.env.FEATURE_INVENTORY_ENABLED;
+    delete process.env.FEATURE_DIRECTORY_ENABLED;
 
     expect(isModuleEnabled(ModuleKey.VENDOR_MANAGEMENT)).toBe(true);
     expect(isModuleEnabled(ModuleKey.PROCUREMENT)).toBe(true);
     expect(isModuleEnabled(ModuleKey.INVENTORY)).toBe(true);
+    expect(isModuleEnabled(ModuleKey.DIRECTORY)).toBe(true);
   });
 
   it("defaults Phase 2 modules (receiving, warehouse-operations) to enabled", () => {

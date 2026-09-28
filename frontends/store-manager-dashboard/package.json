@@ -2,7 +2,7 @@
   "name": "@mms/store-manager-dashboard",
   "version": "0.1.0",
   "private": true,
-  "description": "Store Manager Dashboard — Enter cash counts, compare against expected totals, and close registers.",
+  "description": "Store Manager Dashboard \u2014 Enter cash counts, compare against expected totals, and close registers.",
   "scripts": {
     "dev": "next dev -p 3107",
     "build": "next build",
@@ -10,6 +10,7 @@
     "lint": "eslint \"app/**/*.{ts,tsx}\""
   },
   "dependencies": {
+    "@mms/ui": "workspace:*",
     "next": "^16.3.4",
     "react": "^19.3.0",
     "react-dom": "^19.3.0"

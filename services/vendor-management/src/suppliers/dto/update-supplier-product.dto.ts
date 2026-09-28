@@ -1,5 +1,6 @@
 import { ApiPropertyOptional } from "@nestjs/swagger";
-import { IsNumber, IsOptional, IsString, Min } from "class-validator";
+import { SUPPORTED_CURRENCY_CODES } from "@mms/shared";
+import { IsIn, IsNumber, IsOptional, IsString, Min } from "class-validator";
 
 export class UpdateSupplierProductDto {
   @ApiPropertyOptional()
@@ -13,8 +14,8 @@ export class UpdateSupplierProductDto {
   @Min(0)
   unitCost?: number;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ enum: SUPPORTED_CURRENCY_CODES })
   @IsOptional()
-  @IsString()
+  @IsIn(SUPPORTED_CURRENCY_CODES, { message: `currency must be one of ${SUPPORTED_CURRENCY_CODES.join(", ")}` })
   currency?: string;
 }

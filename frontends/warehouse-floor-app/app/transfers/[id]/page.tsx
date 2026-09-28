@@ -2,9 +2,11 @@
 
 import Link from "next/link";
 import { use, useEffect, useState } from "react";
+import { formatDateTime, StaffPicker, useFlash, useLocations, useStaffNames } from "@mms/ui";
 import { AppShell, type NavSection } from "../../../components/AppShell";
 import { BoxesIcon, LayersIcon, PackageIcon } from "../../../components/icons";
 import { api, type PickTask, type Transfer } from "../../../lib/api";
+import { useOperator } from "../../../lib/operator";
 
 const NAV: NavSection[] = [
   {
@@ -21,6 +23,10 @@ export default function TransferPage({ params }: { params: Promise<{ id: string 
   const { id } = use(params);
   const [transfer, setTransfer] = useState<Transfer | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [operator, setOperator] = useOperator();
+  const nameOf = useStaffNames();
+  const { data: locations } = useLocations();
+  const locationName = (code: string) => locations.find((l) => l.code === code)?.name ?? code;
 
   const load = () => {
     setError(null);
@@ -64,14 +70,16 @@ export default function TransferPage({ params }: { params: Promise<{ id: string 
           </dd>
           <dt className="muted">Route</dt>
           <dd style={{ margin: 0 }}>
-            {transfer.fromLocationCode} → {transfer.toLocationCode}
+            {locationName(transfer.fromLocationCode)} → {locationName(transfer.toLocationCode)}
           </dd>
           <dt className="muted">Requested by</dt>
-          <dd style={{ margin: 0 }}>{transfer.requestedById}</dd>
+          <dd style={{ margin: 0 }}>{nameOf(transfer.requestedById)}</dd>
+          <dt className="muted">Requested</dt>
+          <dd style={{ margin: 0 }}>{formatDateTime(transfer.createdAt)}</dd>
           {transfer.completedAt && (
             <>
               <dt className="muted">Completed</dt>
-              <dd style={{ margin: 0 }}>{new Date(transfer.completedAt).toLocaleString()}</dd>
+              <dd style={{ margin: 0 }}>{formatDateTime(transfer.completedAt)}</dd>
             </>
           )}
         </dl>
@@ -79,17 +87,33 @@ export default function TransferPage({ params }: { params: Promise<{ id: string 
 
       <section>
         <h2>Picks{transfer.status === "PICKING" ? ` — ${remaining} to go` : ""}</h2>
+        {transfer.status === "PICKING" && (
+          <label style={{ maxWidth: 360, marginBottom: "1rem" }}>
+            Picking as
+            <StaffPicker roles={["WAREHOUSE_STAFF", "MANAGER"]} value={operator} onChange={setOperator} />
+          </label>
+        )}
         {transfer.picks.map((pick) => (
-          <PickCard key={pick.id} pick={pick} onChanged={load} />
+          <PickCard key={pick.id} pick={pick} operator={operator} pickedByName={nameOf(pick.pickedById)} onChanged={load} />
         ))}
       </section>
     </AppShell>
   );
 }
 
-function PickCard({ pick, onChanged }: { pick: PickTask; onChanged: () => void }) {
+function PickCard({
+  pick,
+  operator,
+  pickedByName,
+  onChanged,
+}: {
+  pick: PickTask;
+  operator: string;
+  pickedByName: string;
+  onChanged: () => void;
+}) {
+  const flash = useFlash();
   const [scannedBinCode, setScannedBinCode] = useState("");
-  const [pickedById, setPickedById] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -98,7 +122,8 @@ function PickCard({ pick, onChanged }: { pick: PickTask; onChanged: () => void }
     setBusy(true);
     setError(null);
     try {
-      await api.completePick(pick.id, { pickedById, scannedBinCode });
+      await api.completePick(pick.id, { pickedById: operator, scannedBinCode });
+      flash.success(`Picked ${pick.quantity} × ${pick.sku} from ${pick.bin.code}`);
       onChanged();
     } catch (err) {
       setError((err as Error).message);
@@ -119,14 +144,14 @@ function PickCard({ pick, onChanged }: { pick: PickTask; onChanged: () => void }
 
       {pick.status === "PICKED" ? (
         <p className="muted" style={{ margin: 0 }}>
-          Picked by {pick.pickedById}
-          {pick.pickedAt ? ` on ${new Date(pick.pickedAt).toLocaleString()}` : ""}.
+          Picked by {pickedByName}
+          {pick.pickedAt ? ` on ${formatDateTime(pick.pickedAt)}` : ""}.
         </p>
       ) : (
         <form onSubmit={submit}>
           <div className="field-row">
             <label>
-              Scan bin code
+              Confirm bin — scan its label or pick it
               <input
                 required
                 value={scannedBinCode}
@@ -134,22 +159,22 @@ function PickCard({ pick, onChanged }: { pick: PickTask; onChanged: () => void }
                 placeholder={`Scan ${pick.bin.code}`}
                 style={{ fontSize: "1.1rem", padding: "0.75rem 0.9rem" }}
                 autoComplete="off"
+                list={`pick-bin-${pick.id}`}
               />
-            </label>
-            <label>
-              Your user id
-              <input
-                required
-                value={pickedById}
-                onChange={(e) => setPickedById(e.target.value)}
-                placeholder="e.g. picker-lucy"
-                style={{ fontSize: "1.1rem", padding: "0.75rem 0.9rem" }}
-              />
+              <datalist id={`pick-bin-${pick.id}`}>
+                <option value={pick.bin.code}>{`Zone ${pick.bin.zone}`}</option>
+              </datalist>
             </label>
           </div>
           {error && <p className="error">{error}</p>}
+          {!operator && <p className="muted" style={{ margin: 0 }}>Choose who is picking above to confirm.</p>}
           <div>
-            <button className="primary" type="submit" disabled={busy} style={{ padding: "0.75rem 1.5rem" }}>
+            <button
+              className="primary"
+              type="submit"
+              disabled={busy || !operator}
+              style={{ padding: "0.75rem 1.5rem" }}
+            >
               {busy ? "Confirming…" : "Confirm pick"}
             </button>
           </div>

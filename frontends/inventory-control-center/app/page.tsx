@@ -2,8 +2,10 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { formatDateTime, formatMoney, usePolling, useFlash } from "@mms/ui";
 import { AppShell, type NavSection } from "../components/AppShell";
 import { BoxesIcon, LayersIcon } from "../components/icons";
+import { InventoryCharts } from "../components/InventoryCharts";
 import { api, type Product, type ValuationReport } from "../lib/api";
 
 const FEATURE_ENABLED = process.env.NEXT_PUBLIC_FEATURE_INVENTORY_ENABLED !== "false";
@@ -23,15 +25,22 @@ export default function Page() {
   const [search, setSearch] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
+  const flash = useFlash();
 
   const load = () => {
-    setError(null);
-    api.listProducts().then(setProducts).catch((err: Error) => setError(err.message));
+    api
+      .listProducts()
+      .then((rows) => {
+        setProducts(rows);
+        setError(null);
+      })
+      .catch((err: Error) => setError(err.message));
   };
 
   useEffect(() => {
     if (FEATURE_ENABLED) load();
   }, []);
+  usePolling(load, 10000, FEATURE_ENABLED);
 
   const visible = useMemo(() => {
     if (!products) return null;
@@ -78,8 +87,9 @@ export default function Page() {
     >
       {showForm && (
         <NewProductForm
-          onCreated={() => {
+          onCreated={(name) => {
             setShowForm(false);
+            flash.success(`Product ${name} created`);
             load();
           }}
         />
@@ -88,6 +98,8 @@ export default function Page() {
       {error && <p className="error">{error}</p>}
 
       <ValuationSummary />
+
+      <InventoryCharts />
 
       <div className="card" style={{ padding: 0 }}>
         {visible === null ? (
@@ -104,7 +116,7 @@ export default function Page() {
               <tr>
                 <th>SKU</th>
                 <th>Name</th>
-                <th>Unit cost</th>
+                <th className="num">Unit cost</th>
                 <th />
               </tr>
             </thead>
@@ -115,7 +127,7 @@ export default function Page() {
                     <code>{p.sku}</code>
                   </td>
                   <td>{p.name}</td>
-                  <td>{Number(p.unitCost).toFixed(2)}</td>
+                  <td className="num">{formatMoney(p.unitCost)}</td>
                   <td>
                     <Link href={`/products/${p.sku}`}>View</Link>
                   </td>
@@ -132,9 +144,12 @@ export default function Page() {
 function ValuationSummary() {
   const [report, setReport] = useState<ValuationReport | null>(null);
 
-  useEffect(() => {
+  const load = () => {
     api.valuationReport().then(setReport).catch(() => setReport(null));
-  }, []);
+  };
+  useEffect(load, []);
+  // Valuation moves with every sale, receipt and adjustment.
+  usePolling(load, 10000);
 
   if (!report) return null;
 
@@ -142,17 +157,17 @@ function ValuationSummary() {
     <div className="stat-card">
       <span className="muted">Stock valuation</span>
       <p className="stat-value">
-        {report.totalValue.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+        {formatMoney(report.totalValue)}
       </p>
       <p className="muted" style={{ margin: 0 }}>
-        As of {new Date(report.asOf).toLocaleString()} across {report.byProduct.length} product
+        As of {formatDateTime(report.asOf)} across {report.byProduct.length} product
         {report.byProduct.length === 1 ? "" : "s"} with stock
       </p>
     </div>
   );
 }
 
-function NewProductForm({ onCreated }: { onCreated: () => void }) {
+function NewProductForm({ onCreated }: { onCreated: (name: string) => void }) {
   const [sku, setSku] = useState("");
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -173,7 +188,7 @@ function NewProductForm({ onCreated }: { onCreated: () => void }) {
         unitCost,
         weightKg: weightKg === "" ? undefined : weightKg,
       });
-      onCreated();
+      onCreated(name);
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -212,7 +227,7 @@ function NewProductForm({ onCreated }: { onCreated: () => void }) {
       </div>
       <div className="field-row">
         <label>
-          Unit cost (valuation baseline)
+          Unit cost in KES (valuation baseline)
           <input
             required
             type="number"

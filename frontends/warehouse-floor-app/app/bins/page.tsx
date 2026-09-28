@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { BarChart, ChartCard, formatQuantity, LocationPicker, useFlash, useLocations } from "@mms/ui";
 import { AppShell, type NavSection } from "../../components/AppShell";
 import { BoxesIcon, LayersIcon, PackageIcon } from "../../components/icons";
 import { api, type Bin, type ZoneUtilization } from "../../lib/api";
@@ -24,6 +25,9 @@ export default function BinsPage() {
   const [locationFilter, setLocationFilter] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
+  const flash = useFlash();
+  const { data: locations } = useLocations();
+  const locationName = (code: string) => locations.find((l) => l.code === code)?.name ?? code;
 
   const load = () => {
     setError(null);
@@ -52,8 +56,9 @@ export default function BinsPage() {
     >
       {showForm && (
         <NewBinForm
-          onCreated={() => {
+          onCreated={(code) => {
             setShowForm(false);
+            flash.success(`Bin ${code} created`);
             load();
           }}
         />
@@ -63,12 +68,8 @@ export default function BinsPage() {
 
       <div className="row-between">
         <label style={{ maxWidth: 220 }}>
-          Location code
-          <input
-            value={locationFilter}
-            onChange={(e) => setLocationFilter(e.target.value)}
-            placeholder="All locations"
-          />
+          Location
+          <LocationPicker clearable value={locationFilter} onChange={setLocationFilter} placeholder="All locations" />
         </label>
       </div>
 
@@ -81,7 +82,7 @@ export default function BinsPage() {
           zones.map((z) => (
             <div className="stat-card" key={`${z.locationCode}-${z.zone}`}>
               <span className="muted">
-                {z.locationCode} · {z.zone}
+                {locationName(z.locationCode)} · {z.zone}
               </span>
               <p className="stat-value">{z.volumeUtilizationPct}%</p>
               <p className="muted" style={{ margin: 0 }}>
@@ -93,6 +94,32 @@ export default function BinsPage() {
           ))
         )}
       </div>
+
+      {zones && zones.length > 0 && (
+        <ChartCard
+          title="How full each zone is"
+          subtitle="Share of volume capacity in use, including space reserved for directed putaways"
+          table={{
+            columns: ["Zone", "Volume used", "Weight used", "Bins"],
+            rows: zones.map((z) => [
+              `${locationName(z.locationCode)} · ${z.zone}`,
+              `${z.volumeUtilizationPct}%`,
+              `${z.weightUtilizationPct}%`,
+              z.binCount,
+            ]),
+          }}
+        >
+          <BarChart
+            max={100}
+            data={zones.map((z) => ({
+              label: `${locationName(z.locationCode)} · ${z.zone}`,
+              value: z.volumeUtilizationPct,
+              detail: `weight ${z.weightUtilizationPct}% · ${formatQuantity(z.binCount)} bins`,
+            }))}
+            format={(v) => `${v}%`}
+          />
+        </ChartCard>
+      )}
 
       <div className="card" style={{ padding: 0 }}>
         {bins === null ? (
@@ -123,7 +150,7 @@ export default function BinsPage() {
                     <td>
                       <code>{bin.code}</code>
                     </td>
-                    <td>{bin.locationCode}</td>
+                    <td>{locationName(bin.locationCode)}</td>
                     <td>{bin.zone}</td>
                     <td>
                       {(Number(bin.usedVolumeCm3) / CM3_PER_M3).toFixed(2)} /{" "}
@@ -136,7 +163,7 @@ export default function BinsPage() {
                       {contents.length === 0 ? (
                         <span className="muted">Empty</span>
                       ) : (
-                        contents.map((s) => `${s.quantity} × ${s.sku}`).join(", ")
+                        contents.map((s) => `${formatQuantity(s.quantity)} × ${s.sku}`).join(", ")
                       )}
                     </td>
                   </tr>
@@ -150,9 +177,9 @@ export default function BinsPage() {
   );
 }
 
-function NewBinForm({ onCreated }: { onCreated: () => void }) {
+function NewBinForm({ onCreated }: { onCreated: (code: string) => void }) {
   const [code, setCode] = useState("");
-  const [locationCode, setLocationCode] = useState("WH-MAIN");
+  const [locationCode, setLocationCode] = useState("");
   const [zone, setZone] = useState("");
   const [pickPriority, setPickPriority] = useState(100);
   const [capacityM3, setCapacityM3] = useState(1);
@@ -173,7 +200,7 @@ function NewBinForm({ onCreated }: { onCreated: () => void }) {
         capacityVolumeCm3: Math.round(capacityM3 * CM3_PER_M3),
         maxWeightKg,
       });
-      onCreated();
+      onCreated(code);
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -191,8 +218,8 @@ function NewBinForm({ onCreated }: { onCreated: () => void }) {
           <input required value={code} onChange={(e) => setCode(e.target.value)} placeholder="e.g. A-01-03" />
         </label>
         <label>
-          Location code
-          <input required value={locationCode} onChange={(e) => setLocationCode(e.target.value)} />
+          Location
+          <LocationPicker required value={locationCode} onChange={setLocationCode} />
         </label>
         <label>
           Zone

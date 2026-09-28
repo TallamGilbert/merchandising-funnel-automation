@@ -1,0 +1,266 @@
+# Generated from the running service: curl localhost:3009/docs-json (see CONTRIBUTING.md, NFR-4).
+openapi: 3.0.0
+paths:
+  /health:
+    get:
+      operationId: HealthController_check
+      parameters: []
+      responses:
+        '200':
+          description: Service is up.
+      tags:
+      - health
+  /locations:
+    get:
+      operationId: LocationsController_list
+      parameters:
+      - name: type
+        required: false
+        in: query
+        schema:
+          enum:
+          - STORE
+          - WAREHOUSE
+          type: string
+      - name: includeInactive
+        required: false
+        in: query
+        schema:
+          type: boolean
+      responses:
+        '200':
+          description: ''
+      tags:
+      - locations
+    post:
+      operationId: LocationsController_create
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateLocationDto'
+      responses:
+        '201':
+          description: ''
+      tags:
+      - locations
+  /locations/{code}:
+    get:
+      operationId: LocationsController_findOne
+      parameters:
+      - name: code
+        required: true
+        in: path
+        schema:
+          type: string
+      responses:
+        '200':
+          description: ''
+      tags:
+      - locations
+    patch:
+      operationId: LocationsController_update
+      parameters:
+      - name: code
+        required: true
+        in: path
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateLocationDto'
+      responses:
+        '200':
+          description: ''
+      tags:
+      - locations
+  /locations/{code}/registers:
+    post:
+      operationId: LocationsController_addRegister
+      parameters:
+      - name: code
+        required: true
+        in: path
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateRegisterDto'
+      responses:
+        '201':
+          description: ''
+      tags:
+      - locations
+  /staff:
+    get:
+      operationId: StaffController_list
+      parameters:
+      - name: role
+        required: false
+        in: query
+        description: One role, or several comma-separated (MANAGER,OWNER)
+        schema:
+          type: string
+      - name: locationCode
+        required: false
+        in: query
+        schema:
+          type: string
+      - name: includeInactive
+        required: false
+        in: query
+        schema:
+          type: boolean
+      responses:
+        '200':
+          description: ''
+      tags:
+      - staff
+    post:
+      operationId: StaffController_create
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateStaffDto'
+      responses:
+        '201':
+          description: ''
+      tags:
+      - staff
+  /staff/{id}:
+    get:
+      operationId: StaffController_findOne
+      parameters:
+      - name: id
+        required: true
+        in: path
+        schema:
+          type: string
+      responses:
+        '200':
+          description: ''
+      tags:
+      - staff
+    patch:
+      operationId: StaffController_update
+      parameters:
+      - name: id
+        required: true
+        in: path
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateStaffDto'
+      responses:
+        '200':
+          description: ''
+      tags:
+      - staff
+info:
+  title: Directory Service
+  description: Reference directory of staff (with roles), stores/warehouses and registers
+    (D-10). Generated from the live /docs-json.
+  version: 0.1.0
+  contact: {}
+tags: []
+servers:
+- url: http://localhost:3009
+components:
+  schemas:
+    CreateLocationDto:
+      type: object
+      properties:
+        code:
+          type: string
+          example: STORE-3
+          description: Uppercase code used by every other service
+        name:
+          type: string
+          example: Karen Showroom
+        type:
+          type: string
+          enum:
+          - STORE
+          - WAREHOUSE
+      required:
+      - code
+      - name
+      - type
+    UpdateLocationDto:
+      type: object
+      properties:
+        name:
+          type: string
+        active:
+          type: boolean
+    CreateRegisterDto:
+      type: object
+      properties:
+        code:
+          type: string
+          example: REG-3
+          description: Unique within its store
+        name:
+          type: string
+          example: Till 3 (entrance)
+      required:
+      - code
+      - name
+    CreateStaffDto:
+      type: object
+      properties:
+        id:
+          type: string
+          example: cashier-amy
+          description: Identifier other services record against this person
+        name:
+          type: string
+          example: Amy Wanjiru
+        role:
+          type: string
+          enum:
+          - OWNER
+          - MANAGER
+          - CASHIER
+          - WAREHOUSE_STAFF
+        locationCode:
+          type: string
+          example: STORE-1
+          description: Home store/warehouse
+      required:
+      - id
+      - name
+      - role
+    UpdateStaffDto:
+      type: object
+      properties:
+        name:
+          type: string
+        role:
+          type: string
+          enum:
+          - OWNER
+          - MANAGER
+          - CASHIER
+          - WAREHOUSE_STAFF
+        locationCode:
+          type: object
+          nullable: true
+          description: null clears the home location
+        active:
+          type: boolean
