@@ -1,9 +1,3 @@
-// Scaffold-only schema. This service is not implemented in this pass — see
-// the root README's module status table for its phase. Replace this stub
-// with the service's real domain models when its phase begins; keep the
-// datasource/generator blocks as-is (DATABASE_URL points at this service's
-// own isolated database — see docker/postgres-init/init-databases.sh).
-
 generator client {
   provider = "prisma-client-js"
   // Custom output — pnpm dedups identical @prisma/client versions into one
@@ -18,7 +12,86 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model Placeholder {
-  id        String   @id @default(uuid())
-  createdAt DateTime @default(now())
+enum DailyCloseStatus {
+  OPEN
+  BLOCKED_ON_EXPLANATION
+  CLOSED
+}
+
+/// FR-7.1/7.7 — the running expected-total accumulator for one store on one
+/// business date, kept current by consuming ItemSold (D-9). Closing is
+/// store-level (D-4), so there is exactly one row per (storeId, businessDate)
+/// even though a store may have several registers.
+model StoreDayLedger {
+  id            String   @id @default(uuid())
+  storeId       String
+  businessDate  String
+  expectedTotal Decimal  @default(0) @db.Decimal(12, 2)
+  updatedAt     DateTime @updatedAt
+
+  cashierLines CashierLedgerLine[]
+  close        DailyClose?
+
+  @@unique([storeId, businessDate])
+}
+
+/// FR-7.3 — per-cashier/register accumulation within a store-day, for
+/// pattern detection. Rolls up into StoreDayLedger.expectedTotal but is
+/// never closed individually, since closing itself is store-level (D-4).
+model CashierLedgerLine {
+  id               String         @id @default(uuid())
+  storeDayLedgerId String
+  storeDayLedger   StoreDayLedger @relation(fields: [storeDayLedgerId], references: [id], onDelete: Cascade)
+  cashierId        String
+  registerId       String
+  expectedAmount   Decimal        @default(0) @db.Decimal(12, 2)
+
+  @@unique([storeDayLedgerId, cashierId, registerId])
+}
+
+/// Idempotency guard for the ItemSold consumer (D-9) — the ledger it writes
+/// is an additive accumulator, not an upsert-by-natural-key, so a redelivered
+/// event needs its own applied-once record.
+model AppliedItemSoldEvent {
+  eventId    String   @id
+  appliedAt  DateTime @default(now())
+}
+
+/// FR-7.2/7.4/7.6 — one store's physical-count close for one business date.
+/// Blocked on a nonzero discrepancy until a manager explains it (FR-7.4);
+/// publishes DayClosed once CLOSED.
+model DailyClose {
+  id                     String           @id @default(uuid())
+  storeDayLedgerId       String           @unique
+  storeDayLedger         StoreDayLedger   @relation(fields: [storeDayLedgerId], references: [id])
+  storeId                String
+  businessDate           String
+  expectedTotal          Decimal          @db.Decimal(12, 2)
+  actualCountedTotal     Decimal?         @db.Decimal(12, 2)
+  discrepancyAmount      Decimal?         @db.Decimal(12, 2)
+  discrepancyExplanation String?
+  status                 DailyCloseStatus @default(OPEN)
+  closedByManagerId      String?
+  closedAt               DateTime?
+  createdAt              DateTime         @default(now())
+
+  @@index([storeId, businessDate])
+}
+
+/// FR-7.5 — append-only historical discrepancy log, independent of
+/// DailyClose so it survives even if a close is later reopened/corrected.
+/// Written on every close, including zero-discrepancy closes, so the log
+/// stays complete for pattern detection.
+model DiscrepancyLogEntry {
+  id                String   @id @default(uuid())
+  storeId           String
+  businessDate      String
+  cashierId         String?
+  registerId        String?
+  discrepancyAmount Decimal  @db.Decimal(12, 2)
+  explanation       String?
+  recordedAt        DateTime @default(now())
+
+  @@index([storeId, businessDate])
+  @@index([cashierId])
 }

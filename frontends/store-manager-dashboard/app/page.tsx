@@ -1,60 +1,118 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { AppShell, type NavSection } from "../components/AppShell";
+import { ClipboardCheckIcon, StoreIcon } from "../components/icons";
+import { api, type StoreDayLedger } from "../lib/api";
 
-// Inlined at build time by Next.js — see .env.example for the full set of
-// NEXT_PUBLIC_* vars this app reads. Mirrors the backend's own feature flag
-// (NEXT_PUBLIC_FEATURE_SALES_AUDIT_ENABLED) so the frontend and its backend module enable/disable together.
 const FEATURE_ENABLED = process.env.NEXT_PUBLIC_FEATURE_SALES_AUDIT_ENABLED !== "false";
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3007";
 
-type HealthState =
-  | { status: "checking" }
-  | { status: "ok"; detail: string }
-  | { status: "error"; detail: string };
+const NAV: NavSection[] = [
+  {
+    label: "Main menu",
+    items: [
+      { label: "Overview", href: "/", icon: <StoreIcon /> },
+      { label: "Close register", href: "/close", icon: <ClipboardCheckIcon /> },
+    ],
+  },
+];
+
+function todayIso(): string {
+  return new Date().toISOString().slice(0, 10);
+}
 
 export default function Page() {
-  const [health, setHealth] = useState<HealthState>({ status: "checking" });
+  const router = useRouter();
+  const [storeId, setStoreId] = useState("STORE-1");
+  const [businessDate, setBusinessDate] = useState(todayIso());
+  const [ledger, setLedger] = useState<StoreDayLedger | null | undefined>(undefined);
+  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
+  const load = () => {
     if (!FEATURE_ENABLED) return;
-    fetch(`${API_URL}/health`)
-      .then((res) => res.json())
-      .then((data) =>
-        setHealth({ status: "ok", detail: `${data.service} — ${data.status}` }),
-      )
-      .catch((err: Error) => setHealth({ status: "error", detail: err.message }));
-  }, []);
+    setError(null);
+    api
+      .getLedger(storeId, businessDate)
+      .then(setLedger)
+      .catch((err: Error) => setError(err.message));
+  };
+
+  useEffect(load, [storeId, businessDate]);
 
   if (!FEATURE_ENABLED) {
     return (
-      <main style={{ fontFamily: "system-ui", padding: "3rem", maxWidth: 640 }}>
+      <main className="page-body">
         <h1>Store Manager Dashboard</h1>
         <p>
-          <strong>Phase 3 — Retail</strong> — not yet implemented.
+          <strong>Phase 3 — Retail</strong> — this module is implemented, but its
+          feature flag is currently off.
         </p>
         <p>
-          This module is scaffold-only and gated behind its feature flag. Set{" "}
-          <code>NEXT_PUBLIC_FEATURE_SALES_AUDIT_ENABLED=true</code> once the{" "}
-          <code>sales-audit</code> backend service ships this phase.
+          Set <code>NEXT_PUBLIC_FEATURE_SALES_AUDIT_ENABLED=true</code> to view it.
         </p>
       </main>
     );
   }
 
   return (
-    <main style={{ fontFamily: "system-ui", padding: "3rem", maxWidth: 640 }}>
-      <h1>Store Manager Dashboard</h1>
-      <p>Enter cash counts, compare against expected totals, and close registers.</p>
-      <p>
-        <strong>User:</strong> Store managers
-      </p>
-      <p>
-        Backend: <code>http://localhost:3007</code> —{" "}
-        {health.status === "checking" && "checking connectivity…"}
-        {health.status === "ok" && `connected (${health.detail})`}
-        {health.status === "error" && `unreachable (${health.detail})`}
-      </p>
-    </main>
+    <AppShell
+      brandName="Store Manager"
+      nav={NAV}
+      title="Overview"
+      subtitle="Today's running expected total, kept current as sales come in (FR-7.7)."
+    >
+      <div className="card">
+        <div className="field-row">
+          <label>
+            Store
+            <input value={storeId} onChange={(e) => setStoreId(e.target.value)} placeholder="e.g. STORE-1" />
+          </label>
+          <label>
+            Business date
+            <input type="date" value={businessDate} onChange={(e) => setBusinessDate(e.target.value)} />
+          </label>
+        </div>
+      </div>
+
+      {error && <p className="error">{error}</p>}
+
+      <div className="card">
+        {ledger === undefined ? (
+          <p className="muted" style={{ margin: 0 }}>Loading…</p>
+        ) : ledger === null ? (
+          <p className="muted" style={{ margin: 0 }}>No sales recorded yet for {storeId} on {businessDate}.</p>
+        ) : (
+          <>
+            <h3 style={{ margin: 0 }}>Expected total so far</h3>
+            <p style={{ fontSize: "2rem", margin: "0.5rem 0" }}>{ledger.expectedTotal}</p>
+            <table>
+              <thead>
+                <tr>
+                  <th>Cashier</th>
+                  <th>Register</th>
+                  <th>Expected</th>
+                </tr>
+              </thead>
+              <tbody>
+                {ledger.cashierLines.map((line) => (
+                  <tr key={line.id}>
+                    <td>{line.cashierId}</td>
+                    <td>{line.registerId}</td>
+                    <td>{line.expectedAmount}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </>
+        )}
+      </div>
+
+      <div className="actions">
+        <button className="primary" onClick={() => router.push("/close")} style={{ padding: "0.75rem 1.5rem" }}>
+          Start close
+        </button>
+      </div>
+    </AppShell>
   );
 }

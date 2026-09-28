@@ -14,7 +14,10 @@ async function bootstrap() {
 
   const config = new DocumentBuilder()
     .setTitle("Sales Audit Service")
-    .setDescription("Phase 3 scaffold. Cash-drawer reconciliation against POS transactions (FR-7.x).")
+    .setDescription(
+      "Cash-drawer reconciliation against POS transactions (FR-7.x). Keeps a running " +
+        "expected total from ItemSold, blocks store close until discrepancies are explained.",
+    )
     .setVersion("0.1.0")
     .build();
   const document = SwaggerModule.createDocument(app, config);

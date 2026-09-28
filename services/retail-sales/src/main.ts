@@ -14,7 +14,10 @@ async function bootstrap() {
 
   const config = new DocumentBuilder()
     .setTitle("Retail Sales (POS) Service")
-    .setDescription("Phase 3 scaffold. Point-of-sale transaction engine (FR-6.x).")
+    .setDescription(
+      "Point-of-sale transaction engine (FR-6.x). Checks and reserves stock with " +
+        "Inventory over gRPC before completing a sale, publishes ItemSold/ItemReturned.",
+    )
     .setVersion("0.1.0")
     .build();
   const document = SwaggerModule.createDocument(app, config);

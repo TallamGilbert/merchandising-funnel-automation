@@ -1,7 +1,7 @@
 {
   "name": "@mms/retail-sales",
   "version": "0.1.0",
-  "description": "Point-of-sale transaction engine (FR-6.x). Phase 3 scaffold.",
+  "description": "Point-of-sale transaction engine (FR-6.x).",
   "private": true,
   "scripts": {
     "build": "nest build",
@@ -18,10 +18,13 @@
     "prisma:deploy": "prisma migrate deploy"
   },
   "dependencies": {
+    "@grpc/grpc-js": "^1.11.1",
+    "@grpc/proto-loader": "^0.7.13",
     "@mms/shared": "workspace:*",
     "@nestjs/common": "^10.4.4",
     "@nestjs/config": "^3.2.3",
     "@nestjs/core": "^10.4.4",
+    "@nestjs/microservices": "^10.4.4",
     "@nestjs/platform-express": "^10.4.4",
     "@nestjs/swagger": "^7.4.2",
     "@prisma/client": "^5.19.1",

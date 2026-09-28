@@ -225,6 +225,59 @@ export class StockService {
     ]);
   }
 
+  /**
+   * FR-6.4 / D-8 — adds returned stock back onto On Hand. No inspection
+   * step (D-5): the full quantity always goes straight back to Available at
+   * the location it was sold from. Applied at most once per
+   * (returnId, product, location), since the bus may redeliver and a single
+   * return can cover several SKUs.
+   */
+  async applyItemReturn(
+    sku: string,
+    locationCode: string,
+    quantity: number,
+    returnId: string,
+  ): Promise<void> {
+    const product = await this.prisma.product.findUnique({ where: { sku } });
+    if (!product) {
+      this.logger.warn(
+        `ItemReturned ${returnId} for unknown SKU ${sku} — no product master record, skipping`,
+      );
+      return;
+    }
+
+    const alreadyApplied = await this.prisma.inventoryTransaction.findFirst({
+      where: {
+        referenceType: "RETURN",
+        referenceId: returnId,
+        productId: product.id,
+        locationCode,
+      },
+    });
+    if (alreadyApplied) {
+      this.logger.log(`Return ${returnId} already applied for ${sku} at ${locationCode} — skipping`);
+      return;
+    }
+
+    await this.upsertLevel(product.id, locationCode, product.unitCost);
+    await this.prisma.$transaction([
+      this.prisma.stockLevel.update({
+        where: { productId_locationCode: { productId: product.id, locationCode } },
+        data: { onHand: { increment: quantity } },
+      }),
+      this.prisma.inventoryTransaction.create({
+        data: {
+          productId: product.id,
+          locationCode,
+          type: InventoryTransactionType.RETURN,
+          quantityDelta: quantity,
+          referenceType: "RETURN",
+          referenceId: returnId,
+        },
+      }),
+    ]);
+  }
+
   /** FR-4.5 / FR-6.2 / NFR-5 — the gRPC checkout stock check + reservation. */
   async reserve(
     sku: string,
