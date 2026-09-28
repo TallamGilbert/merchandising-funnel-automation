@@ -96,7 +96,12 @@ export function Combobox({
       setActive((i) => Math.max(i - 1, 0));
     } else if (e.key === "Enter" && open) {
       e.preventDefault();
-      const option = matches[active];
+      // A scanner types the whole code then Enter: an exact value match wins
+      // over whatever happens to be highlighted (SKU-1 vs SKU-10).
+      // An exact match that's disabled (e.g. out of stock) picks nothing.
+      const typed = query.trim().toLowerCase();
+      const exact = options.find((o) => o.value.toLowerCase() === typed);
+      const option = exact ?? matches[active];
       if (option) pick(option);
     } else if (e.key === "Escape") {
       setOpen(false);

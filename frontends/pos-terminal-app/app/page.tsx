@@ -1,10 +1,24 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
+import {
+  Combobox,
+  type ComboboxOption,
+  formatDateTime,
+  formatMoney,
+  LocationPicker,
+  lookupApi,
+  RegisterPicker,
+  StaffPicker,
+  useFlash,
+  usePolling,
+} from "@mms/ui";
 import { AppShell, type NavSection } from "../components/AppShell";
 import { ArrowUturnLeftIcon, CartIcon } from "../components/icons";
-import { api, type PaymentMethodType } from "../lib/api";
+import { api, type PaymentMethodType, type Product } from "../lib/api";
 import { activePromotion, computeLinePrice } from "../lib/pricing";
+import { useTerminal } from "../lib/terminal";
 
 const FEATURE_ENABLED = process.env.NEXT_PUBLIC_FEATURE_RETAIL_SALES_ENABLED !== "false";
 
@@ -32,18 +46,25 @@ interface PaymentRow {
   amount: number;
 }
 
+interface Receipt {
+  id: string;
+  transactionNumber: string;
+  totalAmount: string;
+  createdAt: string;
+}
+
 export default function Page() {
-  const [storeId, setStoreId] = useState("STORE-1");
-  const [registerId, setRegisterId] = useState("REG-1");
-  const [cashierId, setCashierId] = useState("");
+  const flash = useFlash();
+  const [terminal, setTerminal] = useTerminal();
+  const { storeId, registerId, cashierId } = terminal;
+  const [products, setProducts] = useState<Product[] | null>(null);
+  const [catalogError, setCatalogError] = useState<string | null>(null);
+  const [available, setAvailable] = useState<Map<string, number> | null>(null);
   const [cart, setCart] = useState<CartLine[]>([]);
-  const [sku, setSku] = useState("");
-  const [scanError, setScanError] = useState<string | null>(null);
   const [payments, setPayments] = useState<PaymentRow[]>([{ method: "CASH", amount: 0 }]);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [receipt, setReceipt] = useState<{ transactionNumber: string; totalAmount: string } | null>(null);
-  const skuInput = useRef<HTMLInputElement>(null);
+  const [receipt, setReceipt] = useState<Receipt | null>(null);
 
   const priced = useMemo(
     () =>
@@ -68,6 +89,54 @@ export default function Page() {
     setPayments((prev) => (prev.length === 1 ? [{ ...prev[0], amount: total }] : prev));
   }, [total]);
 
+  useEffect(() => {
+    if (!FEATURE_ENABLED) return;
+    api
+      .listProducts()
+      .then(setProducts)
+      .catch((err: Error) => setCatalogError(`Could not load the price list: ${err.message}`));
+  }, []);
+
+  // What's on the shelf at this store, so the cashier sees stock before scanning.
+  const loadStock = () => {
+    if (!storeId) {
+      setAvailable(null);
+      return;
+    }
+    lookupApi
+      .listStockLevels(storeId)
+      .then((levels) => setAvailable(new Map(levels.map((l) => [l.sku, l.available]))))
+      .catch(() => setAvailable(null));
+  };
+  useEffect(loadStock, [storeId]);
+  usePolling(loadStock, 15000, FEATURE_ENABLED && Boolean(storeId));
+
+  const productOptions: ComboboxOption[] = useMemo(
+    () =>
+      (products ?? []).map((p) => {
+        const promo = activePromotion(p);
+        const inStock = available?.get(p.sku);
+        const inCart = cart.find((l) => l.sku === p.sku)?.quantity ?? 0;
+        const stockNote =
+          available === null ? null : inStock === undefined || inStock <= 0 ? "Out of stock" : `${inStock} in stock`;
+        return {
+          value: p.sku,
+          label: p.name,
+          description: [
+            p.sku,
+            formatMoney(p.unitPrice),
+            promo ? `${Number(promo.discountPct)}% off` : null,
+            stockNote,
+            inCart ? `${inCart} in cart` : null,
+          ]
+            .filter(Boolean)
+            .join(" · "),
+          disabled: available !== null && (inStock ?? 0) <= inCart,
+        };
+      }),
+    [products, available, cart],
+  );
+
   if (!FEATURE_ENABLED) {
     return (
       <main className="page-body">
@@ -83,37 +152,28 @@ export default function Page() {
     );
   }
 
-  const scanSku = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const code = sku.trim();
-    if (!code) return;
-    setScanError(null);
-    try {
-      const product = await api.getProduct(code);
-      const promo = activePromotion(product);
-      setCart((prev) => {
-        const existing = prev.find((l) => l.sku === code);
-        if (existing) {
-          return prev.map((l) => (l.sku === code ? { ...l, quantity: l.quantity + 1 } : l));
-        }
-        return [
-          ...prev,
-          {
-            sku: product.sku,
-            productName: product.name,
-            quantity: 1,
-            unitPrice: Number(product.unitPrice),
-            taxRatePct: Number(product.taxRatePct),
-            discountPct: promo ? Number(promo.discountPct) : null,
-          },
-        ];
-      });
-      setSku("");
-    } catch (err) {
-      setScanError((err as Error).message);
-    } finally {
-      skuInput.current?.focus();
-    }
+  const addToCart = (sku: string) => {
+    const product = products?.find((p) => p.sku === sku);
+    if (!product) return;
+    const promo = activePromotion(product);
+    setReceipt(null);
+    setCart((prev) => {
+      const existing = prev.find((l) => l.sku === sku);
+      if (existing) {
+        return prev.map((l) => (l.sku === sku ? { ...l, quantity: l.quantity + 1 } : l));
+      }
+      return [
+        ...prev,
+        {
+          sku: product.sku,
+          productName: product.name,
+          quantity: 1,
+          unitPrice: Number(product.unitPrice),
+          taxRatePct: Number(product.taxRatePct),
+          discountPct: promo ? Number(promo.discountPct) : null,
+        },
+      ];
+    });
   };
 
   const updateQuantity = (targetSku: string, quantity: number) => {
@@ -141,9 +201,16 @@ export default function Page() {
         lines: cart.map((l) => ({ sku: l.sku, quantity: l.quantity })),
         payments: payments.map((p) => ({ method: p.method, amount: p.amount })),
       });
-      setReceipt({ transactionNumber: transaction.transactionNumber, totalAmount: transaction.totalAmount });
+      setReceipt({
+        id: transaction.id,
+        transactionNumber: transaction.transactionNumber,
+        totalAmount: transaction.totalAmount,
+        createdAt: transaction.createdAt,
+      });
+      flash.success(`Sale ${transaction.transactionNumber} complete — ${formatMoney(transaction.totalAmount)}`);
       setCart([]);
       setPayments([{ method: "CASH", amount: 0 }]);
+      loadStock();
     } catch (err) {
       setCheckoutError((err as Error).message);
     } finally {
@@ -151,29 +218,46 @@ export default function Page() {
     }
   };
 
+  const ready = Boolean(storeId && registerId && cashierId);
+
   return (
     <AppShell
       brandName="POS"
       nav={NAV}
       title="Checkout"
-      subtitle="Scan items, capture payment, and complete the sale (FR-6.x)."
+      subtitle="Find items, capture payment, and complete the sale (FR-6.x)."
     >
       <div className="card">
         <div className="field-row">
           <label>
             Store
-            <input value={storeId} onChange={(e) => setStoreId(e.target.value)} placeholder="e.g. STORE-1" />
+            <LocationPicker
+              type="STORE"
+              required
+              value={storeId}
+              // A different store has different tills and staff.
+              onChange={(value) => setTerminal({ storeId: value, registerId: "", cashierId: "" })}
+            />
           </label>
           <label>
             Register
-            <input value={registerId} onChange={(e) => setRegisterId(e.target.value)} placeholder="e.g. REG-1" />
+            <RegisterPicker
+              required
+              locationCode={storeId}
+              value={registerId}
+              onChange={(value) => setTerminal({ registerId: value })}
+            />
           </label>
           <label>
             Cashier
-            <input
+            <StaffPicker
+              required
+              roles={["CASHIER", "MANAGER"]}
+              locationCode={storeId || undefined}
+              disabled={!storeId}
+              placeholder={storeId ? "Search by name…" : "Choose a store first"}
               value={cashierId}
-              onChange={(e) => setCashierId(e.target.value)}
-              placeholder="e.g. cashier-amy"
+              onChange={(value) => setTerminal({ cashierId: value })}
             />
           </label>
         </div>
@@ -182,28 +266,33 @@ export default function Page() {
       {receipt && (
         <div className="card">
           <h3 style={{ margin: 0 }}>Sale complete — {receipt.transactionNumber}</h3>
-          <p className="muted" style={{ margin: 0 }}>Total charged: {receipt.totalAmount}</p>
+          <p className="muted" style={{ margin: 0 }}>
+            Total charged: {formatMoney(receipt.totalAmount)} · {formatDateTime(receipt.createdAt)}
+          </p>
+          <p className="muted" style={{ margin: 0 }}>
+            Transaction id (for returns): <code>{receipt.id}</code> ·{" "}
+            <Link href={`/returns?transaction=${receipt.id}`}>Return items from this sale</Link>
+          </p>
         </div>
       )}
 
-      <form className="card" onSubmit={scanSku}>
-        <h3 style={{ margin: 0 }}>Scan an item</h3>
-        <div className="field-row">
-          <label style={{ flex: 3 }}>
-            Barcode / SKU
-            <input
-              ref={skuInput}
-              autoFocus
-              value={sku}
-              onChange={(e) => setSku(e.target.value)}
-              placeholder="Scan or type a SKU, then Enter"
-              style={{ fontSize: "1.15rem", padding: "0.8rem 0.9rem" }}
-              autoComplete="off"
-            />
-          </label>
-        </div>
-        {scanError && <p className="error">{scanError}</p>}
-      </form>
+      <div className="card">
+        <h3 style={{ margin: 0 }}>Add an item</h3>
+        <label>
+          Scan a barcode, or search by product name or SKU
+          <Combobox
+            autoFocus
+            clearOnSelect
+            options={productOptions}
+            loading={products === null && !catalogError}
+            value=""
+            placeholder="Scan, or start typing a product…"
+            emptyMessage="No matching products"
+            onChange={addToCart}
+          />
+        </label>
+        {catalogError && <p className="error">{catalogError}</p>}
+      </div>
 
       <div className="card" style={{ padding: 0 }}>
         {cart.length === 0 ? (
@@ -215,10 +304,10 @@ export default function Page() {
                 <th>SKU</th>
                 <th>Product</th>
                 <th>Qty</th>
-                <th>Unit price</th>
-                <th>Discount</th>
-                <th>Tax</th>
-                <th>Line total</th>
+                <th className="num">Unit price</th>
+                <th className="num">Discount</th>
+                <th className="num">Tax</th>
+                <th className="num">Line total</th>
                 <th />
               </tr>
             </thead>
@@ -236,10 +325,10 @@ export default function Page() {
                       style={{ width: 64 }}
                     />
                   </td>
-                  <td>{line.unitPrice.toFixed(2)}</td>
-                  <td>{line.pricing.discountAmount.toFixed(2)}</td>
-                  <td>{line.pricing.taxAmount.toFixed(2)}</td>
-                  <td>{line.pricing.lineTotal.toFixed(2)}</td>
+                  <td className="num">{formatMoney(line.unitPrice)}</td>
+                  <td className="num">{formatMoney(line.pricing.discountAmount)}</td>
+                  <td className="num">{formatMoney(line.pricing.taxAmount)}</td>
+                  <td className="num">{formatMoney(line.pricing.lineTotal)}</td>
                   <td>
                     <button type="button" onClick={() => removeLine(line.sku)}>Remove</button>
                   </td>
@@ -253,7 +342,7 @@ export default function Page() {
       <div className="card">
         <div className="row-between">
           <h3 style={{ margin: 0 }}>Payment</h3>
-          <strong>Total: {total.toFixed(2)}</strong>
+          <strong className="num">Total: {formatMoney(total)}</strong>
         </div>
         {payments.map((payment, i) => (
           <div className="field-row" key={i}>
@@ -273,7 +362,7 @@ export default function Page() {
               </select>
             </label>
             <label>
-              Amount
+              Amount (KES)
               <input
                 type="number"
                 step="0.01"
@@ -291,13 +380,16 @@ export default function Page() {
           <button type="button" onClick={addPaymentRow}>Split payment</button>
         </div>
         {paymentsTotal !== total && (
-          <p className="error">Payments total {paymentsTotal.toFixed(2)}, but the sale total is {total.toFixed(2)}.</p>
+          <p className="error">
+            Payments total {formatMoney(paymentsTotal)}, but the sale total is {formatMoney(total)}.
+          </p>
         )}
+        {!ready && <p className="muted" style={{ margin: 0 }}>Choose the store, register and cashier to take payment.</p>}
         {checkoutError && <p className="error">{checkoutError}</p>}
         <div className="actions">
           <button
             className="primary"
-            disabled={busy || cart.length === 0 || !cashierId || paymentsTotal !== total}
+            disabled={busy || cart.length === 0 || !ready || paymentsTotal !== total}
             onClick={completeSale}
             style={{ padding: "0.75rem 1.5rem" }}
           >

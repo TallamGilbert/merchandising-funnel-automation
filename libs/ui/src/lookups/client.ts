@@ -11,6 +11,14 @@ export interface CatalogProduct {
   unitCost: string;
 }
 
+export interface StockLevelSummary {
+  sku: string;
+  locationCode: string;
+  onHand: number;
+  allocated: number;
+  available: number;
+}
+
 export type PurchaseOrderStatus =
   | "DRAFT"
   | "PENDING_APPROVAL"
@@ -41,5 +49,9 @@ async function get<T>(url: string): Promise<T> {
 
 export const lookupApi = {
   listCatalogProducts: () => get<CatalogProduct[]>(`${INVENTORY_URL}/products`),
+  listStockLevels: (locationCode?: string) =>
+    get<StockLevelSummary[]>(
+      `${INVENTORY_URL}/stock-levels${locationCode ? `?locationCode=${encodeURIComponent(locationCode)}` : ""}`,
+    ),
   listPurchaseOrders: () => get<PurchaseOrderSummary[]>(`${PROCUREMENT_URL}/purchase-orders`),
 };

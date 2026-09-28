@@ -71,7 +71,12 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const api = {
+  listProducts: () => request<Product[]>("/products"),
+
   getProduct: (sku: string) => request<Product>(`/products/${encodeURIComponent(sku)}`),
+
+  listRecentTransactions: (storeId?: string) =>
+    request<Transaction[]>(`/transactions?limit=100${storeId ? `&storeId=${encodeURIComponent(storeId)}` : ""}`),
 
   getTransaction: (id: string) => request<Transaction>(`/transactions/${id}`),
 
