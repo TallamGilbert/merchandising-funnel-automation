@@ -13,6 +13,16 @@ export class TransactionsRepository {
     });
   }
 
+  /** Newest first — what a cashier scrolls to find the sale being returned. */
+  findRecent(filter: { storeId?: string; take: number }) {
+    return this.prisma.transaction.findMany({
+      where: { storeId: filter.storeId },
+      include: { lines: true },
+      orderBy: { createdAt: "desc" },
+      take: filter.take,
+    });
+  }
+
   findByIdWithLines(id: string) {
     return this.prisma.transaction.findUnique({
       where: { id },
