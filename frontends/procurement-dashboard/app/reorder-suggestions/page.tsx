@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { formatDateTime, useFlash } from "@mms/ui";
 import { AppShell, type NavSection } from "../../components/AppShell";
 import { BellAlertIcon, ClipboardListIcon } from "../../components/icons";
 import { api, type ReorderSuggestion, type ReorderSuggestionStatus } from "../../lib/api";
@@ -30,9 +31,16 @@ export default function ReorderSuggestionsPage() {
 
   useEffect(load, [statusFilter]);
 
-  const dismiss = async (id: string) => {
-    await api.dismissReorderSuggestion(id);
-    load();
+  const flash = useFlash();
+
+  const dismiss = async (id: string, sku: string) => {
+    try {
+      await api.dismissReorderSuggestion(id);
+      flash.success(`Suggestion for ${sku} dismissed`);
+      load();
+    } catch (err) {
+      flash.error((err as Error).message);
+    }
   };
 
   return (
@@ -89,10 +97,10 @@ export default function ReorderSuggestionsPage() {
                   <td>
                     <span className="badge">{s.status}</span>
                   </td>
-                  <td>{new Date(s.createdAt).toLocaleString()}</td>
+                  <td>{formatDateTime(s.createdAt)}</td>
                   <td>
                     {s.status === "NEW" && (
-                      <button onClick={() => dismiss(s.id)}>Dismiss</button>
+                      <button onClick={() => dismiss(s.id, s.sku)}>Dismiss</button>
                     )}
                   </td>
                 </tr>

@@ -49,3 +49,10 @@ export function useStaff(filter: StaffFilter = {}): Loaded<StaffMember[]> {
 export function useLocations(type?: LocationType): Loaded<DirectoryLocation[]> {
   return useLoader(() => directoryApi.listLocations(type), [], type ?? "all");
 }
+
+/** Show people by name wherever the API only gives an id; falls back to the id. */
+export function useStaffNames(): (id: string | null | undefined) => string {
+  const { data: staff } = useStaff({ includeInactive: true });
+  const names = new Map(staff.map((s) => [s.id, s.name]));
+  return (id) => (id ? (names.get(id) ?? id) : "—");
+}

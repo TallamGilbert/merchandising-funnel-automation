@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { Combobox, formatDateTime, formatMoney, StaffPicker, useFlash } from "@mms/ui";
 import { AppShell, type NavSection } from "../components/AppShell";
 import { BellAlertIcon, ClipboardListIcon } from "../components/icons";
 import {
@@ -30,6 +31,7 @@ export default function Page() {
   const [search, setSearch] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
+  const flash = useFlash();
 
   const loadOrders = () => {
     setError(null);
@@ -89,8 +91,9 @@ export default function Page() {
     >
       {showForm && (
         <NewPurchaseOrderForm
-          onCreated={() => {
+          onCreated={(poNumber) => {
             setShowForm(false);
+            flash.success(`Draft ${poNumber} created`);
             loadOrders();
           }}
         />
@@ -132,7 +135,8 @@ export default function Page() {
                 <th>PO number</th>
                 <th>Supplier</th>
                 <th>Status</th>
-                <th>Total</th>
+                <th>Created</th>
+                <th className="num">Total</th>
                 <th />
               </tr>
             </thead>
@@ -144,9 +148,8 @@ export default function Page() {
                   <td>
                     <span className="badge">{po.status.replaceAll("_", " ")}</span>
                   </td>
-                  <td>
-                    {po.currency} {Number(po.totalAmount).toFixed(2)}
-                  </td>
+                  <td>{formatDateTime(po.createdAt)}</td>
+                  <td className="num">{formatMoney(po.totalAmount, po.currency)}</td>
                   <td>
                     <Link href={`/purchase-orders/${po.id}`}>View</Link>
                   </td>
@@ -160,7 +163,7 @@ export default function Page() {
   );
 }
 
-function NewPurchaseOrderForm({ onCreated }: { onCreated: () => void }) {
+function NewPurchaseOrderForm({ onCreated }: { onCreated: (poNumber: string) => void }) {
   const [suppliers, setSuppliers] = useState<SupplierSummary[] | null>(null);
   const [supplierId, setSupplierId] = useState("");
   const [supplierProducts, setSupplierProducts] = useState<SupplierOfferedProduct[]>([]);
@@ -198,12 +201,12 @@ function NewPurchaseOrderForm({ onCreated }: { onCreated: () => void }) {
     setSubmitting(true);
     setError(null);
     try {
-      await api.createPurchaseOrder({
+      const po = await api.createPurchaseOrder({
         supplierId,
         requestedById,
         lines: lines.filter((l) => l.sku),
       });
-      onCreated();
+      onCreated(po.poNumber);
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -218,31 +221,25 @@ function NewPurchaseOrderForm({ onCreated }: { onCreated: () => void }) {
       <div className="field-row">
         <label>
           Supplier
-          <select
+          <Combobox
             required
+            loading={suppliers === null}
+            placeholder="Search suppliers…"
+            options={(suppliers ?? []).map((s) => ({ value: s.id, label: s.name }))}
             value={supplierId}
-            onChange={(e) => {
-              setSupplierId(e.target.value);
+            onChange={(value) => {
+              setSupplierId(value);
               setLines([{ sku: "", quantityOrdered: 1 }]);
             }}
-          >
-            <option value="" disabled>
-              {suppliers === null ? "Loading…" : "Select a supplier"}
-            </option>
-            {suppliers?.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
-          </select>
+          />
         </label>
         <label>
-          Requested by (user id)
-          <input
+          Requested by
+          <StaffPicker
             required
+            roles={["MANAGER", "OWNER"]}
             value={requestedById}
-            onChange={(e) => setRequestedById(e.target.value)}
-            placeholder="e.g. buyer-jane"
+            onChange={setRequestedById}
           />
         </label>
       </div>
@@ -253,21 +250,20 @@ function NewPurchaseOrderForm({ onCreated }: { onCreated: () => void }) {
           <div className="field-row" key={i}>
             <label>
               SKU
-              <select
+              <Combobox
                 required
-                value={line.sku}
-                onChange={(e) => updateLine(i, { sku: e.target.value })}
                 disabled={!supplierId}
-              >
-                <option value="" disabled>
-                  {supplierId ? "Select a SKU" : "Select a supplier first"}
-                </option>
-                {supplierProducts.map((p) => (
-                  <option key={p.sku} value={p.sku}>
-                    {p.sku} — {p.productName} ({p.currency} {Number(p.unitCost).toFixed(2)})
-                  </option>
-                ))}
-              </select>
+                placeholder={supplierId ? "Search this supplier's products…" : "Choose a supplier first"}
+                options={supplierProducts.map((p) => ({
+                  value: p.sku,
+                  label: p.productName,
+                  description: `${p.sku} · ${formatMoney(p.unitCost, p.currency)}`,
+                  // One line per SKU — the rest are already on this PO.
+                  disabled: lines.some((l, idx) => idx !== i && l.sku === p.sku),
+                }))}
+                value={line.sku}
+                onChange={(value) => updateLine(i, { sku: value })}
+              />
             </label>
             <label style={{ maxWidth: 140 }}>
               Quantity
