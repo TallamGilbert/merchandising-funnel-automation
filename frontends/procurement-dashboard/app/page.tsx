@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Combobox, formatDateTime, formatMoney, StaffPicker, useFlash } from "@mms/ui";
 import { AppShell, type NavSection } from "../components/AppShell";
 import { BellAlertIcon, ClipboardListIcon } from "../components/icons";
+import { ProcurementCharts } from "../components/ProcurementCharts";
 import {
   api,
   type PurchaseOrder,
@@ -100,6 +101,8 @@ export default function Page() {
       )}
 
       {error && <p className="error">{error}</p>}
+
+      {orders && !statusFilter && <ProcurementCharts orders={orders} />}
 
       <div className="row-between">
         <label style={{ maxWidth: 220 }}>

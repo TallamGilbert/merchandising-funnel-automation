@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { formatDate, formatMoney, LocationPicker, useLocations, usePolling, useStaffNames } from "@mms/ui";
 import { AppShell } from "../components/AppShell";
+import { SalesAnalytics } from "../components/SalesAnalytics";
 import { api, type StoreDayLedger } from "../lib/api";
 import { NAV } from "../lib/nav";
 import { useSelectedStore } from "../lib/store";
@@ -115,6 +116,8 @@ export default function Page() {
           Start close
         </button>
       </div>
+
+      {storeId && <SalesAnalytics storeId={storeId} endDate={businessDate} />}
     </AppShell>
   );
 }

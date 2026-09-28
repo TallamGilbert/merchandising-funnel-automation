@@ -1,6 +1,7 @@
 import { isSupportedCurrency } from "../currency";
 import {
   formatAmount,
+  formatCompact,
   formatDate,
   formatDateTime,
   formatMoney,
@@ -94,5 +95,13 @@ describe("isSupportedCurrency", () => {
     expect(isSupportedCurrency("KES")).toBe(true);
     expect(isSupportedCurrency("kes")).toBe(false);
     expect(isSupportedCurrency("KES 100")).toBe(false);
+  });
+});
+
+describe("formatCompact", () => {
+  it("abbreviates thousands and millions for axis ticks", () => {
+    expect(formatCompact(950)).toBe("950");
+    expect(formatCompact(12500)).toBe("12.5K");
+    expect(formatCompact(2000000)).toBe("2M");
   });
 });

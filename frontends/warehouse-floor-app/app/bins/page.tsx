@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { formatQuantity, LocationPicker, useFlash, useLocations } from "@mms/ui";
+import { BarChart, ChartCard, formatQuantity, LocationPicker, useFlash, useLocations } from "@mms/ui";
 import { AppShell, type NavSection } from "../../components/AppShell";
 import { BoxesIcon, LayersIcon, PackageIcon } from "../../components/icons";
 import { api, type Bin, type ZoneUtilization } from "../../lib/api";
@@ -94,6 +94,32 @@ export default function BinsPage() {
           ))
         )}
       </div>
+
+      {zones && zones.length > 0 && (
+        <ChartCard
+          title="How full each zone is"
+          subtitle="Share of volume capacity in use, including space reserved for directed putaways"
+          table={{
+            columns: ["Zone", "Volume used", "Weight used", "Bins"],
+            rows: zones.map((z) => [
+              `${locationName(z.locationCode)} · ${z.zone}`,
+              `${z.volumeUtilizationPct}%`,
+              `${z.weightUtilizationPct}%`,
+              z.binCount,
+            ]),
+          }}
+        >
+          <BarChart
+            max={100}
+            data={zones.map((z) => ({
+              label: `${locationName(z.locationCode)} · ${z.zone}`,
+              value: z.volumeUtilizationPct,
+              detail: `weight ${z.weightUtilizationPct}% · ${formatQuantity(z.binCount)} bins`,
+            }))}
+            format={(v) => `${v}%`}
+          />
+        </ChartCard>
+      )}
 
       <div className="card" style={{ padding: 0 }}>
         {bins === null ? (

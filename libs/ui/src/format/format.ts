@@ -79,3 +79,11 @@ export function formatDateTime(value: Date | string | null | undefined, options:
   }).format(date);
   return `${formatDate(date, options)} at ${time}`;
 }
+
+const compactFormat = new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 });
+
+/** Axis ticks and tight spaces: 12500 → "12.5K", 2000000 → "2M". */
+export function formatCompact(value: Numeric): string {
+  const n = toNumber(value);
+  return n === null ? "—" : compactFormat.format(n);
+}

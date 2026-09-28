@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { formatDateTime, formatMoney, usePolling, useFlash } from "@mms/ui";
 import { AppShell, type NavSection } from "../components/AppShell";
 import { BoxesIcon, LayersIcon } from "../components/icons";
+import { InventoryCharts } from "../components/InventoryCharts";
 import { api, type Product, type ValuationReport } from "../lib/api";
 
 const FEATURE_ENABLED = process.env.NEXT_PUBLIC_FEATURE_INVENTORY_ENABLED !== "false";
@@ -97,6 +98,8 @@ export default function Page() {
       {error && <p className="error">{error}</p>}
 
       <ValuationSummary />
+
+      <InventoryCharts />
 
       <div className="card" style={{ padding: 0 }}>
         {visible === null ? (

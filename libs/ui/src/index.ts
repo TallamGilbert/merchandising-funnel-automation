@@ -10,3 +10,8 @@ export * from "./directory/hooks";
 export * from "./directory/pickers";
 export * from "./lookups/client";
 export * from "./lookups/pickers";
+export * from "./charts/colors";
+export * from "./charts/ChartCard";
+export * from "./charts/BarChart";
+export * from "./charts/ShareBar";
+export * from "./charts/TimeSeriesChart";
