@@ -14,23 +14,13 @@ import {
   useFlash,
   usePolling,
 } from "@mms/ui";
-import { AppShell, type NavSection } from "../components/AppShell";
-import { ArrowUturnLeftIcon, CartIcon } from "../components/icons";
+import { AppShell } from "../components/AppShell";
+import { NAV } from "../lib/nav";
 import { api, type PaymentMethodType, type Product } from "../lib/api";
 import { activePromotion, computeLinePrice } from "../lib/pricing";
 import { useTerminal } from "../lib/terminal";
 
 const FEATURE_ENABLED = process.env.NEXT_PUBLIC_FEATURE_RETAIL_SALES_ENABLED !== "false";
-
-const NAV: NavSection[] = [
-  {
-    label: "Main menu",
-    items: [
-      { label: "Checkout", href: "/", icon: <CartIcon /> },
-      { label: "Returns", href: "/returns", icon: <ArrowUturnLeftIcon /> },
-    ],
-  },
-];
 
 interface CartLine {
   sku: string;
@@ -136,6 +126,14 @@ export default function Page() {
       }),
     [products, available, cart],
   );
+
+  // Stock the store holds that the price list doesn't know about — the usual
+  // reason a freshly transferred item "isn't there" at the till.
+  const unpriced = useMemo(() => {
+    if (!available || !products) return [];
+    const priced = new Set(products.map((p) => p.sku));
+    return [...available.entries()].filter(([sku, qty]) => qty > 0 && !priced.has(sku)).map(([sku]) => sku);
+  }, [available, products]);
 
   if (!FEATURE_ENABLED) {
     return (
@@ -292,6 +290,13 @@ export default function Page() {
           />
         </label>
         {catalogError && <p className="error">{catalogError}</p>}
+        {unpriced.length > 0 && (
+          <p className="muted" style={{ margin: 0 }}>
+            {unpriced.length === 1 ? "1 item" : `${unpriced.length} items`} in stock here can&apos;t be sold yet because{" "}
+            {unpriced.length === 1 ? "it has" : "they have"} no price ({unpriced.slice(0, 3).join(", ")}
+            {unpriced.length > 3 ? "…" : ""}). <Link href="/prices">Set prices</Link>
+          </p>
+        )}
       </div>
 
       <div className="card" style={{ padding: 0 }}>

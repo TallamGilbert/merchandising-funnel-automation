@@ -11,20 +11,10 @@ import {
   useFlash,
   useStaffNames,
 } from "@mms/ui";
-import { AppShell, type NavSection } from "../../components/AppShell";
-import { ArrowUturnLeftIcon, CartIcon } from "../../components/icons";
+import { AppShell } from "../../components/AppShell";
+import { NAV } from "../../lib/nav";
 import { api, type Transaction } from "../../lib/api";
 import { useTerminal } from "../../lib/terminal";
-
-const NAV: NavSection[] = [
-  {
-    label: "Main menu",
-    items: [
-      { label: "Checkout", href: "/", icon: <CartIcon /> },
-      { label: "Returns", href: "/returns", icon: <ArrowUturnLeftIcon /> },
-    ],
-  },
-];
 
 export default function ReturnsPage() {
   const flash = useFlash();

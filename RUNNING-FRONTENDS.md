@@ -158,6 +158,14 @@ bug. To see the full flow work end to end:
    the drop-down) → confirm the bin → Confirm putaway.
 6. **Inventory Control Center** → Stock levels — the received quantity shows
    up there, and keeps refreshing as the POS sells.
+7. **Warehouse Floor App** → Transfers → New transfer from the warehouse to a
+   store → open it → confirm every pick. Stock only moves to the store once
+   the last pick is confirmed.
+8. **POS Terminal App** → Price list → the product shows under "In stock at a
+   store, but not priced" → Set price. The POS sells from Retail Sales' own
+   price list, so a product needs a price here before the till can sell it.
+9. **POS Terminal App** → Checkout → pick the store, register and cashier →
+   search for the product → Complete sale.
 
 ## Troubleshooting
 

@@ -75,6 +75,18 @@ export const api = {
 
   getProduct: (sku: string) => request<Product>(`/products/${encodeURIComponent(sku)}`),
 
+  createProduct: (data: { sku: string; name: string; unitPrice: number; taxRatePct?: number }) =>
+    request<Product>("/products", { method: "POST", body: JSON.stringify(data) }),
+
+  updateProduct: (sku: string, data: Partial<{ name: string; unitPrice: number; taxRatePct: number }>) =>
+    request<Product>(`/products/${encodeURIComponent(sku)}`, { method: "PATCH", body: JSON.stringify(data) }),
+
+  addPromotion: (sku: string, data: { discountPct: number; startsAt: string; endsAt: string }) =>
+    request<Promotion>(`/products/${encodeURIComponent(sku)}/promotions`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
   listRecentTransactions: (storeId?: string) =>
     request<Transaction[]>(`/transactions?limit=100${storeId ? `&storeId=${encodeURIComponent(storeId)}` : ""}`),
 
