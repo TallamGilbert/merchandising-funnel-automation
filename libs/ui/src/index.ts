@@ -8,3 +8,5 @@ export * from "./hooks/usePolling";
 export * from "./directory/client";
 export * from "./directory/hooks";
 export * from "./directory/pickers";
+export * from "./lookups/client";
+export * from "./lookups/pickers";
