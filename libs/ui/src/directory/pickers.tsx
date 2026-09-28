@@ -10,6 +10,8 @@ interface PickerProps {
   required?: boolean;
   disabled?: boolean;
   placeholder?: string;
+  /** Optional filters: a × resets the choice to nothing. */
+  clearable?: boolean;
   "aria-label"?: string;
 }
 
@@ -45,6 +47,7 @@ export function StaffPicker({
         emptyMessage="No matching staff"
         value={props.value}
         required={props.required}
+        clearable={props.clearable}
         disabled={props.disabled}
         aria-label={props["aria-label"]}
         onChange={(value) => {
@@ -76,6 +79,7 @@ export function LocationPicker({ type, ...props }: PickerProps & { type?: Locati
         value={props.value}
         onChange={(value) => props.onChange(value)}
         required={props.required}
+        clearable={props.clearable}
         disabled={props.disabled}
         aria-label={props["aria-label"]}
       />
@@ -100,6 +104,7 @@ export function RegisterPicker({ locationCode, ...props }: PickerProps & { locat
         value={props.value}
         onChange={(value) => props.onChange(value)}
         required={props.required}
+        clearable={props.clearable}
         disabled={props.disabled || !locationCode}
         aria-label={props["aria-label"]}
       />

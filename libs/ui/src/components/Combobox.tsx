@@ -22,6 +22,8 @@ export interface ComboboxProps {
   emptyMessage?: string;
   /** Clear the search box after each pick (e.g. adding SKUs to a cart). */
   clearOnSelect?: boolean;
+  /** Show a × that resets an optional choice back to nothing. */
+  clearable?: boolean;
   id?: string;
   name?: string;
   autoFocus?: boolean;
@@ -46,6 +48,7 @@ export function Combobox({
   loading,
   emptyMessage = "No matches",
   clearOnSelect,
+  clearable,
   id,
   name,
   autoFocus,
@@ -102,7 +105,7 @@ export function Combobox({
   }
 
   return (
-    <div className="mms-combobox">
+    <div className={`mms-combobox${clearable && value ? " has-clear" : ""}`}>
       <input
         ref={inputRef}
         id={id}
@@ -130,6 +133,19 @@ export function Combobox({
         }}
         onKeyDown={onKeyDown}
       />
+      {clearable && value && !disabled && (
+        <button
+          type="button"
+          className="mms-icon-btn mms-combobox-clear"
+          aria-label="Clear"
+          onClick={() => {
+            onChange("", null);
+            setQuery("");
+          }}
+        >
+          ×
+        </button>
+      )}
       {/* Carries the real value for native `required` validation and plain form posts. */}
       <input
         tabIndex={-1}

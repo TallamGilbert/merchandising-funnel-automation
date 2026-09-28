@@ -1,9 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { formatDateTime, StaffPicker, useFlash, useLocations, useStaffNames } from "@mms/ui";
 import { AppShell, type NavSection } from "../components/AppShell";
+import { BinPicker } from "../components/BinPicker";
 import { BoxesIcon, LayersIcon, PackageIcon } from "../components/icons";
-import { api, type PutawayTask, type PutawayTaskStatus } from "../lib/api";
+import { api, type Bin, type PutawayTask, type PutawayTaskStatus } from "../lib/api";
+import { useOperator } from "../lib/operator";
 
 const FEATURE_ENABLED = process.env.NEXT_PUBLIC_FEATURE_WAREHOUSE_OPERATIONS_ENABLED !== "false";
 
@@ -23,6 +26,8 @@ export default function Page() {
   const [statusFilter, setStatusFilter] = useState<PutawayTaskStatus | "">("PENDING");
   const [search, setSearch] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [bins, setBins] = useState<Bin[]>([]);
+  const [operator, setOperator] = useOperator();
 
   const load = () => {
     setError(null);
@@ -30,6 +35,8 @@ export default function Page() {
       .listPutawayTasks(statusFilter || undefined)
       .then(setTasks)
       .catch((err: Error) => setError(err.message));
+    // Bin fill levels change with every putaway, so refresh them together.
+    api.listBins().then(setBins).catch(() => setBins([]));
   };
 
   useEffect(() => {
@@ -92,6 +99,10 @@ export default function Page() {
             <option value="">All</option>
           </select>
         </label>
+        <label style={{ minWidth: 260 }}>
+          Working as
+          <StaffPicker roles={["WAREHOUSE_STAFF", "MANAGER"]} value={operator} onChange={setOperator} />
+        </label>
       </div>
 
       {visible === null ? (
@@ -99,24 +110,46 @@ export default function Page() {
       ) : visible.length === 0 ? (
         <p className="muted">No putaway tasks found.</p>
       ) : (
-        visible.map((task) => <PutawayCard key={task.id} task={task} onChanged={load} />)
+        visible.map((task) => (
+          <PutawayCard
+            key={task.id}
+            task={task}
+            operator={operator}
+            bins={bins.filter((b) => b.locationCode === task.locationCode)}
+            onChanged={load}
+          />
+        ))
       )}
     </AppShell>
   );
 }
 
-function PutawayCard({ task, onChanged }: { task: PutawayTask; onChanged: () => void }) {
+function PutawayCard({
+  task,
+  operator,
+  bins,
+  onChanged,
+}: {
+  task: PutawayTask;
+  operator: string;
+  bins: Bin[];
+  onChanged: () => void;
+}) {
+  const flash = useFlash();
+  const nameOf = useStaffNames();
+  const { data: locations } = useLocations();
   const [scannedBinCode, setScannedBinCode] = useState("");
-  const [completedById, setCompletedById] = useState("");
   const [overrideBin, setOverrideBin] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const locationName = locations.find((l) => l.code === task.locationCode)?.name ?? task.locationCode;
 
-  const run = async (action: () => Promise<unknown>) => {
+  const run = async (action: () => Promise<unknown>, success: string) => {
     setBusy(true);
     setError(null);
     try {
       await action();
+      flash.success(success);
       onChanged();
     } catch (err) {
       setError((err as Error).message);
@@ -133,7 +166,8 @@ function PutawayCard({ task, onChanged }: { task: PutawayTask; onChanged: () => 
             {task.quantity} × <code>{task.sku}</code> — {task.productName}
           </h3>
           <p className="muted" style={{ margin: "0.25rem 0 0" }}>
-            {task.goodsReceivedNoteNumber} · PO {task.poNumber} · arrived at {task.locationCode}
+            {task.goodsReceivedNoteNumber} · PO {task.poNumber} · arrived at {locationName} ·{" "}
+            {formatDateTime(task.createdAt)}
           </p>
         </div>
         <span className={`badge${task.status === "COMPLETED" ? " ok" : ""}`}>{task.status}</span>
@@ -141,8 +175,8 @@ function PutawayCard({ task, onChanged }: { task: PutawayTask; onChanged: () => 
 
       {task.status === "COMPLETED" ? (
         <p className="muted" style={{ margin: 0 }}>
-          Put away in <strong>{task.bin?.code}</strong> by {task.completedById}
-          {task.completedAt ? ` on ${new Date(task.completedAt).toLocaleString()}` : ""}.
+          Put away in <strong>{task.bin?.code}</strong> by {nameOf(task.completedById)}
+          {task.completedAt ? ` on ${formatDateTime(task.completedAt)}` : ""}.
         </p>
       ) : task.bin ? (
         <>
@@ -153,12 +187,15 @@ function PutawayCard({ task, onChanged }: { task: PutawayTask; onChanged: () => 
           <form
             onSubmit={(e) => {
               e.preventDefault();
-              void run(() => api.completePutaway(task.id, { completedById, scannedBinCode }));
+              void run(
+                () => api.completePutaway(task.id, { completedById: operator, scannedBinCode }),
+                `${task.quantity} × ${task.sku} put away in ${scannedBinCode}`,
+              );
             }}
           >
             <div className="field-row">
               <label>
-                Scan bin code
+                Confirm bin — scan its label or pick it
                 <input
                   required
                   value={scannedBinCode}
@@ -166,21 +203,23 @@ function PutawayCard({ task, onChanged }: { task: PutawayTask; onChanged: () => 
                   placeholder={`Scan ${task.bin.code}`}
                   style={{ fontSize: "1.1rem", padding: "0.75rem 0.9rem" }}
                   autoComplete="off"
+                  list={`bins-${task.id}`}
                 />
-              </label>
-              <label>
-                Your user id
-                <input
-                  required
-                  value={completedById}
-                  onChange={(e) => setCompletedById(e.target.value)}
-                  placeholder="e.g. fork-amos"
-                  style={{ fontSize: "1.1rem", padding: "0.75rem 0.9rem" }}
-                />
+                <datalist id={`bins-${task.id}`}>
+                  {[task.bin, ...bins.filter((b) => b.code !== task.bin?.code)].map(
+                    (b) => b && <option key={b.code} value={b.code}>{`Zone ${b.zone}`}</option>,
+                  )}
+                </datalist>
               </label>
             </div>
+            {!operator && <p className="muted" style={{ margin: 0 }}>Choose who is working above to confirm.</p>}
             <div>
-              <button className="primary" type="submit" disabled={busy} style={{ padding: "0.75rem 1.5rem" }}>
+              <button
+                className="primary"
+                type="submit"
+                disabled={busy || !operator}
+                style={{ padding: "0.75rem 1.5rem" }}
+              >
                 {busy ? "Confirming…" : "Confirm putaway"}
               </button>
             </div>
@@ -195,18 +234,19 @@ function PutawayCard({ task, onChanged }: { task: PutawayTask; onChanged: () => 
           <div className="field-row">
             <label>
               Specific bin (optional — leave empty to auto-select)
-              <input
-                value={overrideBin}
-                onChange={(e) => setOverrideBin(e.target.value)}
-                placeholder="e.g. A-01-03"
-              />
+              <BinPicker bins={bins} value={overrideBin} onChange={setOverrideBin} />
             </label>
           </div>
           <div>
             <button
               className="primary"
               disabled={busy}
-              onClick={() => run(() => api.assignBin(task.id, overrideBin.trim() || undefined))}
+              onClick={() =>
+                run(
+                  () => api.assignBin(task.id, overrideBin.trim() || undefined),
+                  overrideBin ? `Assigned to bin ${overrideBin}` : "Bin found — take the item there",
+                )
+              }
             >
               {overrideBin.trim() ? "Assign this bin" : "Find a bin"}
             </button>

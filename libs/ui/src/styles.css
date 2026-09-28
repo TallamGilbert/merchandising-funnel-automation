@@ -16,6 +16,17 @@
   width: 100%;
 }
 
+.mms-combobox.has-clear > input[role="combobox"] {
+  padding-right: 2rem;
+}
+
+.mms-combobox-clear {
+  position: absolute;
+  right: 0.4rem;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
 /* Hidden but still focusable by native validation, so `required` works. */
 .mms-combobox-value {
   position: absolute;
