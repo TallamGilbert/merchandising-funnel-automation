@@ -1,13 +1,13 @@
 import { BadRequestException } from "@nestjs/common";
 import { EventBusService, EventRoutingKey } from "@mms/shared";
-import { PrismaService } from "../prisma/prisma.service";
 import { ProductsService } from "../products/products.service";
 import { InventoryGrpcClientService } from "../inventory-grpc-client/inventory-grpc-client.service";
+import { TransactionsRepository } from "../transactions/transactions.repository";
 import { CheckoutService } from "./checkout.service";
 
 describe("CheckoutService", () => {
   let service: CheckoutService;
-  let prisma: { transaction: Record<string, jest.Mock>; $queryRaw: jest.Mock };
+  let transactions: { nextSequence: jest.Mock; create: jest.Mock };
   let products: { getActivePriceAndPromotion: jest.Mock };
   let inventory: { checkAndReserveStock: jest.Mock; releaseReservation: jest.Mock };
   let eventBus: { publish: jest.Mock };
@@ -22,11 +22,9 @@ describe("CheckoutService", () => {
   };
 
   beforeEach(() => {
-    prisma = {
-      transaction: {
-        create: jest.fn().mockResolvedValue({ id: "txn-1", lines: [], payments: [] }),
-      },
-      $queryRaw: jest.fn().mockResolvedValue([{ nextval: BigInt(1) }]),
+    transactions = {
+      nextSequence: jest.fn().mockResolvedValue(1),
+      create: jest.fn().mockResolvedValue({ id: "txn-1", lines: [], payments: [] }),
     };
     products = {
       getActivePriceAndPromotion: jest.fn().mockResolvedValue({
@@ -50,7 +48,7 @@ describe("CheckoutService", () => {
     eventBus = { publish: jest.fn() };
 
     service = new CheckoutService(
-      prisma as unknown as PrismaService,
+      transactions as unknown as TransactionsRepository,
       products as unknown as ProductsService,
       inventory as unknown as InventoryGrpcClientService,
       eventBus as unknown as EventBusService,
@@ -63,26 +61,24 @@ describe("CheckoutService", () => {
     expect(inventory.checkAndReserveStock).toHaveBeenCalledWith(
       expect.objectContaining({ sku: "SKU-1", locationCode: "STORE-1", quantityRequested: 2 }),
     );
-    expect(prisma.transaction.create).toHaveBeenCalledWith(
+    expect(transactions.create).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: expect.objectContaining({
-          transactionNumber: "TXN-1001",
-          storeId: "STORE-1",
-          totalAmount: 21.6,
-          lines: {
-            create: [
-              expect.objectContaining({
-                sku: "SKU-1",
-                quantitySold: 2,
-                unitPrice: 10,
-                discountAmount: 0,
-                taxAmount: 1.6,
-                lineTotal: 21.6,
-                reservationId: "res-1",
-              }),
-            ],
-          },
-        }),
+        transactionNumber: "TXN-1001",
+        storeId: "STORE-1",
+        totalAmount: 21.6,
+        lines: {
+          create: [
+            expect.objectContaining({
+              sku: "SKU-1",
+              quantitySold: 2,
+              unitPrice: 10,
+              discountAmount: 0,
+              taxAmount: 1.6,
+              lineTotal: 21.6,
+              reservationId: "res-1",
+            }),
+          ],
+        },
       }),
     );
     expect(eventBus.publish).toHaveBeenCalledWith(
@@ -110,7 +106,7 @@ describe("CheckoutService", () => {
     await expect(service.checkout(twoLineDto)).rejects.toBeInstanceOf(BadRequestException);
 
     expect(inventory.releaseReservation).toHaveBeenCalledWith("res-1");
-    expect(prisma.transaction.create).not.toHaveBeenCalled();
+    expect(transactions.create).not.toHaveBeenCalled();
     expect(eventBus.publish).not.toHaveBeenCalled();
   });
 
@@ -120,6 +116,6 @@ describe("CheckoutService", () => {
     await expect(service.checkout(mismatched)).rejects.toBeInstanceOf(BadRequestException);
 
     expect(inventory.releaseReservation).toHaveBeenCalledWith("res-1");
-    expect(prisma.transaction.create).not.toHaveBeenCalled();
+    expect(transactions.create).not.toHaveBeenCalled();
   });
 });

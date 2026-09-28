@@ -1,8 +1,8 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
-import { PrismaService } from "../prisma/prisma.service";
 import { CreateProductDto } from "./dto/create-product.dto";
 import { CreatePromotionDto } from "./dto/create-promotion.dto";
 import { UpdateProductDto } from "./dto/update-product.dto";
+import { ProductsRepository } from "./products.repository";
 
 export interface PricedProduct {
   id: string;
@@ -15,49 +15,39 @@ export interface PricedProduct {
 
 @Injectable()
 export class ProductsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly products: ProductsRepository) {}
 
   list() {
-    return this.prisma.product.findMany({
-      include: { promotions: true },
-      orderBy: { sku: "asc" },
-    });
+    return this.products.findAll();
   }
 
   async findOne(sku: string) {
-    const product = await this.prisma.product.findUnique({
-      where: { sku },
-      include: { promotions: true },
-    });
+    const product = await this.products.findBySku(sku);
     if (!product) throw new NotFoundException(`Product ${sku} not found`);
     return product;
   }
 
   create(dto: CreateProductDto) {
-    return this.prisma.product.create({
-      data: {
-        sku: dto.sku,
-        name: dto.name,
-        unitPrice: dto.unitPrice,
-        taxRatePct: dto.taxRatePct ?? 0,
-      },
+    return this.products.create({
+      sku: dto.sku,
+      name: dto.name,
+      unitPrice: dto.unitPrice,
+      taxRatePct: dto.taxRatePct ?? 0,
     });
   }
 
   async update(sku: string, dto: UpdateProductDto) {
     await this.findOne(sku);
-    return this.prisma.product.update({ where: { sku }, data: dto });
+    return this.products.update(sku, dto);
   }
 
   async addPromotion(sku: string, dto: CreatePromotionDto) {
     const product = await this.findOne(sku);
-    return this.prisma.promotion.create({
-      data: {
-        productId: product.id,
-        discountPct: dto.discountPct,
-        startsAt: new Date(dto.startsAt),
-        endsAt: new Date(dto.endsAt),
-      },
+    return this.products.createPromotion({
+      productId: product.id,
+      discountPct: dto.discountPct,
+      startsAt: new Date(dto.startsAt),
+      endsAt: new Date(dto.endsAt),
     });
   }
 
@@ -67,11 +57,7 @@ export class ProductsService {
    * whole checkout prices every line against the same instant.
    */
   async getActivePriceAndPromotion(sku: string, at: Date = new Date()): Promise<PricedProduct> {
-    const product = await this.prisma.product.findUnique({
-      where: { sku },
-      include: { promotions: true },
-    });
-    if (!product) throw new NotFoundException(`Product ${sku} not found`);
+    const product = await this.findOne(sku);
 
     const activePromotion = product.promotions.find(
       (promo) => promo.startsAt <= at && promo.endsAt >= at,

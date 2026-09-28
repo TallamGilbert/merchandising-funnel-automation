@@ -1,9 +1,13 @@
 import { Injectable } from "@nestjs/common";
-import { PrismaService } from "../prisma/prisma.service";
+import { ReturnsRepository } from "../returns/returns.repository";
+import { TransactionsRepository } from "../transactions/transactions.repository";
 
 @Injectable()
 export class ExpectedTotalService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly transactions: TransactionsRepository,
+    private readonly returns: ReturnsRepository,
+  ) {}
 
   /**
    * FR-7.1 cross-module call — Sales Audit's REST cross-check at close time
@@ -14,19 +18,10 @@ export class ExpectedTotalService {
   async getExpectedTotal(storeId: string, businessDate: string) {
     const { start, end } = dayBounds(businessDate);
 
-    const [sales, returns] = await Promise.all([
-      this.prisma.transaction.aggregate({
-        where: { storeId, createdAt: { gte: start, lt: end } },
-        _sum: { totalAmount: true },
-      }),
-      this.prisma.returnTransaction.aggregate({
-        where: { storeId, createdAt: { gte: start, lt: end } },
-        _sum: { refundAmount: true },
-      }),
+    const [salesTotal, returnsTotal] = await Promise.all([
+      this.transactions.sumTotalForStore(storeId, start, end),
+      this.returns.sumRefundsForStore(storeId, start, end),
     ]);
-
-    const salesTotal = Number(sales._sum.totalAmount ?? 0);
-    const returnsTotal = Number(returns._sum.refundAmount ?? 0);
 
     return { storeId, businessDate, expectedTotal: round2(salesTotal - returnsTotal) };
   }

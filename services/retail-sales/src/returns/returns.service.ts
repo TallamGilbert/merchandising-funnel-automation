@@ -2,13 +2,15 @@ import { randomUUID } from "crypto";
 import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
 import { EventBusService, EventRoutingKey, ItemReturnedEvent } from "@mms/shared";
 import { TransactionStatus } from "../generated/prisma";
-import { PrismaService } from "../prisma/prisma.service";
+import { TransactionsRepository } from "../transactions/transactions.repository";
 import { CreateReturnDto } from "./dto/create-return.dto";
+import { ReturnsRepository } from "./returns.repository";
 
 @Injectable()
 export class ReturnsService {
   constructor(
-    private readonly prisma: PrismaService,
+    private readonly returns: ReturnsRepository,
+    private readonly transactions: TransactionsRepository,
     private readonly eventBus: EventBusService,
   ) {}
 
@@ -19,10 +21,7 @@ export class ReturnsService {
    * originally sold quantity, tracked by TransactionLine.quantityReturned.
    */
   async processReturn(dto: CreateReturnDto) {
-    const transaction = await this.prisma.transaction.findUnique({
-      where: { id: dto.originalTransactionId },
-      include: { lines: true },
-    });
+    const transaction = await this.transactions.findByIdWithLines(dto.originalTransactionId);
     if (!transaction) {
       throw new NotFoundException(`Transaction ${dto.originalTransactionId} not found`);
     }
@@ -48,52 +47,38 @@ export class ReturnsService {
 
     const totalRefund = round2(returnLines.reduce((sum, rl) => sum + rl.refundAmount, 0));
 
-    const [{ nextval }] = await this.prisma.$queryRaw<{ nextval: bigint }[]>`
-      SELECT nextval(pg_get_serial_sequence('"ReturnTransaction"', 'sequence')) AS nextval
-    `;
-    const sequence = Number(nextval);
-    const returnId = randomUUID();
+    const sequence = await this.returns.nextSequence();
 
-    const [returnTransaction] = await this.prisma.$transaction([
-      this.prisma.returnTransaction.create({
-        data: {
-          id: returnId,
-          sequence,
-          returnNumber: `RET-${1000 + sequence}`,
-          originalTransactionId: transaction.id,
-          storeId: dto.storeId,
-          registerId: dto.registerId,
-          refundAmount: totalRefund,
-          lines: {
-            create: returnLines.map(({ line, requested, refundAmount }) => ({
-              transactionLineId: line.id,
-              sku: line.sku,
-              productName: line.productName,
-              quantityReturned: requested.quantityReturned,
-              locationCode: line.locationCode,
-              refundAmount,
-            })),
-          },
+    const returnTransaction = await this.returns.createWithLineIncrements(
+      {
+        id: randomUUID(),
+        sequence,
+        returnNumber: `RET-${1000 + sequence}`,
+        originalTransactionId: transaction.id,
+        storeId: dto.storeId,
+        registerId: dto.registerId,
+        refundAmount: totalRefund,
+        lines: {
+          create: returnLines.map(({ line, requested, refundAmount }) => ({
+            transactionLineId: line.id,
+            sku: line.sku,
+            productName: line.productName,
+            quantityReturned: requested.quantityReturned,
+            locationCode: line.locationCode,
+            refundAmount,
+          })),
         },
-        include: { lines: true },
-      }),
-      ...returnLines.map(({ line, requested }) =>
-        this.prisma.transactionLine.update({
-          where: { id: line.id },
-          data: { quantityReturned: { increment: requested.quantityReturned } },
-        }),
-      ),
-    ]);
+      },
+      returnLines.map(({ line, requested }) => ({
+        transactionLineId: line.id,
+        quantityReturned: requested.quantityReturned,
+      })),
+    );
 
-    const refreshedLines = await this.prisma.transactionLine.findMany({
-      where: { transactionId: transaction.id },
-    });
+    const refreshedLines = await this.transactions.findLines(transaction.id);
     const fullyReturned = refreshedLines.every((l) => l.quantityReturned >= l.quantitySold);
     if (fullyReturned) {
-      await this.prisma.transaction.update({
-        where: { id: transaction.id },
-        data: { status: TransactionStatus.RETURNED },
-      });
+      await this.transactions.updateStatus(transaction.id, TransactionStatus.RETURNED);
     }
 
     const event: ItemReturnedEvent = {

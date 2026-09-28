@@ -1,12 +1,12 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { ItemSoldEvent } from "@mms/shared";
-import { PrismaService } from "../prisma/prisma.service";
+import { LedgerRepository } from "./ledger.repository";
 
 @Injectable()
 export class LedgerService {
   private readonly logger = new Logger(LedgerService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly ledgers: LedgerRepository) {}
 
   /**
    * FR-7.1/7.3/7.7 — accumulates one sale onto its store-day's running
@@ -16,57 +16,27 @@ export class LedgerService {
    * rather than an upsert-by-natural-key.
    */
   async recordSale(event: ItemSoldEvent): Promise<void> {
-    const alreadyApplied = await this.prisma.appliedItemSoldEvent.findUnique({
-      where: { eventId: event.eventId },
-    });
-    if (alreadyApplied) {
+    if (await this.ledgers.isEventApplied(event.eventId)) {
       this.logger.log(`ItemSold ${event.eventId} already applied — skipping`);
       return;
     }
 
-    const businessDate = event.occurredAt.slice(0, 10);
-
-    await this.prisma.$transaction(async (tx) => {
-      const ledger = await tx.storeDayLedger.upsert({
-        where: { storeId_businessDate: { storeId: event.storeId, businessDate } },
-        create: { storeId: event.storeId, businessDate, expectedTotal: event.totalAmount },
-        update: { expectedTotal: { increment: event.totalAmount } },
-      });
-
-      await tx.cashierLedgerLine.upsert({
-        where: {
-          storeDayLedgerId_cashierId_registerId: {
-            storeDayLedgerId: ledger.id,
-            cashierId: event.cashierId,
-            registerId: event.registerId,
-          },
-        },
-        create: {
-          storeDayLedgerId: ledger.id,
-          cashierId: event.cashierId,
-          registerId: event.registerId,
-          expectedAmount: event.totalAmount,
-        },
-        update: { expectedAmount: { increment: event.totalAmount } },
-      });
-
-      await tx.appliedItemSoldEvent.create({ data: { eventId: event.eventId } });
+    await this.ledgers.applySale({
+      eventId: event.eventId,
+      storeId: event.storeId,
+      businessDate: event.occurredAt.slice(0, 10),
+      cashierId: event.cashierId,
+      registerId: event.registerId,
+      amount: event.totalAmount,
     });
   }
 
   getLedger(storeId: string, businessDate: string) {
-    return this.prisma.storeDayLedger.findUnique({
-      where: { storeId_businessDate: { storeId, businessDate } },
-      include: { cashierLines: true },
-    });
+    return this.ledgers.findByStoreDay(storeId, businessDate);
   }
 
   /** Daily close needs a ledger row to hang off even on a day with zero sales. */
   ensureLedger(storeId: string, businessDate: string) {
-    return this.prisma.storeDayLedger.upsert({
-      where: { storeId_businessDate: { storeId, businessDate } },
-      create: { storeId, businessDate, expectedTotal: 0 },
-      update: {},
-    });
+    return this.ledgers.ensureForStoreDay(storeId, businessDate);
   }
 }

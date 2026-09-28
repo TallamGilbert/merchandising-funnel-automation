@@ -3,8 +3,8 @@ import { BadRequestException, Injectable } from "@nestjs/common";
 import { EventBusService, EventRoutingKey, ItemSoldEvent, ItemSoldLine } from "@mms/shared";
 import { computeLinePrice } from "../products/pricing";
 import { ProductsService } from "../products/products.service";
-import { PrismaService } from "../prisma/prisma.service";
 import { InventoryGrpcClientService } from "../inventory-grpc-client/inventory-grpc-client.service";
+import { TransactionsRepository } from "../transactions/transactions.repository";
 import { CheckoutDto } from "./dto/checkout.dto";
 
 interface ReservedLine {
@@ -22,7 +22,7 @@ interface ReservedLine {
 @Injectable()
 export class CheckoutService {
   constructor(
-    private readonly prisma: PrismaService,
+    private readonly transactions: TransactionsRepository,
     private readonly products: ProductsService,
     private readonly inventory: InventoryGrpcClientService,
     private readonly eventBus: EventBusService,
@@ -94,45 +94,39 @@ export class CheckoutService {
       );
     }
 
-    const [{ nextval }] = await this.prisma.$queryRaw<{ nextval: bigint }[]>`
-      SELECT nextval(pg_get_serial_sequence('"Transaction"', 'sequence')) AS nextval
-    `;
-    const sequence = Number(nextval);
+    const sequence = await this.transactions.nextSequence();
 
-    const transaction = await this.prisma.transaction.create({
-      data: {
-        id: transactionId,
-        sequence,
-        transactionNumber: `TXN-${1000 + sequence}`,
-        storeId: dto.storeId,
-        registerId: dto.registerId,
-        cashierId: dto.cashierId,
-        subtotalAmount,
-        discountAmount,
-        taxAmount,
-        totalAmount,
-        lines: {
-          create: reserved.map((line) => ({
-            productId: line.productId,
-            sku: line.sku,
-            productName: line.productName,
-            quantitySold: line.quantitySold,
-            unitPrice: line.unitPrice,
-            discountAmount: line.discountAmount,
-            taxAmount: line.taxAmount,
-            lineTotal: line.lineTotal,
-            reservationId: line.reservationId,
-            locationCode: dto.locationCode,
-          })),
-        },
-        payments: {
-          create: dto.payments.map((payment) => ({
-            method: payment.method,
-            amount: payment.amount,
-          })),
-        },
+    const transaction = await this.transactions.create({
+      id: transactionId,
+      sequence,
+      transactionNumber: `TXN-${1000 + sequence}`,
+      storeId: dto.storeId,
+      registerId: dto.registerId,
+      cashierId: dto.cashierId,
+      subtotalAmount,
+      discountAmount,
+      taxAmount,
+      totalAmount,
+      lines: {
+        create: reserved.map((line) => ({
+          productId: line.productId,
+          sku: line.sku,
+          productName: line.productName,
+          quantitySold: line.quantitySold,
+          unitPrice: line.unitPrice,
+          discountAmount: line.discountAmount,
+          taxAmount: line.taxAmount,
+          lineTotal: line.lineTotal,
+          reservationId: line.reservationId,
+          locationCode: dto.locationCode,
+        })),
       },
-      include: { lines: true, payments: true },
+      payments: {
+        create: dto.payments.map((payment) => ({
+          method: payment.method,
+          amount: payment.amount,
+        })),
+      },
     });
 
     const eventLines: ItemSoldLine[] = reserved.map((line) => ({

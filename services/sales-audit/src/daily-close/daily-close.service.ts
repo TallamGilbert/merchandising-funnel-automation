@@ -2,9 +2,9 @@ import { randomUUID } from "crypto";
 import { BadRequestException, Injectable, Logger, NotFoundException } from "@nestjs/common";
 import { DayClosedEvent, EventBusService, EventRoutingKey } from "@mms/shared";
 import { DailyCloseStatus } from "../generated/prisma";
-import { PrismaService } from "../prisma/prisma.service";
 import { LedgerService } from "../item-sold-ledger/ledger.service";
 import { RetailSalesClientService } from "../retail-sales-client/retail-sales-client.service";
+import { DailyCloseRepository } from "./daily-close.repository";
 
 const MISMATCH_EPSILON = 0.01;
 
@@ -13,14 +13,14 @@ export class DailyCloseService {
   private readonly logger = new Logger(DailyCloseService.name);
 
   constructor(
-    private readonly prisma: PrismaService,
+    private readonly closes: DailyCloseRepository,
     private readonly ledger: LedgerService,
     private readonly retailSales: RetailSalesClientService,
     private readonly eventBus: EventBusService,
   ) {}
 
   get(storeId: string, businessDate: string) {
-    return this.prisma.dailyClose.findFirst({ where: { storeId, businessDate } });
+    return this.closes.findByStoreDay(storeId, businessDate);
   }
 
   /**
@@ -55,24 +55,14 @@ export class DailyCloseService {
     const status =
       discrepancyAmount !== 0 ? DailyCloseStatus.BLOCKED_ON_EXPLANATION : DailyCloseStatus.OPEN;
 
-    return this.prisma.dailyClose.upsert({
-      where: { storeDayLedgerId: ledger.id },
-      create: {
-        storeDayLedgerId: ledger.id,
-        storeId,
-        businessDate,
-        expectedTotal,
-        actualCountedTotal,
-        discrepancyAmount,
-        status,
-      },
-      update: {
-        expectedTotal,
-        actualCountedTotal,
-        discrepancyAmount,
-        status,
-        discrepancyExplanation: null,
-      },
+    return this.closes.saveCount({
+      storeDayLedgerId: ledger.id,
+      storeId,
+      businessDate,
+      expectedTotal,
+      actualCountedTotal,
+      discrepancyAmount,
+      status,
     });
   }
 
@@ -83,15 +73,12 @@ export class DailyCloseService {
       throw new NotFoundException(`No count recorded yet for ${storeId} on ${businessDate}`);
     }
 
-    return this.prisma.dailyClose.update({
-      where: { id: close.id },
-      data: {
-        discrepancyExplanation: explanation,
-        status:
-          close.status === DailyCloseStatus.BLOCKED_ON_EXPLANATION
-            ? DailyCloseStatus.OPEN
-            : close.status,
-      },
+    return this.closes.update(close.id, {
+      discrepancyExplanation: explanation,
+      status:
+        close.status === DailyCloseStatus.BLOCKED_ON_EXPLANATION
+          ? DailyCloseStatus.OPEN
+          : close.status,
     });
   }
 
@@ -119,24 +106,12 @@ export class DailyCloseService {
     const discrepancyAmount = Number(close.discrepancyAmount ?? 0);
     const actualCountedTotal = Number(close.actualCountedTotal);
 
-    await this.prisma.$transaction([
-      this.prisma.discrepancyLogEntry.create({
-        data: {
-          storeId,
-          businessDate,
-          discrepancyAmount,
-          explanation: close.discrepancyExplanation,
-        },
-      }),
-      this.prisma.dailyClose.update({
-        where: { id: close.id },
-        data: {
-          status: DailyCloseStatus.CLOSED,
-          closedByManagerId,
-          closedAt: new Date(),
-        },
-      }),
-    ]);
+    await this.closes.closeWithLogEntry(close.id, closedByManagerId, {
+      storeId,
+      businessDate,
+      discrepancyAmount,
+      explanation: close.discrepancyExplanation,
+    });
 
     const event: DayClosedEvent = {
       eventId: randomUUID(),

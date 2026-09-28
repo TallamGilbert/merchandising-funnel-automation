@@ -1,38 +1,36 @@
 import { BadRequestException } from "@nestjs/common";
 import { EventBusService, EventRoutingKey } from "@mms/shared";
 import { DailyCloseStatus } from "../generated/prisma";
-import { PrismaService } from "../prisma/prisma.service";
 import { LedgerService } from "../item-sold-ledger/ledger.service";
 import { RetailSalesClientService } from "../retail-sales-client/retail-sales-client.service";
+import { DailyCloseRepository } from "./daily-close.repository";
 import { DailyCloseService } from "./daily-close.service";
 
 describe("DailyCloseService", () => {
   let service: DailyCloseService;
-  let prisma: {
-    dailyClose: Record<string, jest.Mock>;
-    discrepancyLogEntry: Record<string, jest.Mock>;
-    $transaction: jest.Mock;
+  let closes: {
+    findByStoreDay: jest.Mock;
+    saveCount: jest.Mock;
+    update: jest.Mock;
+    closeWithLogEntry: jest.Mock;
   };
   let ledger: { ensureLedger: jest.Mock };
   let retailSales: { getExpectedTotal: jest.Mock };
   let eventBus: { publish: jest.Mock };
 
   beforeEach(() => {
-    prisma = {
-      dailyClose: {
-        findFirst: jest.fn(),
-        upsert: jest.fn().mockImplementation(({ create }) => Promise.resolve({ id: "close-1", ...create })),
-        update: jest.fn().mockReturnValue("close-update"),
-      },
-      discrepancyLogEntry: { create: jest.fn().mockReturnValue("log-create") },
-      $transaction: jest.fn().mockResolvedValue([{}, {}]),
+    closes = {
+      findByStoreDay: jest.fn(),
+      saveCount: jest.fn().mockImplementation((count) => Promise.resolve({ id: "close-1", ...count })),
+      update: jest.fn().mockResolvedValue({}),
+      closeWithLogEntry: jest.fn().mockResolvedValue(undefined),
     };
     ledger = { ensureLedger: jest.fn().mockResolvedValue({ id: "ledger-1", expectedTotal: 100 }) };
     retailSales = { getExpectedTotal: jest.fn().mockResolvedValue({ expectedTotal: 100 }) };
     eventBus = { publish: jest.fn() };
 
     service = new DailyCloseService(
-      prisma as unknown as PrismaService,
+      closes as unknown as DailyCloseRepository,
       ledger as unknown as LedgerService,
       retailSales as unknown as RetailSalesClientService,
       eventBus as unknown as EventBusService,
@@ -75,23 +73,23 @@ describe("DailyCloseService", () => {
 
   describe("explainDiscrepancy", () => {
     it("flips a blocked close back to open once explained", async () => {
-      prisma.dailyClose.findFirst.mockResolvedValue({
+      closes.findByStoreDay.mockResolvedValue({
         id: "close-1",
         status: DailyCloseStatus.BLOCKED_ON_EXPLANATION,
       });
 
       await service.explainDiscrepancy("STORE-1", "2026-09-24", "Till miscount, corrected on recount");
 
-      expect(prisma.dailyClose.update).toHaveBeenCalledWith({
-        where: { id: "close-1" },
-        data: { discrepancyExplanation: "Till miscount, corrected on recount", status: DailyCloseStatus.OPEN },
+      expect(closes.update).toHaveBeenCalledWith("close-1", {
+        discrepancyExplanation: "Till miscount, corrected on recount",
+        status: DailyCloseStatus.OPEN,
       });
     });
   });
 
   describe("close", () => {
     it("rejects while blocked on an unexplained discrepancy", async () => {
-      prisma.dailyClose.findFirst.mockResolvedValue({
+      closes.findByStoreDay.mockResolvedValue({
         id: "close-1",
         actualCountedTotal: 95,
         status: DailyCloseStatus.BLOCKED_ON_EXPLANATION,
@@ -104,7 +102,7 @@ describe("DailyCloseService", () => {
     });
 
     it("rejects when no count has been recorded yet", async () => {
-      prisma.dailyClose.findFirst.mockResolvedValue(null);
+      closes.findByStoreDay.mockResolvedValue(null);
 
       await expect(service.close("STORE-1", "2026-09-24", "mgr-1")).rejects.toBeInstanceOf(
         BadRequestException,
@@ -112,7 +110,7 @@ describe("DailyCloseService", () => {
     });
 
     it("writes the discrepancy log and publishes DayClosed with the correct sign convention", async () => {
-      prisma.dailyClose.findFirst.mockResolvedValue({
+      closes.findByStoreDay.mockResolvedValue({
         id: "close-1",
         expectedTotal: 100,
         actualCountedTotal: 95,
@@ -123,13 +121,11 @@ describe("DailyCloseService", () => {
 
       await service.close("STORE-1", "2026-09-24", "mgr-1");
 
-      expect(prisma.discrepancyLogEntry.create).toHaveBeenCalledWith({
-        data: {
-          storeId: "STORE-1",
-          businessDate: "2026-09-24",
-          discrepancyAmount: -5,
-          explanation: "Till miscount",
-        },
+      expect(closes.closeWithLogEntry).toHaveBeenCalledWith("close-1", "mgr-1", {
+        storeId: "STORE-1",
+        businessDate: "2026-09-24",
+        discrepancyAmount: -5,
+        explanation: "Till miscount",
       });
       expect(eventBus.publish).toHaveBeenCalledWith(
         EventRoutingKey.DAY_CLOSED,

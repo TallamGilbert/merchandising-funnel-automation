@@ -1,17 +1,13 @@
 import { BadRequestException, NotFoundException } from "@nestjs/common";
 import { EventBusService, EventRoutingKey } from "@mms/shared";
-import { PrismaService } from "../prisma/prisma.service";
+import { TransactionsRepository } from "../transactions/transactions.repository";
+import { ReturnsRepository } from "./returns.repository";
 import { ReturnsService } from "./returns.service";
 
 describe("ReturnsService", () => {
   let service: ReturnsService;
-  let prisma: {
-    transaction: Record<string, jest.Mock>;
-    transactionLine: Record<string, jest.Mock>;
-    returnTransaction: Record<string, jest.Mock>;
-    $queryRaw: jest.Mock;
-    $transaction: jest.Mock;
-  };
+  let returns: { nextSequence: jest.Mock; createWithLineIncrements: jest.Mock };
+  let transactions: { findByIdWithLines: jest.Mock; findLines: jest.Mock; updateStatus: jest.Mock };
   let eventBus: { publish: jest.Mock };
 
   const transactionLine = {
@@ -25,28 +21,23 @@ describe("ReturnsService", () => {
   };
 
   beforeEach(() => {
-    prisma = {
-      transaction: {
-        findUnique: jest.fn().mockResolvedValue({
-          id: "txn-1",
-          lines: [transactionLine],
-        }),
-        update: jest.fn().mockResolvedValue({}),
-      },
-      transactionLine: {
-        findMany: jest.fn(),
-        update: jest.fn().mockReturnValue("line-update"),
-      },
-      returnTransaction: {
-        create: jest.fn().mockReturnValue("return-create"),
-      },
-      $queryRaw: jest.fn().mockResolvedValue([{ nextval: BigInt(1) }]),
-      $transaction: jest.fn(),
+    returns = {
+      nextSequence: jest.fn().mockResolvedValue(1),
+      createWithLineIncrements: jest.fn().mockResolvedValue({ id: "ret-1" }),
+    };
+    transactions = {
+      findByIdWithLines: jest.fn().mockResolvedValue({
+        id: "txn-1",
+        lines: [transactionLine],
+      }),
+      findLines: jest.fn(),
+      updateStatus: jest.fn().mockResolvedValue({}),
     };
     eventBus = { publish: jest.fn() };
 
     service = new ReturnsService(
-      prisma as unknown as PrismaService,
+      returns as unknown as ReturnsRepository,
+      transactions as unknown as TransactionsRepository,
       eventBus as unknown as EventBusService,
     );
   });
@@ -59,7 +50,7 @@ describe("ReturnsService", () => {
   };
 
   it("rejects a transaction that doesn't exist", async () => {
-    prisma.transaction.findUnique.mockResolvedValue(null);
+    transactions.findByIdWithLines.mockResolvedValue(null);
     await expect(service.processReturn(dto)).rejects.toBeInstanceOf(NotFoundException);
   });
 
@@ -70,24 +61,19 @@ describe("ReturnsService", () => {
   });
 
   it("records the return, flips the transaction to RETURNED once fully returned, and publishes ItemReturned", async () => {
-    prisma.$transaction.mockResolvedValue([{ id: "ret-1" }]);
-    prisma.transactionLine.findMany.mockResolvedValue([{ ...transactionLine, quantityReturned: 2 }]);
+    transactions.findLines.mockResolvedValue([{ ...transactionLine, quantityReturned: 2 }]);
 
     await service.processReturn(dto);
 
-    expect(prisma.returnTransaction.create).toHaveBeenCalledWith(
+    expect(returns.createWithLineIncrements).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: expect.objectContaining({
-          returnNumber: "RET-1001",
-          refundAmount: 21.6,
-          lines: { create: [expect.objectContaining({ sku: "SKU-1", quantityReturned: 2, refundAmount: 21.6 })] },
-        }),
+        returnNumber: "RET-1001",
+        refundAmount: 21.6,
+        lines: { create: [expect.objectContaining({ sku: "SKU-1", quantityReturned: 2, refundAmount: 21.6 })] },
       }),
+      [{ transactionLineId: "line-1", quantityReturned: 2 }],
     );
-    expect(prisma.transaction.update).toHaveBeenCalledWith({
-      where: { id: "txn-1" },
-      data: { status: "RETURNED" },
-    });
+    expect(transactions.updateStatus).toHaveBeenCalledWith("txn-1", "RETURNED");
     expect(eventBus.publish).toHaveBeenCalledWith(
       EventRoutingKey.ITEM_RETURNED,
       expect.objectContaining({
@@ -98,11 +84,10 @@ describe("ReturnsService", () => {
   });
 
   it("leaves the transaction status alone on a partial return", async () => {
-    prisma.$transaction.mockResolvedValue([{ id: "ret-1" }]);
-    prisma.transactionLine.findMany.mockResolvedValue([{ ...transactionLine, quantityReturned: 1 }]);
+    transactions.findLines.mockResolvedValue([{ ...transactionLine, quantityReturned: 1 }]);
 
     await service.processReturn({ ...dto, lines: [{ transactionLineId: "line-1", quantityReturned: 1 }] });
 
-    expect(prisma.transaction.update).not.toHaveBeenCalled();
+    expect(transactions.updateStatus).not.toHaveBeenCalled();
   });
 });
