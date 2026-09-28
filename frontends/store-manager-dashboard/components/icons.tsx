@@ -36,6 +36,17 @@ export function ClipboardCheckIcon({ size = 18 }: IconProps) {
   );
 }
 
+export function UsersIcon({ size = 18 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" {...base}>
+      <circle cx="9" cy="8" r="3.5" />
+      <path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5" />
+      <path d="M16 4.6a3.5 3.5 0 0 1 0 6.8" />
+      <path d="M18 14.8c1.9.7 3.1 2.4 3.5 5.2" />
+    </svg>
+  );
+}
+
 export function SearchIcon({ size = 16 }: IconProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" {...base}>

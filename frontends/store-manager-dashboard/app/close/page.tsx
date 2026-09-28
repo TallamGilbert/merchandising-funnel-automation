@@ -1,26 +1,33 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { AppShell, type NavSection } from "../../components/AppShell";
-import { ClipboardCheckIcon, StoreIcon } from "../../components/icons";
+import {
+  formatDate,
+  formatDateTime,
+  formatMoney,
+  formatSignedMoney,
+  LocationPicker,
+  StaffPicker,
+  useFlash,
+  useLocations,
+  useStaffNames,
+} from "@mms/ui";
+import { AppShell } from "../../components/AppShell";
 import { api, type CashierLedgerLine, type DailyClose } from "../../lib/api";
-
-const NAV: NavSection[] = [
-  {
-    label: "Main menu",
-    items: [
-      { label: "Overview", href: "/", icon: <StoreIcon /> },
-      { label: "Close register", href: "/close", icon: <ClipboardCheckIcon /> },
-    ],
-  },
-];
+import { NAV } from "../../lib/nav";
+import { useSelectedStore } from "../../lib/store";
 
 function todayIso(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
 export default function ClosePage() {
-  const [storeId, setStoreId] = useState("STORE-1");
+  const [storeId, setStoreId] = useSelectedStore();
+  const flash = useFlash();
+  const nameOf = useStaffNames();
+  const { data: stores } = useLocations("STORE");
+  const store = stores.find((s) => s.code === storeId);
+  const registerName = (code: string) => store?.registers.find((r) => r.code === code)?.name ?? code;
   const [businessDate, setBusinessDate] = useState(todayIso());
   const [managerId, setManagerId] = useState("");
   const [close, setClose] = useState<DailyClose | null>(null);
@@ -31,6 +38,7 @@ export default function ClosePage() {
   const [busy, setBusy] = useState(false);
 
   const load = () => {
+    if (!storeId) return;
     setError(null);
     Promise.all([
       api.getDailyClose(storeId, businessDate),
@@ -52,6 +60,9 @@ export default function ClosePage() {
     try {
       const result = await api.recordCount(storeId, businessDate, Number(actualCountedTotal));
       setClose(result);
+      const off = Number(result.discrepancyAmount ?? 0);
+      if (off === 0) flash.success("Count recorded — the store balances");
+      else flash.info(`Count recorded — ${formatSignedMoney(off)} against expected. Explain it before closing.`);
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -65,6 +76,7 @@ export default function ClosePage() {
     try {
       const result = await api.explainDiscrepancy(storeId, businessDate, explanation);
       setClose(result);
+      flash.success("Explanation saved — the store can now be closed");
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -78,6 +90,7 @@ export default function ClosePage() {
     try {
       const result = await api.closeDay(storeId, businessDate, managerId);
       setClose(result);
+      flash.success(`${store?.name ?? storeId} closed for ${formatDate(businessDate)}`);
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -102,7 +115,7 @@ export default function ClosePage() {
         <div className="field-row">
           <label>
             Store
-            <input value={storeId} onChange={(e) => setStoreId(e.target.value)} />
+            <LocationPicker type="STORE" value={storeId} onChange={setStoreId} />
           </label>
           <label>
             Business date
@@ -113,9 +126,13 @@ export default function ClosePage() {
 
       {error && <p className="error">{error}</p>}
 
-      {closed ? (
+      {!storeId ? (
+        <p className="card muted">Choose a store to close.</p>
+      ) : closed ? (
         <p className="card">
-          <span className="badge ok">Closed</span> {storeId} is closed for {businessDate}.
+          <span className="badge ok">Closed</span> {store?.name ?? storeId} is closed for {formatDate(businessDate)}
+          {close?.closedByManagerId && ` — by ${nameOf(close.closedByManagerId)}`}
+          {close?.closedAt && ` on ${formatDateTime(close.closedAt)}`}.
         </p>
       ) : (
         <>
@@ -126,7 +143,7 @@ export default function ClosePage() {
             </p>
             <div className="field-row">
               <label>
-                Actual counted total
+                Actual counted total (KES)
                 <input
                   type="number"
                   step="0.01"
@@ -152,7 +169,8 @@ export default function ClosePage() {
                 </span>
               </div>
               <p style={{ margin: 0 }}>
-                Expected {close.expectedTotal} · Counted {close.actualCountedTotal} · Discrepancy {close.discrepancyAmount ?? "0.00"}
+                Expected {formatMoney(close.expectedTotal)} · Counted {formatMoney(close.actualCountedTotal)} ·
+                Discrepancy <strong>{formatSignedMoney(close.discrepancyAmount ?? 0)}</strong>
               </p>
 
               {blocked && (
@@ -193,15 +211,15 @@ export default function ClosePage() {
                   <tr>
                     <th>Cashier</th>
                     <th>Register</th>
-                    <th>Expected</th>
+                    <th className="num">Expected</th>
                   </tr>
                 </thead>
                 <tbody>
                   {cashierLines.map((line) => (
                     <tr key={line.id}>
-                      <td>{line.cashierId}</td>
-                      <td>{line.registerId}</td>
-                      <td>{line.expectedAmount}</td>
+                      <td>{nameOf(line.cashierId)}</td>
+                      <td>{registerName(line.registerId)}</td>
+                      <td className="num">{formatMoney(line.expectedAmount)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -213,7 +231,12 @@ export default function ClosePage() {
             <div className="card">
               <label>
                 Closing manager
-                <input value={managerId} onChange={(e) => setManagerId(e.target.value)} placeholder="e.g. mgr-james" />
+                <StaffPicker
+                  required
+                  roles={["MANAGER", "OWNER"]}
+                  value={managerId}
+                  onChange={setManagerId}
+                />
               </label>
               <div className="actions">
                 <button
