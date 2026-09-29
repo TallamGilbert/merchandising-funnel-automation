@@ -3,8 +3,7 @@
 Step-by-step process to get every built frontend up and talking to real backend
 data. Follow this top to bottom on a clean checkout.
 
-**7 of the 8** frontends have real UI right now. `finance-portal` is still
-scaffold-only (Phase 4), so there's nothing to run there.
+All **8** frontends have real UI.
 
 | Frontend | Port | Backend it needs |
 |---|---|---|
@@ -15,12 +14,16 @@ scaffold-only (Phase 4), so there's nothing to run there.
 | Warehouse Floor App | 3105 | warehouse-operations (3005) |
 | POS Terminal App | 3106 | retail-sales (3006), inventory (3003, gRPC 5003) |
 | Store Manager Dashboard | 3107 | sales-audit (3007), retail-sales (3006) |
+| Finance Portal | 3108 | financials (3008) |
 
 Every frontend also reads the **directory** service (3009) — staff, stores,
 warehouses and registers — to fill its pickers, and some read other modules
 for lookups (e.g. the POS shows stock from inventory, the vendor portal picks
 SKUs from inventory and POs from procurement). Running all 8 backends is the
 simplest way to get every picker populated.
+
+Financials books the ledger from events, and calls procurement (PO costs) and
+inventory (unit costs) to value them — if either is down it retries on its own.
 
 ## 1. Install dependencies
 
@@ -64,12 +67,12 @@ SQL
 
 ## 3. Set up each backend service's env file
 
-For each of the 8 services, copy its local-dev env template and point
+For each of the 9 services, copy its local-dev env template and point
 `DATABASE_URL` at whichever Postgres port you actually used in step 2 (5432,
 or 5433 if you remapped it):
 
 ```bash
-for svc in vendor-management procurement inventory receiving warehouse-operations retail-sales sales-audit directory; do
+for svc in vendor-management procurement inventory receiving warehouse-operations retail-sales sales-audit financials directory; do
   cp "services/$svc/.env.example" "services/$svc/.env"
   # only needed if you remapped the port in step 2:
   sed -i 's/localhost:5432/localhost:5433/' "services/$svc/.env"
@@ -81,15 +84,15 @@ done
 ```bash
 pnpm --filter @mms/shared run build
 
-for svc in vendor-management procurement inventory receiving warehouse-operations retail-sales sales-audit directory; do
+for svc in vendor-management procurement inventory receiving warehouse-operations retail-sales sales-audit financials directory; do
   pnpm --filter "@mms/${svc}" exec prisma generate
   pnpm --filter "@mms/${svc}" exec prisma db push --skip-generate --accept-data-loss
 done
 ```
 
-## 5. Start the 8 backend services
+## 5. Start the 9 backend services
 
-All eight in one terminal (output is prefixed per service; Ctrl+C stops all):
+All nine in one terminal (output is prefixed per service; Ctrl+C stops all):
 
 ```bash
 pnpm dev:services
@@ -98,12 +101,12 @@ pnpm dev:services
 Confirm they're all up before moving on:
 
 ```bash
-for p in 3001 3002 3003 3004 3005 3006 3007 3009; do
+for p in 3001 3002 3003 3004 3005 3006 3007 3008 3009; do
   curl -s -o /dev/null -w "port $p: %{http_code}\n" http://localhost:$p/health
 done
 ```
 
-You should see `200` for all eight. On first start the directory seeds demo
+You should see `200` for all nine. On first start the directory seeds demo
 locations (WH-MAIN, DOCK-1, STORE-1, STORE-2), registers and staff; manage
 them on the Store Manager Dashboard's **Staff** page. If one shows `000`, check that terminal's
 output — it's usually a `Can't reach database server` race on first boot;
@@ -112,7 +115,7 @@ just re-run `pnpm --filter @mms/<svc> run dev` for that one service.
 ## 6. Set up each frontend's env file
 
 ```bash
-for fe in vendor-management-portal procurement-dashboard inventory-control-center warehouse-receiving-app warehouse-floor-app pos-terminal-app store-manager-dashboard; do
+for fe in vendor-management-portal procurement-dashboard inventory-control-center warehouse-receiving-app warehouse-floor-app pos-terminal-app store-manager-dashboard finance-portal; do
   cp "frontends/$fe/.env.example" "frontends/$fe/.env.local"
 done
 ```
@@ -120,7 +123,7 @@ done
 These already point at the right backend ports (3001–3009) out of the box —
 no editing needed.
 
-## 7. Start the 7 frontends
+## 7. Start the 8 frontends
 
 In a second terminal:
 
@@ -137,6 +140,7 @@ pnpm dev:frontends
 - Warehouse Floor App — http://localhost:3105
 - POS Terminal App — http://localhost:3106
 - Store Manager Dashboard — http://localhost:3107
+- Finance Portal — http://localhost:3108
 
 On a fresh database every list will say "No X found" — that's expected, not a
 bug. To see the full flow work end to end:
@@ -166,6 +170,15 @@ bug. To see the full flow work end to end:
    price list, so a product needs a price here before the till can sell it.
 9. **POS Terminal App** → Checkout → pick the store, register and cashier →
    search for the product → Complete sale.
+10. **Store Manager Dashboard** → Close register → record the count, explain
+    any discrepancy → Close store.
+11. **Finance Portal** → Accounts payable shows the supplier bill from step 4
+    (due after the PO's payment terms) → Record payment. Overview and
+    Profitability show the sale's revenue and gross profit; General ledger
+    shows every posting and a trial balance that balances.
+
+Financials only sees events published while it's subscribed: its queues are
+created the first time it starts, so activity from before that isn't booked.
 
 ## Troubleshooting
 

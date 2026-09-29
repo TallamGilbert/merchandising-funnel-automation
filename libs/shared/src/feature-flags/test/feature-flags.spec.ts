@@ -100,10 +100,10 @@ describe("isModuleEnabled", () => {
     expect(isModuleEnabled(ModuleKey.SALES_AUDIT)).toBe(true);
   });
 
-  it("defaults Phase 4 modules to disabled", () => {
+  it("defaults Phase 4 modules (financials) to enabled", () => {
     delete process.env.FEATURE_FINANCIALS_ENABLED;
 
-    expect(isModuleEnabled(ModuleKey.FINANCIALS)).toBe(false);
+    expect(isModuleEnabled(ModuleKey.FINANCIALS)).toBe(true);
   });
 
   it("lets an explicit env var override a Phase 1 module's default", () => {
@@ -111,9 +111,9 @@ describe("isModuleEnabled", () => {
     expect(isModuleEnabled(ModuleKey.INVENTORY)).toBe(false);
   });
 
-  it("lets an explicit env var override a later-phase module's default", () => {
-    process.env.FEATURE_FINANCIALS_ENABLED = "true";
-    expect(isModuleEnabled(ModuleKey.FINANCIALS)).toBe(true);
+  it("lets an explicit env var switch off a Phase 4 module", () => {
+    process.env.FEATURE_FINANCIALS_ENABLED = "false";
+    expect(isModuleEnabled(ModuleKey.FINANCIALS)).toBe(false);
   });
 
   it("lets an explicit env var switch off a Phase 2 module", () => {
