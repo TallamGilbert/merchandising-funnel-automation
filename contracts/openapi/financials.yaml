@@ -1,31 +1,242 @@
-openapi: 3.0.3
-info:
-  title: Financials Service
-  description: >
-    Scaffold only in this pass — Phase 4 — Accounting per PRD Section 7. Routes
-    beyond /health are gated behind this module's feature flag and return
-    503 "not yet implemented" until the module is built. This file will be
-    expanded to the module's full contract (and regenerated from the live
-    /docs-json) when its phase begins, per NFR-4 (contract-first) and the
-    Definition of Done in CONTRIBUTING.md.
-  version: 0.1.0
-servers:
-  - url: http://localhost:3008
-tags:
-  - name: health
+# Generated from the service's own Swagger document (see CONTRIBUTING.md, NFR-4).
+openapi: 3.0.0
 paths:
   /health:
     get:
-      tags: [health]
-      summary: Liveness/readiness probe. Always reachable regardless of feature flag state.
+      operationId: HealthController_check
+      parameters: []
       responses:
-        "200":
+        '200':
           description: Service is up.
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  status: { type: string, example: ok }
-                  service: { type: string, example: financials }
-                  timestamp: { type: string, format: date-time }
+      tags:
+      - health
+  /accounts:
+    get:
+      operationId: AccountsController_list
+      parameters: []
+      responses:
+        '200':
+          description: ''
+      tags:
+      - accounts
+  /ledger/entries:
+    get:
+      operationId: LedgerController_entries
+      parameters:
+      - name: from
+        required: false
+        in: query
+        description: YYYY-MM-DD
+        schema:
+          type: string
+      - name: to
+        required: false
+        in: query
+        description: YYYY-MM-DD, inclusive
+        schema:
+          type: string
+      - name: accountCode
+        required: false
+        in: query
+        schema:
+          type: string
+      - name: source
+        required: false
+        in: query
+        schema:
+          enum:
+          - GOODS_RECEIVED
+          - ITEM_SOLD
+          - ITEM_RETURNED
+          - DAY_CLOSED
+          - BILL_PAYMENT
+          type: string
+      - name: limit
+        required: false
+        in: query
+        description: Default 100, max 500
+        schema:
+          type: number
+      responses:
+        '200':
+          description: ''
+      tags:
+      - ledger
+  /ledger/trial-balance:
+    get:
+      operationId: LedgerController_trialBalance
+      parameters:
+      - name: asOf
+        required: false
+        in: query
+        description: YYYY-MM-DD, inclusive; default today
+        schema:
+          type: string
+      responses:
+        '200':
+          description: ''
+      tags:
+      - ledger
+  /inbox:
+    get:
+      operationId: InboxController_list
+      parameters:
+      - name: status
+        required: false
+        in: query
+        schema:
+          enum:
+          - PENDING
+          - POSTED
+          - NEEDS_ATTENTION
+          type: string
+      responses:
+        '200':
+          description: ''
+      tags:
+      - inbox
+  /inbox/{eventId}/retry:
+    post:
+      operationId: InboxController_retry
+      parameters:
+      - name: eventId
+        required: true
+        in: path
+        schema:
+          type: string
+      responses:
+        '201':
+          description: ''
+      tags:
+      - inbox
+  /payables:
+    get:
+      operationId: PayablesController_list
+      parameters:
+      - name: status
+        required: false
+        in: query
+        schema:
+          enum:
+          - OPEN
+          - PAID
+          type: string
+      - name: supplierId
+        required: false
+        in: query
+        schema:
+          type: string
+      responses:
+        '200':
+          description: ''
+      tags:
+      - payables
+  /payables/aging:
+    get:
+      operationId: PayablesController_aging
+      parameters:
+      - name: asOf
+        required: false
+        in: query
+        description: YYYY-MM-DD; default today
+        schema:
+          type: string
+      responses:
+        '200':
+          description: ''
+      tags:
+      - payables
+  /payables/{id}/pay:
+    post:
+      operationId: PayablesController_pay
+      parameters:
+      - name: id
+        required: true
+        in: path
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PayBillDto'
+      responses:
+        '201':
+          description: ''
+      tags:
+      - payables
+  /reports/profitability:
+    get:
+      operationId: ReportsController_profitability
+      parameters:
+      - name: from
+        required: true
+        in: query
+        description: YYYY-MM-DD
+        schema:
+          type: string
+      - name: to
+        required: true
+        in: query
+        description: YYYY-MM-DD, inclusive
+        schema:
+          type: string
+      - name: groupBy
+        required: false
+        in: query
+        schema:
+          enum:
+          - product
+          - store
+          - day
+          type: string
+      responses:
+        '200':
+          description: ''
+      tags:
+      - reports
+  /reports/summary:
+    get:
+      operationId: ReportsController_summary
+      parameters:
+      - name: from
+        required: true
+        in: query
+        description: YYYY-MM-DD
+        schema:
+          type: string
+      - name: to
+        required: true
+        in: query
+        description: YYYY-MM-DD, inclusive
+        schema:
+          type: string
+      responses:
+        '200':
+          description: ''
+      tags:
+      - reports
+info:
+  title: Financials Service
+  description: 'Automated bookkeeper: turns goods received, sales, returns and day
+    closes into double-entry ledger postings, accounts payable and profitability reports
+    (FR-8.x).'
+  version: 0.1.0
+  contact: {}
+tags: []
+servers:
+- url: http://localhost:3008
+components:
+  schemas:
+    PayBillDto:
+      type: object
+      properties:
+        paymentReference:
+          type: string
+          example: MPESA-QX81K2
+          description: Bank or M-Pesa reference
+        paidOn:
+          type: string
+          example: '2026-09-29'
+          description: Defaults to today

@@ -14,7 +14,7 @@ async function bootstrap() {
 
   const config = new DocumentBuilder()
     .setTitle("Financials Service")
-    .setDescription("Phase 4 scaffold. Automated bookkeeper translating domain events into ledger entries (FR-8.x).")
+    .setDescription("Automated bookkeeper: turns goods received, sales, returns and day closes into double-entry ledger postings, accounts payable and profitability reports (FR-8.x).")
     .setVersion("0.1.0")
     .build();
   const document = SwaggerModule.createDocument(app, config);
