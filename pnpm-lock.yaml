@@ -29,6 +29,9 @@ importers:
 
   frontends/finance-portal:
     dependencies:
+      '@mms/ui':
+        specifier: workspace:*
+        version: link:../../libs/ui
       next:
         specifier: ^16.3.4
         version: 16.3.4(@types/node@20.19.43)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
