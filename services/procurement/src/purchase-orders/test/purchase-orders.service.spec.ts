@@ -254,4 +254,23 @@ describe("PurchaseOrdersService", () => {
       expect(prisma.$transaction).not.toHaveBeenCalled();
     });
   });
+
+  describe("findAnyByPoNumber", () => {
+    it("returns a PO whatever its status, e.g. already closed", async () => {
+      prisma.purchaseOrder.findUnique.mockResolvedValue({ poNumber: "PO-1001", status: PurchaseOrderStatus.CLOSED });
+
+      await expect(service.findAnyByPoNumber("PO-1001")).resolves.toEqual(
+        expect.objectContaining({ status: PurchaseOrderStatus.CLOSED }),
+      );
+      expect(prisma.purchaseOrder.findUnique).toHaveBeenCalledWith({
+        where: { poNumber: "PO-1001" },
+        include: { lines: true },
+      });
+    });
+
+    it("rejects an unknown PO number", async () => {
+      prisma.purchaseOrder.findUnique.mockResolvedValue(null);
+      await expect(service.findAnyByPoNumber("PO-9999")).rejects.toThrow("Purchase order PO-9999 not found");
+    });
+  });
 });

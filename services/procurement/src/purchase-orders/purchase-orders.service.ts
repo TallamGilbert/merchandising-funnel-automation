@@ -70,6 +70,20 @@ export class PurchaseOrdersService {
     return po;
   }
 
+  /**
+   * Any status, for record lookups. Financials values a GoodsReceived at the
+   * PO's frozen unit costs (FR-8.1) — by then the PO may already be CLOSED,
+   * which findByPoNumber deliberately refuses.
+   */
+  async findAnyByPoNumber(poNumber: string) {
+    const po = await this.prisma.purchaseOrder.findUnique({
+      where: { poNumber },
+      include: { lines: true },
+    });
+    if (!po) throw new NotFoundException(`Purchase order ${poNumber} not found`);
+    return po;
+  }
+
   /** FR-2.1/FR-2.2 — prices and freezes a draft PO from Vendor Management's live offer. */
   async create(dto: CreatePurchaseOrderDto) {
     const pricedLines = await Promise.all(
