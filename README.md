@@ -88,6 +88,7 @@ Each backend module pairs with a frontend under [`frontends/`](frontends), gated
 | Point of Sale Terminal | [`frontends/pos-terminal-app`](frontends/pos-terminal-app) | retail-sales |
 | Store Manager Dashboard | [`frontends/store-manager-dashboard`](frontends/store-manager-dashboard) | sales-audit |
 | Finance Portal | [`frontends/finance-portal`](frontends/finance-portal) | financials |
+| Executive Dashboard | [`frontends/executive-dashboard`](frontends/executive-dashboard) | all modules, read-only ([D-15](docs/01-product-requirements.md#9-decisions-log)) |
 
 "Scaffold only" means: the service boots, exposes `/health`, has a Prisma schema stub (`Placeholder { id, createdAt }`), and a Dockerfile — but every other route and event listener 503s / stays unregistered until its feature flag is turned on. See [Feature Flags](#feature-flag-configuration) below.
 
@@ -151,7 +152,7 @@ Once up:
 - Financials — REST http://localhost:3008 (`/docs`)
 - Directory — REST http://localhost:3009 (`/docs`) — staff, stores/warehouses, registers; seeds demo data on an empty database
 - RabbitMQ management UI — http://localhost:15672 (see `.env.example` for credentials)
-- Frontends — `:3101`–`:3108` (see each app's own port in `.env.example`)
+- Frontends — `:3101`–`:3108`, plus the Executive Dashboard on `:3109` (see each app's own port in `.env.example`)
 
 **Adding the Directory to an existing local database:** `init-databases.sh` only runs on a fresh Postgres volume. If yours predates the Directory service, create its role and database once:
 

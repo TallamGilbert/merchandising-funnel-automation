@@ -3,7 +3,8 @@
 Step-by-step process to get every built frontend up and talking to real backend
 data. Follow this top to bottom on a clean checkout.
 
-All **8** frontends have real UI.
+All **8** module frontends have real UI, plus an **Executive Dashboard** that
+shows the whole business on one page (read-only, one sidebar tab per area).
 
 | Frontend | Port | Backend it needs |
 |---|---|---|
@@ -15,6 +16,7 @@ All **8** frontends have real UI.
 | POS Terminal App | 3106 | retail-sales (3006), inventory (3003, gRPC 5003) |
 | Store Manager Dashboard | 3107 | sales-audit (3007), retail-sales (3006) |
 | Finance Portal | 3108 | financials (3008) |
+| Executive Dashboard | 3109 | all backends (read-only) |
 
 Every frontend also reads the **directory** service (3009) — staff, stores,
 warehouses and registers — to fill its pickers, and some read other modules
@@ -115,7 +117,7 @@ just re-run `pnpm --filter @mms/<svc> run dev` for that one service.
 ## 6. Set up each frontend's env file
 
 ```bash
-for fe in vendor-management-portal procurement-dashboard inventory-control-center warehouse-receiving-app warehouse-floor-app pos-terminal-app store-manager-dashboard finance-portal; do
+for fe in vendor-management-portal procurement-dashboard inventory-control-center warehouse-receiving-app warehouse-floor-app pos-terminal-app store-manager-dashboard finance-portal executive-dashboard; do
   cp "frontends/$fe/.env.example" "frontends/$fe/.env.local"
 done
 ```
@@ -123,7 +125,7 @@ done
 These already point at the right backend ports (3001–3009) out of the box —
 no editing needed.
 
-## 7. Start the 8 frontends
+## 7. Start the frontends
 
 In a second terminal:
 
@@ -141,6 +143,7 @@ pnpm dev:frontends
 - POS Terminal App — http://localhost:3106
 - Store Manager Dashboard — http://localhost:3107
 - Finance Portal — http://localhost:3108
+- **Executive Dashboard — http://localhost:3109** (start here for the big picture)
 
 On a fresh database every list will say "No X found" — that's expected, not a
 bug. To see the full flow work end to end:
