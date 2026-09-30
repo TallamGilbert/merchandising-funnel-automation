@@ -1,7 +1,7 @@
 {
   "name": "@mms/financials",
   "version": "0.1.0",
-  "description": "Automated bookkeeper translating domain events into ledger entries (FR-8.x). Phase 4 scaffold.",
+  "description": "Automated bookkeeper translating domain events into ledger entries, accounts payable and profitability reports (FR-8.x).",
   "private": true,
   "scripts": {
     "build": "nest build",

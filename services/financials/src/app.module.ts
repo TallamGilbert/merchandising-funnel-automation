@@ -1,15 +1,23 @@
 import { Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
+import { AccountsModule } from "./accounts/accounts.module";
 import { HealthModule } from "./health/health.module";
+import { InboxModule } from "./inbox/inbox.module";
+import { LedgerModule } from "./ledger/ledger.module";
+import { PayablesModule } from "./payables/payables.module";
 import { PrismaModule } from "./prisma/prisma.module";
+import { ReportsModule } from "./reports/reports.module";
 
-/**
- * Scaffold-only module. This service's feature flag is off by default
- * (see root .env.example) until its phase begins — FeatureFlagGuard
- * (applied globally in main.ts) 503s every route except /health until then.
- * Add this module's real domain modules here when its phase starts.
- */
 @Module({
-  imports: [ConfigModule.forRoot({ isGlobal: true }), PrismaModule, HealthModule],
+  imports: [
+    ConfigModule.forRoot({ isGlobal: true }),
+    PrismaModule,
+    HealthModule,
+    AccountsModule,
+    LedgerModule,
+    InboxModule,
+    PayablesModule,
+    ReportsModule,
+  ],
 })
 export class AppModule {}

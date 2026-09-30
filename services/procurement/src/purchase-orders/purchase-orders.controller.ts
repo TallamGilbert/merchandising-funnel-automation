@@ -25,6 +25,11 @@ export class PurchaseOrdersController {
     return this.purchaseOrders.findByPoNumber(poNumber);
   }
 
+  @Get("purchase-orders/by-number/:poNumber")
+  findAnyByPoNumber(@Param("poNumber") poNumber: string) {
+    return this.purchaseOrders.findAnyByPoNumber(poNumber);
+  }
+
   @Get("purchase-orders/:id")
   findOne(@Param("id") id: string) {
     return this.purchaseOrders.findOne(id);

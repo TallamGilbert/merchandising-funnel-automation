@@ -141,6 +141,26 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/PurchaseOrder" }
         "404": { description: No open PO with that number. }
+  /purchase-orders/by-number/{poNumber}:
+    get:
+      tags: [purchase-orders]
+      summary: >
+        Record lookup by PO number in any status. Financials calls this
+        (FR-8.1) to value a GoodsReceived at the PO's frozen unit costs and
+        payment terms — by then the PO may already be CLOSED, which the
+        lookup endpoint above refuses.
+      parameters:
+        - in: path
+          name: poNumber
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PurchaseOrder" }
+        "404": { description: No PO with that number. }
   /reorder-suggestions:
     get:
       tags: [reorder-suggestions]

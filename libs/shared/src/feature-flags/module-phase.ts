@@ -55,9 +55,11 @@ const ENABLED_BY_DEFAULT_MODULES: ReadonlySet<ModuleKey> = new Set([
   // Phase 3 — Retail
   ModuleKey.RETAIL_SALES,
   ModuleKey.SALES_AUDIT,
+  // Phase 4 — Accounting
+  ModuleKey.FINANCIALS,
 ]);
 
-/** Implemented phases (1–3) default to enabled; every later-phase module defaults to disabled until explicitly flagged on. */
+/** Every implemented phase (1–4) defaults to enabled; a module added later defaults to disabled until explicitly flagged on. */
 export function defaultEnabledFor(moduleKey: ModuleKey): boolean {
   return ENABLED_BY_DEFAULT_MODULES.has(moduleKey);
 }

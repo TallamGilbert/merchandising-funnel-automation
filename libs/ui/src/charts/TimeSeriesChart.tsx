@@ -63,11 +63,16 @@ export function TimeSeriesChart({
 
   const plotW = width - PAD.left - PAD.right;
   const plotH = HEIGHT - PAD.top - PAD.bottom;
-  const max = Math.max(0, ...points.flatMap((p) => series.map((s) => p.values[s.key] ?? 0)));
-  const ticks = niceTicks(max);
+  const values = points.flatMap((p) => series.map((s) => p.values[s.key] ?? 0));
+  const max = Math.max(0, ...values);
+  const min = Math.min(0, ...values);
+  // Values can dip below zero (e.g. a day of refunds): mirror the ticks down.
+  const below = min < 0 ? niceTicks(-min).filter((t) => t > 0).map((t) => -t).reverse() : [];
+  const ticks = [...below, ...niceTicks(max)];
   const top = ticks[ticks.length - 1] || 1;
+  const bottom = ticks[0];
   const x = (i: number) => PAD.left + (points.length <= 1 ? plotW / 2 : (i / (points.length - 1)) * plotW);
-  const y = (v: number) => PAD.top + plotH - (v / top) * plotH;
+  const y = (v: number) => PAD.top + ((top - v) / (top - bottom)) * plotH;
   const labelEvery = Math.max(1, Math.ceil(points.length / Math.max(2, Math.floor(plotW / 70))));
 
   const onMove = (e: PointerEvent<SVGRectElement>) => {

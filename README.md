@@ -73,7 +73,7 @@ Solid arrows are synchronous request/reply (REST, or gRPC on the one latency-sen
 | Warehouse Operations | [`services/warehouse-operations`](services/warehouse-operations) | Putaway/picking direction, transfers, space utilization | 2 — Warehouse | ✅ Implemented |
 | Retail Sales (POS) | [`services/retail-sales`](services/retail-sales) | Checkout, pricing/promotions, returns, payment capture | 3 — Retail | ✅ Implemented |
 | Sales Audit | [`services/sales-audit`](services/sales-audit) | Store-level cash reconciliation, discrepancy sign-off | 3 — Retail | ✅ Implemented |
-| Financials | [`services/financials`](services/financials) | Automated ledger entries, AP, revenue/gross-profit reporting | 4 — Accounting | 🚧 Scaffold only |
+| Financials | [`services/financials`](services/financials) | Automated ledger entries, AP, revenue/gross-profit reporting | 4 — Accounting | ✅ Implemented |
 | Directory | [`services/directory`](services/directory) | Reference data: staff and their roles, stores/warehouses, registers ([D-10](docs/01-product-requirements.md#9-decisions-log)) | 1 — Foundation (cross-cutting) | ✅ Implemented |
 
 Each backend module pairs with a frontend under [`frontends/`](frontends), gated by the same phase flag:
@@ -148,7 +148,7 @@ Once up:
 - Warehouse Operations — REST http://localhost:3005 (`/docs`)
 - Retail Sales — REST http://localhost:3006 (`/docs`)
 - Sales Audit — REST http://localhost:3007 (`/docs`)
-- Financials — REST on `:3008`, `/health` only until its phase ships
+- Financials — REST http://localhost:3008 (`/docs`)
 - Directory — REST http://localhost:3009 (`/docs`) — staff, stores/warehouses, registers; seeds demo data on an empty database
 - RabbitMQ management UI — http://localhost:15672 (see `.env.example` for credentials)
 - Frontends — `:3101`–`:3108` (see each app's own port in `.env.example`)
@@ -185,7 +185,7 @@ Every module — service and frontend — is gated by an env-var feature flag, d
 | `FEATURE_WAREHOUSE_OPERATIONS_ENABLED` | `true` | 2 |
 | `FEATURE_RETAIL_SALES_ENABLED` | `true` | 3 |
 | `FEATURE_SALES_AUDIT_ENABLED` | `true` | 3 |
-| `FEATURE_FINANCIALS_ENABLED` | `false` | 4 |
+| `FEATURE_FINANCIALS_ENABLED` | `true` | 4 |
 
 **Backend:** each service applies `FeatureFlagGuard.forModule(ModuleKey.X)` globally in its `main.ts`. `/health` always responds (so orchestration/monitoring can see the container is up); every other route 503s with `{ message: "... not yet implemented" }` while the flag is off. Event consumers check `isModuleEnabled(...)` in their own `onModuleInit` before subscribing, so a disabled module doesn't drain events meant for it off the queue.
 

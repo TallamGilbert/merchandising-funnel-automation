@@ -1,9 +1,3 @@
-// Scaffold-only schema. This service is not implemented in this pass — see
-// the root README's module status table for its phase. Replace this stub
-// with the service's real domain models when its phase begins; keep the
-// datasource/generator blocks as-is (DATABASE_URL points at this service's
-// own isolated database — see docker/postgres-init/init-databases.sh).
-
 generator client {
   provider = "prisma-client-js"
   // Custom output — pnpm dedups identical @prisma/client versions into one
@@ -18,7 +12,137 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model Placeholder {
-  id        String   @id @default(uuid())
-  createdAt DateTime @default(now())
+enum AccountType {
+  ASSET
+  LIABILITY
+  REVENUE
+  EXPENSE
+}
+
+enum EntrySource {
+  GOODS_RECEIVED
+  ITEM_SOLD
+  ITEM_RETURNED
+  DAY_CLOSED
+  BILL_PAYMENT
+}
+
+enum BillStatus {
+  OPEN
+  PAID
+}
+
+enum InboxStatus {
+  PENDING
+  POSTED
+  // Can't post without a person: unknown PO/SKU, unsupported currency.
+  NEEDS_ATTENTION
+}
+
+/// Chart of accounts, seeded on start (see accounts/chart-of-accounts.ts).
+model Account {
+  code      String      @id
+  name      String
+  type      AccountType
+  createdAt DateTime    @default(now())
+
+  lines JournalLine[]
+}
+
+/// One balanced double-entry posting (sum of debits = sum of credits).
+/// Append-only: mistakes are corrected with a new entry, never an edit.
+model JournalEntry {
+  id          String      @id @default(uuid())
+  sequence    Int         @unique @default(autoincrement())
+  /// When the business event happened (not when it was posted).
+  occurredAt  DateTime
+  postedAt    DateTime    @default(now())
+  source      EntrySource
+  /// The originating document: GRN number, transaction id, return id, store/day, bill id.
+  sourceRef   String
+  description String
+  /// Store the entry belongs to, for store-level reporting (sales, returns, closes).
+  storeId     String?
+
+  lines JournalLine[]
+
+  @@index([occurredAt])
+  /// One entry per source document — a redelivered event can never book twice.
+  @@unique([source, sourceRef])
+}
+
+model JournalLine {
+  id          String       @id @default(uuid())
+  entryId     String
+  entry       JournalEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  accountCode String
+  account     Account      @relation(fields: [accountCode], references: [code])
+  debit       Decimal      @default(0) @db.Decimal(14, 2)
+  credit      Decimal      @default(0) @db.Decimal(14, 2)
+  memo        String?
+
+  @@index([accountCode])
+  @@index([entryId])
+}
+
+/// Accounts payable: one bill per goods received note (FR-8.4), due
+/// `paymentTermsDays` after receipt — terms frozen on the PO by Procurement.
+model PayableBill {
+  id                      String     @id @default(uuid())
+  goodsReceivedNoteNumber String     @unique
+  poNumber                String
+  supplierId              String
+  supplierName            String
+  amount                  Decimal    @db.Decimal(14, 2)
+  currency                String     @default("KES")
+  billDate                DateTime
+  dueDate                 DateTime
+  status                  BillStatus @default(OPEN)
+  paidAt                  DateTime?
+  paymentReference        String?
+  createdAt               DateTime   @default(now())
+
+  @@index([supplierId])
+  @@index([status, dueDate])
+}
+
+/// One row per sold (or returned, negative) line, kept for profitability
+/// reporting by product, store and day (FR-8.5). Revenue is net of VAT.
+model SaleLineFact {
+  id            String   @id @default(uuid())
+  occurredAt    DateTime
+  businessDate  String
+  storeId       String
+  transactionId String
+  returnId      String?
+  sku           String
+  productName   String
+  quantity      Int
+  revenue       Decimal  @db.Decimal(14, 2)
+  taxAmount     Decimal  @db.Decimal(14, 2)
+  cogs          Decimal  @db.Decimal(14, 2)
+  /// Unit cost used for COGS, so a return reverses at the same cost.
+  unitCost      Decimal  @db.Decimal(14, 2)
+
+  @@index([businessDate])
+  @@index([storeId, businessDate])
+  @@index([sku])
+  @@index([transactionId])
+}
+
+/// Every consumed event is stored before it's posted, so a lookup failure
+/// (Procurement or Inventory down) never loses a ledger entry — the event
+/// is retried until it posts or is flagged for a person (NFR resilience).
+model InboxEvent {
+  eventId     String      @id
+  routingKey  String
+  payload     Json
+  status      InboxStatus @default(PENDING)
+  attempts    Int         @default(0)
+  lastError   String?
+  receivedAt  DateTime    @default(now())
+  nextAttempt DateTime    @default(now())
+  postedAt    DateTime?
+
+  @@index([status, nextAttempt])
 }
