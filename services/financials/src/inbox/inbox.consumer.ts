@@ -21,7 +21,7 @@ export class InboxConsumer implements OnModuleInit {
 
   constructor(
     private readonly eventBus: EventBusService,
-    private readonly inbox: InboxRepository,
+    private readonly inboxRepository: InboxRepository,
     private readonly processor: InboxProcessor,
   ) {}
 
@@ -35,7 +35,7 @@ export class InboxConsumer implements OnModuleInit {
     // in RabbitMQ while Financials is down.
     for (const routingKey of CONSUMED) {
       await this.eventBus.subscribe<{ eventId: string }>(`financials.${routingKey}`, [routingKey], async (event) => {
-        await this.inbox.store(event.eventId, routingKey, event);
+        await this.inboxRepository.store(event.eventId, routingKey, event);
         await this.processor.process(event.eventId);
       });
     }

@@ -36,7 +36,7 @@ export class InboxProcessor implements OnModuleInit, OnModuleDestroy {
   private sweeping = false;
 
   constructor(
-    private readonly inbox: InboxRepository,
+    private readonly inboxRepository: InboxRepository,
     private readonly postings: PostingsService,
     private readonly ledger: LedgerRepository,
   ) {}
@@ -53,7 +53,7 @@ export class InboxProcessor implements OnModuleInit, OnModuleDestroy {
     if (this.sweeping) return;
     this.sweeping = true;
     try {
-      for (const event of await this.inbox.findDue(new Date(), BATCH)) {
+      for (const event of await this.inboxRepository.findDue(new Date(), BATCH)) {
         await this.process(event.eventId);
       }
     } catch (error) {
@@ -64,7 +64,7 @@ export class InboxProcessor implements OnModuleInit, OnModuleDestroy {
   }
 
   async process(eventId: string): Promise<ProcessResult> {
-    const event = await this.inbox.findById(eventId);
+    const event = await this.inboxRepository.findById(eventId);
     if (!event || event.status !== "PENDING") return "skipped";
     const attempts = event.attempts + 1;
 
@@ -77,12 +77,12 @@ export class InboxProcessor implements OnModuleInit, OnModuleDestroy {
       const message = (error as Error).message;
       if (error instanceof PermanentPostingError || error instanceof UnbalancedEntryError) {
         this.logger.warn(`${event.routingKey} ${eventId} needs attention: ${message}`);
-        await this.inbox.markNeedsAttention(eventId, attempts, message);
+        await this.inboxRepository.markNeedsAttention(eventId, attempts, message);
         return "needs-attention";
       }
       const delay = backoffMs(attempts);
       this.logger.warn(`${event.routingKey} ${eventId} not posted (attempt ${attempts}), retrying in ${delay / 1000}s: ${message}`);
-      await this.inbox.scheduleRetry(eventId, attempts, message, new Date(Date.now() + delay));
+      await this.inboxRepository.scheduleRetry(eventId, attempts, message, new Date(Date.now() + delay));
       return "retry";
     }
   }

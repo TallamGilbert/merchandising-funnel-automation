@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { formatDateTime, useFlash, usePolling } from "@mms/ui";
 import { AppShell } from "../../components/AppShell";
-import { api, type InboxEvent, type InboxStatus } from "../../lib/api";
+import { api, type InboxEvent, type InboxStatus } from "../../lib/financials-client";
 import { NAV } from "../../lib/nav";
 
 const EVENT_LABEL: Record<string, string> = {

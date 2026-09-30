@@ -13,7 +13,7 @@ import {
 } from "@mms/ui";
 import { AppShell } from "../../components/AppShell";
 import { DateRange, defaultRange, type Range } from "../../components/DateRange";
-import { api, type Profitability, type ProfitGrouping, type ProfitRow } from "../../lib/api";
+import { api, type Profitability, type ProfitGrouping, type ProfitRow } from "../../lib/financials-client";
 import { NAV } from "../../lib/nav";
 
 const GROUPINGS: { key: ProfitGrouping; label: string }[] = [

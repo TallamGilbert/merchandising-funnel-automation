@@ -122,32 +122,39 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return res.json() as Promise<T>;
 }
 
-function qs(params: Record<string, string | undefined>): string {
-  const entries = Object.entries(params).filter((e): e is [string, string] => Boolean(e[1]));
-  return entries.length ? `?${new URLSearchParams(entries)}` : "";
+/** Builds a `?key=value` query string, dropping params that are empty or undefined. */
+function toQueryString(params: Record<string, string | undefined>): string {
+  const presentParams = Object.entries(params).filter(
+    (entry): entry is [string, string] => {
+      const [, value] = entry;
+      return Boolean(value);
+    },
+  );
+  if (presentParams.length === 0) return "";
+  return `?${new URLSearchParams(presentParams)}`;
 }
 
 export const api = {
-  summary: (from: string, to: string) => request<Summary>(`/reports/summary${qs({ from, to })}`),
+  summary: (from: string, to: string) => request<Summary>(`/reports/summary${toQueryString({ from, to })}`),
 
   profitability: (from: string, to: string, groupBy: ProfitGrouping) =>
-    request<Profitability>(`/reports/profitability${qs({ from, to, groupBy })}`),
+    request<Profitability>(`/reports/profitability${toQueryString({ from, to, groupBy })}`),
 
   accounts: () => request<Account[]>("/accounts"),
 
   entries: (filter: { from?: string; to?: string; accountCode?: string; source?: EntrySource }) =>
-    request<JournalEntry[]>(`/ledger/entries${qs({ ...filter, limit: "200" })}`),
+    request<JournalEntry[]>(`/ledger/entries${toQueryString({ ...filter, limit: "200" })}`),
 
-  trialBalance: (asOf?: string) => request<TrialBalance>(`/ledger/trial-balance${qs({ asOf })}`),
+  trialBalance: (asOf?: string) => request<TrialBalance>(`/ledger/trial-balance${toQueryString({ asOf })}`),
 
-  payables: (status?: BillStatus) => request<PayableBill[]>(`/payables${qs({ status })}`),
+  payables: (status?: BillStatus) => request<PayableBill[]>(`/payables${toQueryString({ status })}`),
 
   aging: () => request<AgingReport>("/payables/aging"),
 
   payBill: (id: string, data: { paymentReference?: string; paidOn?: string }) =>
     request<PayableBill>(`/payables/${id}/pay`, { method: "POST", body: JSON.stringify(data) }),
 
-  inbox: (status?: InboxStatus) => request<InboxEvent[]>(`/inbox${qs({ status })}`),
+  inbox: (status?: InboxStatus) => request<InboxEvent[]>(`/inbox${toQueryString({ status })}`),
 
   retryEvent: (eventId: string) =>
     request<{ eventId: string; result: string }>(`/inbox/${encodeURIComponent(eventId)}/retry`, { method: "POST" }),

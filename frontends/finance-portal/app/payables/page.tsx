@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { BarChart, ChartCard, formatDate, formatMoney, Modal, useFlash } from "@mms/ui";
 import { AppShell } from "../../components/AppShell";
-import { type AgingBucket, type AgingReport, api, type BillStatus, type PayableBill } from "../../lib/api";
+import { type AgingBucket, type AgingReport, api, type BillStatus, type PayableBill } from "../../lib/financials-client";
 import { NAV } from "../../lib/nav";
 
 const BUCKET_LABEL: Record<AgingBucket, string> = {

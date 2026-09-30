@@ -13,7 +13,7 @@ import {
 } from "@mms/ui";
 import { AppShell } from "../components/AppShell";
 import { DateRange, defaultRange, type Range } from "../components/DateRange";
-import { api, type Summary } from "../lib/api";
+import { api, type Summary } from "../lib/financials-client";
 import { NAV, STATUS_CARD } from "../lib/nav";
 
 const FEATURE_ENABLED = process.env.NEXT_PUBLIC_FEATURE_FINANCIALS_ENABLED !== "false";

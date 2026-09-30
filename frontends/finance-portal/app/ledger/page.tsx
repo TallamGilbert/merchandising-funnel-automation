@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Combobox, formatDate, formatDateTime, formatMoney } from "@mms/ui";
 import { AppShell } from "../../components/AppShell";
 import { DateRange, defaultRange, type Range } from "../../components/DateRange";
-import { type Account, api, type EntrySource, type JournalEntry, SOURCE_LABEL, type TrialBalance } from "../../lib/api";
+import { type Account, api, type EntrySource, type JournalEntry, SOURCE_LABEL, type TrialBalance } from "../../lib/financials-client";
 import { NAV } from "../../lib/nav";
 
 type Tab = "journal" | "trial-balance";

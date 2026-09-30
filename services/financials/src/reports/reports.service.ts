@@ -77,7 +77,7 @@ export class ReportsService {
   constructor(
     private readonly ledger: LedgerRepository,
     private readonly payables: PayablesRepository,
-    private readonly inbox: InboxRepository,
+    private readonly inboxRepository: InboxRepository,
   ) {}
 
   /** FR-8.5/8.6 — profitability by product, store or day, plus the business total. */
@@ -102,7 +102,7 @@ export class ReportsService {
       this.profitability(from, to, "day"),
       this.ledger.cashOverShort(start, end),
       this.payables.findAll({ status: BillStatus.OPEN }),
-      this.inbox.countByStatus(),
+      this.inboxRepository.countByStatus(),
     ]);
 
     const now = new Date();
