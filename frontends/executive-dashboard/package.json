@@ -1,0 +1,24 @@
+{
+  "name": "@mms/executive-dashboard",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Executive Dashboard \u2014 the whole business at a glance for owners and general managers, one tab per area (D-15).",
+  "scripts": {
+    "dev": "next dev -p 3109",
+    "build": "next build",
+    "start": "next start -p 3109",
+    "lint": "eslint \"app/**/*.{ts,tsx}\""
+  },
+  "dependencies": {
+    "@mms/ui": "workspace:*",
+    "next": "^16.3.4",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.15",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "typescript": "^5.5.4"
+  }
+}
