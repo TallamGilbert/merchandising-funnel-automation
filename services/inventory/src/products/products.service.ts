@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
+import { ListQueryDto, pageArgs, paged, searchAny } from "@mms/shared";
 import { PrismaService } from "../prisma/prisma.service";
 import { StockService } from "../stock/stock.service";
 import { CreateProductDto } from "./dto/create-product.dto";
@@ -13,8 +14,14 @@ export class ProductsService {
     private readonly stock: StockService,
   ) {}
 
-  list() {
-    return this.prisma.product.findMany({ orderBy: { name: "asc" } });
+  /** `q` matches the SKU or name. */
+  async list(query: ListQueryDto) {
+    const where = searchAny(query.q, ["sku", "name"]);
+    const [items, total] = await Promise.all([
+      this.prisma.product.findMany({ where, orderBy: { name: "asc" }, ...pageArgs(query) }),
+      this.prisma.product.count({ where }),
+    ]);
+    return paged(items, total, query);
   }
 
   create(dto: CreateProductDto) {

@@ -8,14 +8,14 @@ import {
   Query,
 } from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
-import { Role, Roles } from "@mms/shared";
-import { SupplierStatus } from "../generated/prisma";
+import { Exportable, ListQueryDto, Role, Roles } from "@mms/shared";
+import { Supplier, SupplierDeliveryRecord } from "../generated/prisma";
 import { CreateSupplierDeliveryRecordDto } from "./dto/create-delivery-record.dto";
 import { CreateSupplierProductDto } from "./dto/create-supplier-product.dto";
 import { CreateSupplierDto } from "./dto/create-supplier.dto";
 import { UpdateSupplierProductDto } from "./dto/update-supplier-product.dto";
 import { UpdateSupplierDto } from "./dto/update-supplier.dto";
-import { PaginationQueryDto } from "./dto/pagination-query.dto";
+import { ListSuppliersQuery } from "./dto/list-suppliers.query";
 import { SuppliersService } from "./suppliers.service";
 
 @ApiTags("suppliers")
@@ -24,11 +24,18 @@ export class SuppliersController {
   constructor(private readonly suppliers: SuppliersService) {}
 
   @Get("suppliers")
-  list(
-    @Query("status") status: SupplierStatus | undefined,
-    @Query() pagination: PaginationQueryDto,
-  ) {
-    return this.suppliers.list(status, pagination);
+  @Exportable<Supplier>("suppliers", [
+    { header: "Name", value: (s) => s.name },
+    { header: "Contact", value: (s) => s.contactName },
+    { header: "Email", value: (s) => s.email },
+    { header: "Phone", value: (s) => s.phone },
+    { header: "Address", value: (s) => s.address },
+    { header: "Payment terms (days)", value: (s) => s.paymentTermsDays },
+    { header: "Status", value: (s) => s.status },
+    { header: "Added", value: (s) => s.createdAt },
+  ])
+  list(@Query() query: ListSuppliersQuery) {
+    return this.suppliers.list(query);
   }
 
   @Post("suppliers")
@@ -79,11 +86,14 @@ export class SuppliersController {
   }
 
   @Get("suppliers/:id/delivery-records")
-  listDeliveryRecords(
-    @Param("id") id: string,
-    @Query() pagination: PaginationQueryDto,
-  ) {
-    return this.suppliers.listDeliveryRecords(id, pagination);
+  @Exportable<SupplierDeliveryRecord>("delivery-records", [
+    { header: "PO reference", value: (r) => r.poReference },
+    { header: "Expected", value: (r) => r.expectedDate.toISOString().slice(0, 10) },
+    { header: "Delivered", value: (r) => r.actualDeliveryDate.toISOString().slice(0, 10) },
+    { header: "On time", value: (r) => (r.onTime ? "Yes" : "No") },
+  ])
+  listDeliveryRecords(@Param("id") id: string, @Query() query: ListQueryDto) {
+    return this.suppliers.listDeliveryRecords(id, query);
   }
 
   @Post("suppliers/:id/delivery-records")

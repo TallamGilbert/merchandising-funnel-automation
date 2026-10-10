@@ -1,8 +1,9 @@
 import { Body, Controller, Get, Param, Post, Query } from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
-import { AuthUser, CurrentUser, Role, Roles } from "@mms/shared";
-import { GoodsReceivedNoteStatus } from "../generated/prisma";
+import { AuthUser, CurrentUser, Exportable, Role, Roles } from "@mms/shared";
+import { GoodsReceivedNote } from "../generated/prisma";
 import { CreateGoodsReceivedNoteDto } from "./dto/create-goods-received-note.dto";
+import { ListGoodsReceivedNotesQuery } from "./dto/list-goods-received-notes.query";
 import { RecordScanDto } from "./dto/record-scan.dto";
 import { GoodsReceivedNotesService } from "./goods-received-notes.service";
 
@@ -12,8 +13,17 @@ export class GoodsReceivedNotesController {
   constructor(private readonly goodsReceivedNotes: GoodsReceivedNotesService) {}
 
   @Get("goods-received-notes")
-  list(@Query("status") status?: GoodsReceivedNoteStatus) {
-    return this.goodsReceivedNotes.list(status);
+  @Exportable<GoodsReceivedNote>("goods-received-notes", [
+    { header: "GRN number", value: (g) => g.goodsReceivedNoteNumber },
+    { header: "PO number", value: (g) => g.poNumber },
+    { header: "Status", value: (g) => g.status },
+    { header: "Received at", value: (g) => g.receivedAtLocation },
+    { header: "Received by", value: (g) => g.receivedById },
+    { header: "Opened", value: (g) => g.createdAt },
+    { header: "Finalized", value: (g) => g.finalizedAt },
+  ])
+  list(@Query() query: ListGoodsReceivedNotesQuery) {
+    return this.goodsReceivedNotes.list(query);
   }
 
   @Post("goods-received-notes")

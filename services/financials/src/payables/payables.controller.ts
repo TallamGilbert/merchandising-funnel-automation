@@ -1,8 +1,9 @@
-import { Body, Controller, Get, Param, ParseEnumPipe, Post, Query } from "@nestjs/common";
+import { Body, Controller, Get, Param, Post, Query } from "@nestjs/common";
 import { ApiQuery, ApiTags } from "@nestjs/swagger";
-import { Role, Roles } from "@mms/shared";
-import { BillStatus } from "../generated/prisma";
+import { Exportable, Role, Roles } from "@mms/shared";
+import { PayableBill } from "../generated/prisma";
 import { PayBillDto } from "./dto/pay-bill.dto";
+import { ListPayablesQuery } from "./list-payables.query";
 import { PayablesService } from "./payables.service";
 
 @ApiTags("payables")
@@ -12,13 +13,21 @@ export class PayablesController {
   constructor(private readonly payables: PayablesService) {}
 
   @Get()
-  @ApiQuery({ name: "status", enum: BillStatus, required: false })
-  @ApiQuery({ name: "supplierId", required: false })
-  list(
-    @Query("status", new ParseEnumPipe(BillStatus, { optional: true })) status?: BillStatus,
-    @Query("supplierId") supplierId?: string,
-  ) {
-    return this.payables.list({ status, supplierId });
+  @Exportable<PayableBill & { daysOverdue: number; agingBucket: string | null }>("payables", [
+    { header: "Supplier", value: (b) => b.supplierName },
+    { header: "PO number", value: (b) => b.poNumber },
+    { header: "GRN number", value: (b) => b.goodsReceivedNoteNumber },
+    { header: "Amount", value: (b) => Number(b.amount) },
+    { header: "Currency", value: (b) => b.currency },
+    { header: "Bill date", value: (b) => b.billDate },
+    { header: "Due date", value: (b) => b.dueDate },
+    { header: "Status", value: (b) => b.status },
+    { header: "Days overdue", value: (b) => b.daysOverdue },
+    { header: "Paid at", value: (b) => b.paidAt },
+    { header: "Payment reference", value: (b) => b.paymentReference },
+  ])
+  list(@Query() query: ListPayablesQuery) {
+    return this.payables.list(query);
   }
 
   @Get("aging")

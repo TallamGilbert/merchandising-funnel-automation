@@ -1,7 +1,8 @@
 import { Controller, Get, Param, Post, Query } from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
-import { Role, Roles } from "@mms/shared";
-import { ReorderSuggestionStatus } from "../generated/prisma";
+import { Exportable, Role, Roles } from "@mms/shared";
+import { ReorderSuggestion } from "../generated/prisma";
+import { ListReorderSuggestionsQuery } from "./list-reorder-suggestions.query";
 import { ReorderSuggestionsService } from "./reorder-suggestions.service";
 
 @ApiTags("reorder-suggestions")
@@ -10,8 +11,14 @@ export class ReorderSuggestionsController {
   constructor(private readonly reorderSuggestions: ReorderSuggestionsService) {}
 
   @Get()
-  list(@Query("status") status?: ReorderSuggestionStatus) {
-    return this.reorderSuggestions.list(status);
+  @Exportable<ReorderSuggestion>("reorder-suggestions", [
+    { header: "SKU", value: (s) => s.sku },
+    { header: "Reason", value: (s) => s.reason },
+    { header: "Status", value: (s) => s.status },
+    { header: "Raised", value: (s) => s.createdAt },
+  ])
+  list(@Query() query: ListReorderSuggestionsQuery) {
+    return this.reorderSuggestions.list(query);
   }
 
   @Post(":id/dismiss")

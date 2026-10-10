@@ -1,8 +1,9 @@
 import { Body, Controller, Get, Param, Post, Query } from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
-import { AuthUser, CurrentUser, Role, Roles } from "@mms/shared";
-import { PurchaseOrderStatus } from "../generated/prisma";
+import { AuthUser, CurrentUser, Exportable, Role, Roles } from "@mms/shared";
+import { PurchaseOrder } from "../generated/prisma";
 import { CreatePurchaseOrderDto } from "./dto/create-purchase-order.dto";
+import { ListPurchaseOrdersQuery } from "./dto/list-purchase-orders.query";
 import { PurchaseOrdersService } from "./purchase-orders.service";
 
 @ApiTags("purchase-orders")
@@ -11,8 +12,19 @@ export class PurchaseOrdersController {
   constructor(private readonly purchaseOrders: PurchaseOrdersService) {}
 
   @Get("purchase-orders")
-  list(@Query("status") status?: PurchaseOrderStatus) {
-    return this.purchaseOrders.list(status);
+  @Exportable<PurchaseOrder>("purchase-orders", [
+    { header: "PO number", value: (po) => po.poNumber },
+    { header: "Supplier", value: (po) => po.supplierName },
+    { header: "Status", value: (po) => po.status },
+    { header: "Currency", value: (po) => po.currency },
+    { header: "Total", value: (po) => Number(po.totalAmount) },
+    { header: "Requested by", value: (po) => po.requestedById },
+    { header: "Approved by", value: (po) => po.approvedById },
+    { header: "Approved at", value: (po) => po.approvedAt },
+    { header: "Created", value: (po) => po.createdAt },
+  ])
+  list(@Query() query: ListPurchaseOrdersQuery) {
+    return this.purchaseOrders.list(query);
   }
 
   @Post("purchase-orders")
