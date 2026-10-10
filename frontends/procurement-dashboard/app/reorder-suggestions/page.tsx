@@ -2,19 +2,10 @@
 
 import { useState } from "react";
 import { ExportMenu, exportUrl, formatDateTime, Pagination, useFlash, usePagedList } from "@mms/ui";
-import { AppShell, type NavSection } from "../../components/AppShell";
-import { BellAlertIcon, ClipboardListIcon } from "../../components/icons";
+import { AppShell } from "../../components/AppShell";
+import { NAV } from "../../lib/nav";
 import { api, type ReorderSuggestionStatus } from "../../lib/api";
 
-const NAV: NavSection[] = [
-  {
-    label: "Main menu",
-    items: [
-      { label: "Purchase orders", href: "/", icon: <ClipboardListIcon /> },
-      { label: "Reorder suggestions", href: "/reorder-suggestions", icon: <BellAlertIcon /> },
-    ],
-  },
-];
 
 export default function ReorderSuggestionsPage() {
   const [statusFilter, setStatusFilter] = useState<ReorderSuggestionStatus | "">("NEW");

@@ -63,3 +63,14 @@ export function ChevronsLeftIcon({ size = 16 }: IconProps) {
     </svg>
   );
 }
+
+export function ChartBarIcon({ size = 18 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" {...base}>
+      <path d="M4 20h16" />
+      <rect x="6" y="11" width="3" height="6" rx="0.5" />
+      <rect x="11" y="6" width="3" height="11" rx="0.5" />
+      <rect x="16" y="9" width="3" height="8" rx="0.5" />
+    </svg>
+  );
+}

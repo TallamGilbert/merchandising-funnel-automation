@@ -17,6 +17,12 @@ export default function SuppliersPage() {
     return { active, details: details.map((d) => d.value) };
   }, []);
   const orders = useLive(() => services.purchaseOrders(), []);
+  const fill = useLive(() => {
+    const to = new Date();
+    const from = new Date(to);
+    from.setUTCFullYear(from.getUTCFullYear() - 1);
+    return services.supplierPerformance(from.toISOString().slice(0, 10), to.toISOString().slice(0, 10));
+  }, []);
 
   return (
     <AppShell
@@ -67,6 +73,31 @@ export default function SuppliersPage() {
                 />
               </ChartCard>
             </>
+          );
+        }}
+      </Show>
+
+      <Show live={fill} what="Fill rate">
+        {(rows) => {
+          const rated = rows.filter((r) => r.fillRate !== null);
+          return (
+            <ChartCard
+              title="Fill rate by supplier"
+              subtitle="Units received of units ordered, closed POs approved in the last 12 months"
+              empty={rated.length === 0 ? "No closed purchase orders yet." : false}
+              table={{
+                columns: ["Supplier", "Closed POs", "Fill rate"],
+                rows: rated.map((r) => [r.supplierName, r.closedOrders, `${Math.round((r.fillRate ?? 0) * 100)}%`]),
+              }}
+            >
+              <BarChart
+                max={100}
+                data={rated
+                  .map((r) => ({ label: r.supplierName, value: Math.round((r.fillRate ?? 0) * 100), detail: `${r.closedOrders} closed PO(s)` }))
+                  .sort((a, b) => a.value - b.value)}
+                format={(v) => `${v}%`}
+              />
+            </ChartCard>
           );
         }}
       </Show>

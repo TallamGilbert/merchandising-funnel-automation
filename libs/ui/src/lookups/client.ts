@@ -12,6 +12,7 @@ export interface CatalogProduct {
   sku: string;
   name: string;
   unitCost: string;
+  category: string | null;
 }
 
 export interface StockLevelSummary {

@@ -15,6 +15,7 @@ export default function InventoryPage() {
   const valuation = useLive(() => services.valuation(), []);
   const levels = useLive(() => services.stockLevels(), []);
   const reorders = useLive(() => services.reorderSuggestions(), []);
+  const movement = useLive(() => services.stockMovement(), []);
 
   return (
     <AppShell
@@ -85,6 +86,42 @@ export default function InventoryPage() {
           }}
         </Show>
       </div>
+
+      <Show live={movement} what="Slow and dead stock">
+        {(rows) => {
+          const dead = rows.filter((r) => r.status === "DEAD");
+          const slow = rows.filter((r) => r.status === "SLOW");
+          const value = (list: typeof rows) => list.reduce((s, r) => s + r.stockValue, 0);
+          return (
+            <>
+              <div className="mms-chart-grid">
+                <Kpi
+                  label="Dead stock"
+                  value={formatMoney(value(dead))}
+                  note={`${dead.length} product-location(s) with no sale in 90 days`}
+                  tone={dead.length ? "warn" : undefined}
+                />
+                <Kpi label="Slow stock" value={formatMoney(value(slow))} note={`${slow.length} with over 90 days of cover`} />
+              </div>
+              {dead.length > 0 && (
+                <ChartCard
+                  title="Biggest dead stock"
+                  subtitle="Stock value with no sale in 90 days"
+                  table={{
+                    columns: ["Product", "Location", "On hand", "Value"],
+                    rows: dead.slice(0, TOP).map((r) => [r.productName, r.locationCode, r.onHand, formatMoney(r.stockValue)]),
+                  }}
+                >
+                  <BarChart
+                    data={dead.slice(0, TOP).map((r) => ({ label: r.productName, value: r.stockValue, detail: `${r.onHand} at ${r.locationCode}` }))}
+                    format={(v) => formatMoney(v)}
+                  />
+                </ChartCard>
+              )}
+            </>
+          );
+        }}
+      </Show>
 
       <Show live={reorders} what="Reorder suggestions">
         {(r) =>

@@ -143,6 +143,21 @@ function toQueryString(params: Record<string, string | undefined>): string {
   return `?${new URLSearchParams(presentParams)}`;
 }
 
+export interface VatMonth {
+  month: string;
+  outputVat: number;
+  refundedVat: number;
+  otherAdjustments: number;
+  netVat: number;
+}
+
+export interface VatReport {
+  from: string;
+  to: string;
+  months: VatMonth[];
+  total: Omit<VatMonth, "month">;
+}
+
 export const api = {
   summary: (from: string, to: string) => request<Summary>(`/reports/summary${toQueryString({ from, to })}`),
 
@@ -152,6 +167,10 @@ export const api = {
   accounts: () => request<Account[]>("/accounts"),
 
   entriesUrl: `${API_URL}/ledger/entries`,
+  vatUrl: `${API_URL}/reports/vat`,
+
+  /** D-20 — VAT on the VAT-payable account by month. */
+  vat: (from: string, to: string) => request<VatReport>(withQuery("/reports/vat", { from, to })),
   payablesUrl: `${API_URL}/payables`,
   inboxUrl: `${API_URL}/inbox`,
 

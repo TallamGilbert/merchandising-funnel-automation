@@ -4,16 +4,19 @@ import { useState } from "react";
 import {
   BarChart,
   ChartCard,
+  DateRange,
+  defaultRange,
   formatCompact,
   formatDate,
   formatMoney,
   formatQuantity,
+  lookupApi,
+  type Range,
   ShareBar,
   TimeSeriesChart,
   useLocations,
 } from "@mms/ui";
 import { AppShell } from "../../components/AppShell";
-import { DateRange, defaultRange, type Range } from "../../components/DateRange";
 import { Kpi, OpenApp, Show } from "../../components/Panels";
 import { combineSales, PAYMENT_LABEL } from "../../lib/aggregate";
 import { NAV, STATUS_CARD } from "../../lib/nav";
@@ -30,6 +33,20 @@ export default function SalesPage() {
     async () => combineSales((await settled(storeCodes, (c) => services.salesSummary(c, range.from, range.to))).map((r) => r.value)),
     [storeCodes.join(), range.from, range.to],
   );
+  const hours = useLive(() => services.salesReport(range.from, range.to, "hour"), [range.from, range.to]);
+  const categories = useLive(async () => {
+    const [bySku, products] = await Promise.all([
+      services.salesReport(range.from, range.to, "sku"),
+      lookupApi.listCatalogProducts(),
+    ]);
+    const categoryOf = new Map(products.map((p) => [p.sku, p.category ?? "Uncategorised"]));
+    const net = new Map<string, number>();
+    for (const row of bySku) {
+      const category = categoryOf.get(row.key) ?? "Uncategorised";
+      net.set(category, (net.get(category) ?? 0) + row.net);
+    }
+    return [...net.entries()].map(([label, value]) => ({ label, value: Math.round(value * 100) / 100 })).sort((a, b) => b.value - a.value);
+  }, [range.from, range.to]);
 
   return (
     <AppShell
@@ -124,6 +141,36 @@ export default function SalesPage() {
           </>
         )}
       </Show>
+
+      <div className="mms-chart-grid">
+        <Show live={hours} what="Sales by hour">
+          {(rows) => (
+            <ChartCard
+              title="Busiest hours"
+              subtitle="Net sales by hour of day, all stores, local time"
+              empty={rows.length === 0 ? "Nothing sold in this period." : false}
+              table={{ columns: ["Hour", "Sales count", "Net"], rows: rows.map((r) => [`${r.key}:00`, r.transactions, formatMoney(r.net)]) }}
+            >
+              <BarChart
+                data={rows.map((r) => ({ label: `${r.key}:00`, value: r.net, detail: `${r.transactions} sale(s)` }))}
+                format={(v) => formatMoney(v)}
+              />
+            </ChartCard>
+          )}
+        </Show>
+        <Show live={categories} what="Sales by category">
+          {(rows) => (
+            <ChartCard
+              title="Sales by category"
+              subtitle="Net sales, all stores"
+              empty={rows.length === 0 ? "Nothing sold in this period." : false}
+              table={{ columns: ["Category", "Net"], rows: rows.map((r) => [r.label, formatMoney(r.value)]) }}
+            >
+              <BarChart data={rows} format={(v) => formatMoney(v)} />
+            </ChartCard>
+          )}
+        </Show>
+      </div>
     </AppShell>
   );
 }

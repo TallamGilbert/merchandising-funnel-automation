@@ -79,6 +79,30 @@ async function request<T>(base: string, path: string, init?: RequestInit): Promi
   return res.json() as Promise<T>;
 }
 
+export interface SupplierPerformance {
+  supplierId: string;
+  supplierName: string;
+  purchaseOrders: number;
+  openOrders: number;
+  closedOrders: number;
+  spendKes: number;
+  otherCurrencyOrders: number;
+  unitsOrdered: number;
+  unitsReceived: number;
+  /** 0–1 on closed POs; null until one closes. */
+  fillRate: number | null;
+}
+
+export interface SupplierOnTime {
+  supplierId: string;
+  supplierName: string;
+  deliveries: number;
+  onTime: number;
+  late: number;
+  onTimeRate: number;
+  averageDaysLate: number | null;
+}
+
 export const api = {
   purchaseOrdersUrl: `${API_URL}/purchase-orders`,
 
@@ -128,6 +152,14 @@ export const api = {
   // Vendor Management is read directly to populate the supplier/SKU pickers
   // when building a PO — Procurement's own backend only prices a PO once
   // supplierId + lines are already chosen.
+  /** D-20 — fill rate and spend from Procurement's own POs. */
+  supplierPerformance: (from: string, to: string) =>
+    request<SupplierPerformance[]>(API_URL, withQuery("/reports/supplier-performance", { from, to })),
+
+  /** D-20 — delivery reliability, which Vendor Management records. */
+  supplierOnTime: (from: string, to: string) =>
+    request<SupplierOnTime[]>(VENDOR_MANAGEMENT_URL, withQuery("/suppliers/performance", { from, to })),
+
   /** Every active supplier, for the PO supplier picker. */
   listActiveSuppliers: () =>
     fetchAllPages((page, pageSize) =>

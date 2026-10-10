@@ -4,15 +4,17 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import {
   ChartCard,
+  DateRange,
+  defaultRange,
   formatCompact,
   formatDate,
   formatMoney,
   formatSignedMoney,
+  type Range,
   TimeSeriesChart,
   usePolling,
 } from "@mms/ui";
 import { AppShell } from "../components/AppShell";
-import { DateRange, defaultRange, type Range } from "../components/DateRange";
 import { api, type Summary } from "../lib/financials-client";
 import { NAV, STATUS_CARD } from "../lib/nav";
 

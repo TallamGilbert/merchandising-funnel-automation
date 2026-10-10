@@ -1,9 +1,19 @@
 "use client";
 
 import { useState } from "react";
-import { BarChart, ChartCard, formatCompact, formatDate, formatMoney, formatSignedMoney, TimeSeriesChart } from "@mms/ui";
+import {
+  BarChart,
+  ChartCard,
+  DateRange,
+  defaultRange,
+  formatCompact,
+  formatDate,
+  formatMoney,
+  formatSignedMoney,
+  type Range,
+  TimeSeriesChart,
+} from "@mms/ui";
 import { AppShell } from "../../components/AppShell";
-import { DateRange, defaultRange, type Range } from "../../components/DateRange";
 import { Kpi, OpenApp, Show } from "../../components/Panels";
 import { NAV, STATUS_CARD } from "../../lib/nav";
 import { APP_URL, services } from "../../lib/services";
