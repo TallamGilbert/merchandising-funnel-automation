@@ -16,9 +16,12 @@ enum LocationType {
 }
 
 /// MANAGER and OWNER line up with Procurement's PO approver roles (D-1).
+/// What each role may do across the modules is in the PRD (D-17).
 enum StaffRole {
   OWNER
   MANAGER
+  BUYER
+  ACCOUNTANT
   CASHIER
   WAREHOUSE_STAFF
 }
@@ -56,15 +59,26 @@ model Register {
 }
 
 /// A person who operates the system. `id` is the human-readable identifier
-/// other services already record (cashierId, closedByManagerId, approvedById).
+/// other services already record (cashierId, closedByManagerId, approvedById)
+/// and the username they sign in with (D-16).
 model Staff {
-  id           String    @id
-  name         String
-  role         StaffRole
+  id                 String    @id
+  name               String
+  role               StaffRole
   /// Home store/warehouse; null for roles that span locations (e.g. OWNER).
-  locationCode String?
-  location     Location? @relation(fields: [locationCode], references: [code], onDelete: SetNull)
-  active       Boolean   @default(true)
+  locationCode       String?
+  location           Location? @relation(fields: [locationCode], references: [code], onDelete: SetNull)
+  active             Boolean   @default(true)
+  /// scrypt hash (see auth/password.ts); null until a password is set — such
+  /// a person can be picked in forms but cannot sign in.
+  passwordHash       String?
+  /// True after an admin sets a temporary password: the next sign-in must
+  /// choose a new one before anything else.
+  mustChangePassword Boolean   @default(true)
+  /// Bumped on deactivation, password reset and role change, which ends the
+  /// person's open sessions at their next /auth/me check.
+  sessionVersion     Int       @default(0)
+  lastLoginAt        DateTime?
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 

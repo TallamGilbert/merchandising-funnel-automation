@@ -1,11 +1,14 @@
 import { BadRequestException } from "@nestjs/common";
+import { AuthUser, Role } from "@mms/shared";
 import { StaffRole } from "../../generated/prisma";
 import { StaffController } from "../staff.controller";
 import { StaffService } from "../staff.service";
 
+const owner = { id: "owner-wanjiku", role: Role.OWNER } as AuthUser;
+
 describe("StaffController", () => {
   let controller: StaffController;
-  let staff: Record<"list" | "create" | "findOne" | "update", jest.Mock>;
+  let staff: Record<"list" | "create" | "findOne" | "update" | "resetPassword", jest.Mock>;
 
   beforeEach(() => {
     staff = {
@@ -13,6 +16,7 @@ describe("StaffController", () => {
       create: jest.fn().mockResolvedValue({}),
       findOne: jest.fn().mockResolvedValue({}),
       update: jest.fn().mockResolvedValue({}),
+      resetPassword: jest.fn().mockResolvedValue({}),
     };
     controller = new StaffController(staff as unknown as StaffService);
   });
@@ -38,10 +42,10 @@ describe("StaffController", () => {
     });
   });
 
-  it("creates a staff member from the body", async () => {
+  it("creates a staff member from the body, as the signed-in user", async () => {
     const dto = { id: "cashier-dan", name: "Dan", role: StaffRole.CASHIER };
-    await controller.create(dto);
-    expect(staff.create).toHaveBeenCalledWith(dto);
+    await controller.create(owner, dto);
+    expect(staff.create).toHaveBeenCalledWith(owner, dto);
   });
 
   it("finds one staff member by id", async () => {
@@ -50,7 +54,12 @@ describe("StaffController", () => {
   });
 
   it("updates a staff member's role", async () => {
-    await controller.update("cashier-amy", { role: StaffRole.MANAGER });
-    expect(staff.update).toHaveBeenCalledWith("cashier-amy", { role: StaffRole.MANAGER });
+    await controller.update(owner, "cashier-amy", { role: StaffRole.MANAGER });
+    expect(staff.update).toHaveBeenCalledWith(owner, "cashier-amy", { role: StaffRole.MANAGER });
+  });
+
+  it("resets a password as the signed-in user", async () => {
+    await controller.resetPassword(owner, "cashier-amy");
+    expect(staff.resetPassword).toHaveBeenCalledWith(owner, "cashier-amy");
   });
 });

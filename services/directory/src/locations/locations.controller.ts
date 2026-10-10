@@ -1,5 +1,6 @@
 import { Body, Controller, Get, Param, ParseBoolPipe, ParseEnumPipe, Patch, Post, Query } from "@nestjs/common";
 import { ApiQuery, ApiTags } from "@nestjs/swagger";
+import { Role, Roles } from "@mms/shared";
 import { LocationType } from "../generated/prisma";
 import { CreateLocationDto } from "./dto/create-location.dto";
 import { CreateRegisterDto } from "./dto/create-register.dto";
@@ -22,6 +23,7 @@ export class LocationsController {
   }
 
   @Post()
+  @Roles(Role.OWNER, Role.MANAGER)
   create(@Body() dto: CreateLocationDto) {
     return this.locations.create(dto);
   }
@@ -32,11 +34,13 @@ export class LocationsController {
   }
 
   @Patch(":code")
+  @Roles(Role.OWNER, Role.MANAGER)
   update(@Param("code") code: string, @Body() dto: UpdateLocationDto) {
     return this.locations.update(code, dto);
   }
 
   @Post(":code/registers")
+  @Roles(Role.OWNER, Role.MANAGER)
   addRegister(@Param("code") code: string, @Body() dto: CreateRegisterDto) {
     return this.locations.addRegister(code, dto);
   }
