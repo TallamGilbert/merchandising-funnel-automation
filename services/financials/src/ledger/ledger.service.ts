@@ -1,7 +1,8 @@
 import { BadRequestException, Injectable } from "@nestjs/common";
+import { pageArgs, paged } from "@mms/shared";
 import { ACCOUNTS, isDebitNormal } from "../accounts/chart-of-accounts";
-import { EntrySource } from "../generated/prisma";
 import { LedgerRepository } from "./ledger.repository";
+import { ListEntriesQuery } from "./list-entries.query";
 import { fromCents, toCents } from "./money";
 
 export interface TrialBalanceRow {
@@ -28,14 +29,19 @@ export class LedgerService {
   constructor(private readonly ledger: LedgerRepository) {}
 
   /** FR-8.6 — the general ledger, newest first. */
-  entries(filter: { from?: string; to?: string; accountCode?: string; source?: EntrySource; limit?: number }) {
-    return this.ledger.findEntries({
-      from: parseDay(filter.from, "from"),
-      to: parseDay(filter.to, "to", true),
-      accountCode: filter.accountCode,
-      source: filter.source,
-      take: Math.min(Math.max(filter.limit ?? 100, 1), 500),
-    });
+  async entries(query: ListEntriesQuery) {
+    const filter = {
+      from: parseDay(query.from, "from"),
+      to: parseDay(query.to, "to", true),
+      accountCode: query.accountCode,
+      source: query.source,
+      q: query.q,
+    };
+    const [items, total] = await Promise.all([
+      this.ledger.findEntries(filter, pageArgs(query)),
+      this.ledger.countEntries(filter),
+    ]);
+    return paged(items, total, query);
   }
 
   /** FR-8.6 — every account's balance as of a date; debits and credits must agree. */

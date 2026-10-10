@@ -1,7 +1,16 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { formatDateTime, useFlash, useLocations, useStaffNames } from "@mms/ui";
+import { useEffect, useState } from "react";
+import {
+  ExportMenu,
+  exportUrl,
+  formatDateTime,
+  Pagination,
+  useFlash,
+  useLocations,
+  usePagedList,
+  useStaffNames,
+} from "@mms/ui";
 import { AppShell, type NavSection } from "../components/AppShell";
 import { BinPicker } from "../components/BinPicker";
 import { BoxesIcon, LayersIcon, PackageIcon } from "../components/icons";
@@ -21,38 +30,22 @@ const NAV: NavSection[] = [
 ];
 
 export default function Page() {
-  const [tasks, setTasks] = useState<PutawayTask[] | null>(null);
   const [statusFilter, setStatusFilter] = useState<PutawayTaskStatus | "">("PENDING");
-  const [search, setSearch] = useState("");
-  const [error, setError] = useState<string | null>(null);
   const [bins, setBins] = useState<Bin[]>([]);
+  const list = usePagedList(api.listPutawayTasks, { status: statusFilter });
+  const visible = list.data?.items ?? null;
 
-  const load = () => {
-    setError(null);
-    api
-      .listPutawayTasks(statusFilter || undefined)
-      .then(setTasks)
-      .catch((err: Error) => setError(err.message));
-    // Bin fill levels change with every putaway, so refresh them together.
+  const loadBins = () => {
     api.listBins().then(setBins).catch(() => setBins([]));
   };
-
   useEffect(() => {
-    if (!FEATURE_ENABLED) return;
-    load();
-  }, [statusFilter]);
-
-  const visible = useMemo(() => {
-    if (!tasks) return null;
-    const q = search.trim().toLowerCase();
-    if (!q) return tasks;
-    return tasks.filter(
-      (t) =>
-        t.sku.toLowerCase().includes(q) ||
-        t.productName.toLowerCase().includes(q) ||
-        t.goodsReceivedNoteNumber.toLowerCase().includes(q),
-    );
-  }, [tasks, search]);
+    if (FEATURE_ENABLED) loadBins();
+  }, []);
+  // Bin fill levels change with every putaway, so refresh them together.
+  const load = () => {
+    list.reload();
+    loadBins();
+  };
 
   if (!FEATURE_ENABLED) {
     return (
@@ -81,9 +74,10 @@ export default function Page() {
       }}
       title="Putaway"
       subtitle="Newly received stock and where to put it. Scan the bin to confirm each task."
-      search={{ value: search, onChange: setSearch, placeholder: "Search SKU, product or GRN…" }}
+      search={{ value: list.q, onChange: list.setQ, placeholder: "Search SKU, product or GRN…" }}
+      actions={<ExportMenu href={(format) => exportUrl(api.putawayTasksUrl, list.params, format)} />}
     >
-      {error && <p className="error">{error}</p>}
+      {list.error && <p className="error">{list.error}</p>}
 
       <div className="row-between">
         <label style={{ maxWidth: 220 }}>
@@ -112,6 +106,11 @@ export default function Page() {
             onChanged={load}
           />
         ))
+      )}
+      {list.items.length > 0 && (
+        <div className="card" style={{ padding: 0 }}>
+          <Pagination data={list.data} onPageChange={list.setPage} />
+        </div>
       )}
     </AppShell>
   );

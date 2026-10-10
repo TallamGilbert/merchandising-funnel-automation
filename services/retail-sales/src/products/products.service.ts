@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
+import { ListQueryDto, pageArgs, paged, searchAny } from "@mms/shared";
 import { CreateProductDto } from "./dto/create-product.dto";
 import { CreatePromotionDto } from "./dto/create-promotion.dto";
 import { UpdateProductDto } from "./dto/update-product.dto";
@@ -17,8 +18,14 @@ export interface PricedProduct {
 export class ProductsService {
   constructor(private readonly products: ProductsRepository) {}
 
-  list() {
-    return this.products.findAll();
+  /** `q` matches the SKU or name. */
+  async list(query: ListQueryDto) {
+    const where = searchAny(query.q, ["sku", "name"]) ?? {};
+    const [items, total] = await Promise.all([
+      this.products.findPage(where, pageArgs(query)),
+      this.products.count(where),
+    ]);
+    return paged(items, total, query);
   }
 
   async findOne(sku: string) {

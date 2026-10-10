@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { formatDateTime, useFlash, usePolling } from "@mms/ui";
+import { useState } from "react";
+import { ExportMenu, exportUrl, formatDateTime, Pagination, useFlash, usePagedList, usePolling } from "@mms/ui";
 import { AppShell } from "../../components/AppShell";
 import { api, type InboxEvent, type InboxStatus } from "../../lib/financials-client";
 import { NAV } from "../../lib/nav";
@@ -39,20 +39,11 @@ function describe(event: InboxEvent): string {
 export default function EventsPage() {
   const flash = useFlash();
   const [status, setStatus] = useState<InboxStatus | "">("NEEDS_ATTENTION");
-  const [events, setEvents] = useState<InboxEvent[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const [retrying, setRetrying] = useState<string | null>(null);
-
-  const load = () => {
-    api
-      .inbox(status || undefined)
-      .then((rows) => {
-        setEvents(rows);
-        setError(null);
-      })
-      .catch((err: Error) => setError(err.message));
-  };
-  useEffect(load, [status]);
+  const list = usePagedList(api.inbox, { status });
+  const events = list.data?.items ?? null;
+  const error = list.error;
+  const load = list.reload;
   usePolling(load, 15000);
 
   const retry = async (event: InboxEvent) => {
@@ -76,6 +67,8 @@ export default function EventsPage() {
       nav={NAV}
       title="Posting issues"
       subtitle="Every event is stored before it's booked. Anything a service outage delayed retries on its own; anything that needs a person waits here."
+      search={{ value: list.q, onChange: list.setQ, placeholder: "Search event id or type…" }}
+      actions={<ExportMenu href={(format) => exportUrl(api.inboxUrl, list.params, format)} />}
     >
       <div className="row-between">
         <label style={{ maxWidth: 220 }}>
@@ -140,6 +133,7 @@ export default function EventsPage() {
             </tbody>
           </table>
         )}
+        <Pagination data={list.data} onPageChange={list.setPage} />
       </div>
     </AppShell>
   );

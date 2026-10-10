@@ -1,4 +1,4 @@
-import { apiFetch } from "@mms/ui";
+import { apiFetch, type ListParams, type Page, withQuery } from "@mms/ui";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3008";
 
@@ -144,19 +144,25 @@ export const api = {
 
   accounts: () => request<Account[]>("/accounts"),
 
-  entries: (filter: { from?: string; to?: string; accountCode?: string; source?: EntrySource }) =>
-    request<JournalEntry[]>(`/ledger/entries${toQueryString({ ...filter, limit: "200" })}`),
+  entriesUrl: `${API_URL}/ledger/entries`,
+  payablesUrl: `${API_URL}/payables`,
+  inboxUrl: `${API_URL}/inbox`,
+
+  /** `q` matches the reference or description; filters: from, to, accountCode, source. */
+  entries: (params: ListParams) => request<Page<JournalEntry>>(withQuery("/ledger/entries", params)),
 
   trialBalance: (asOf?: string) => request<TrialBalance>(`/ledger/trial-balance${toQueryString({ asOf })}`),
 
-  payables: (status?: BillStatus) => request<PayableBill[]>(`/payables${toQueryString({ status })}`),
+  /** `q` matches the supplier, PO or GRN number; filters: status, supplierId. */
+  payables: (params: ListParams) => request<Page<PayableBill>>(withQuery("/payables", params)),
 
   aging: () => request<AgingReport>("/payables/aging"),
 
   payBill: (id: string, data: { paymentReference?: string; paidOn?: string }) =>
     request<PayableBill>(`/payables/${id}/pay`, { method: "POST", body: JSON.stringify(data) }),
 
-  inbox: (status?: InboxStatus) => request<InboxEvent[]>(`/inbox${toQueryString({ status })}`),
+  /** `q` matches the event id or type; filter: status. */
+  inbox: (params: ListParams) => request<Page<InboxEvent>>(withQuery("/inbox", params)),
 
   retryEvent: (eventId: string) =>
     request<{ eventId: string; result: string }>(`/inbox/${encodeURIComponent(eventId)}/retry`, { method: "POST" }),

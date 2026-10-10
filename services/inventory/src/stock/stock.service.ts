@@ -5,6 +5,9 @@ import {
   EventBusService,
   EventRoutingKey,
   GoodsReceivedEvent,
+  pageArgs,
+  paged,
+  searchAny,
   StockLowEvent,
   StockTransferredEvent,
 } from "@mms/shared";
@@ -15,6 +18,7 @@ import {
   StockLevel,
 } from "../generated/prisma";
 import { PrismaService } from "../prisma/prisma.service";
+import { ListStockLevelsQuery } from "./list-stock-levels.query";
 
 const VELOCITY_WINDOW_DAYS = 14;
 
@@ -55,15 +59,23 @@ export class StockService {
     return levels.map((level) => this.withAvailable(level));
   }
 
-  async listStockLevels(locationCode?: string) {
-    const levels = await this.prisma.stockLevel.findMany({
-      where: locationCode ? { locationCode } : undefined,
-      include: { product: true },
-    });
-    return levels.map((level) => ({
+  async listStockLevels(query: ListStockLevelsQuery) {
+    const where = { locationCode: query.locationCode, product: searchAny(query.q, ["sku", "name"]) };
+    const [levels, total] = await Promise.all([
+      this.prisma.stockLevel.findMany({
+        where,
+        include: { product: true },
+        orderBy: [{ product: { sku: "asc" } }, { locationCode: "asc" }],
+        ...pageArgs(query),
+      }),
+      this.prisma.stockLevel.count({ where }),
+    ]);
+    const items = levels.map(({ product, ...level }) => ({
       ...this.withAvailable(level),
-      sku: level.product.sku,
+      sku: product.sku,
+      productName: product.name,
     }));
+    return paged(items, total, query);
   }
 
   /** FR-4.8 — manual stock adjustment (e.g. after a physical count). */

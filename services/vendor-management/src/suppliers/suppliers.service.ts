@@ -1,10 +1,11 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
+import { ListQueryDto, pageArgs, paged, searchAny } from "@mms/shared";
 import { SupplierStatus } from "../generated/prisma";
 import { PrismaService } from "../prisma/prisma.service";
 import { CreateSupplierDeliveryRecordDto } from "./dto/create-delivery-record.dto";
 import { CreateSupplierProductDto } from "./dto/create-supplier-product.dto";
 import { CreateSupplierDto } from "./dto/create-supplier.dto";
-import { PaginationQueryDto } from "./dto/pagination-query.dto";
+import { ListSuppliersQuery } from "./dto/list-suppliers.query";
 import { UpdateSupplierProductDto } from "./dto/update-supplier-product.dto";
 import { UpdateSupplierDto } from "./dto/update-supplier.dto";
 
@@ -12,18 +13,13 @@ import { UpdateSupplierDto } from "./dto/update-supplier.dto";
 export class SuppliersService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async list(status: SupplierStatus | undefined, { page, pageSize }: PaginationQueryDto) {
-    const where = status ? { status } : undefined;
+  async list(query: ListSuppliersQuery) {
+    const where = { status: query.status, ...searchAny(query.q, ["name", "contactName", "email"]) };
     const [items, total] = await Promise.all([
-      this.prisma.supplier.findMany({
-        where,
-        orderBy: { name: "asc" },
-        skip: (page - 1) * pageSize,
-        take: pageSize,
-      }),
+      this.prisma.supplier.findMany({ where, orderBy: { name: "asc" }, ...pageArgs(query) }),
       this.prisma.supplier.count({ where }),
     ]);
-    return { items, total, page, pageSize };
+    return paged(items, total, query);
   }
 
   async create(dto: CreateSupplierDto) {
@@ -106,19 +102,19 @@ export class SuppliersService {
     }));
   }
 
-  async listDeliveryRecords(supplierId: string, { page, pageSize }: PaginationQueryDto) {
+  /** `q` matches the PO reference. */
+  async listDeliveryRecords(supplierId: string, query: ListQueryDto) {
     await this.assertSupplierExistsOrThrow(supplierId);
-    const where = { supplierId };
+    const where = { supplierId, ...searchAny(query.q, ["poReference"]) };
     const [items, total] = await Promise.all([
       this.prisma.supplierDeliveryRecord.findMany({
         where,
         orderBy: { actualDeliveryDate: "desc" },
-        skip: (page - 1) * pageSize,
-        take: pageSize,
+        ...pageArgs(query),
       }),
       this.prisma.supplierDeliveryRecord.count({ where }),
     ]);
-    return { items, total, page, pageSize };
+    return paged(items, total, query);
   }
 
   async addDeliveryRecord(

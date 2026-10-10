@@ -5,9 +5,13 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import {
+  dateRange,
   EventBusService,
   EventRoutingKey,
   GoodsReceivedEvent,
+  pageArgs,
+  paged,
+  searchAny,
 } from "@mms/shared";
 import {
   ExpectedDeliveryStatus,
@@ -18,6 +22,7 @@ import { ExpectedDeliveriesService } from "../expected-deliveries/expected-deliv
 import { PrismaService } from "../prisma/prisma.service";
 import { ProcurementClientService } from "../procurement-client/procurement-client.service";
 import { CreateGoodsReceivedNoteDto } from "./dto/create-goods-received-note.dto";
+import { ListGoodsReceivedNotesQuery } from "./dto/list-goods-received-notes.query";
 import { RecordScanDto } from "./dto/record-scan.dto";
 import { discrepancyFor } from "./discrepancy";
 
@@ -30,12 +35,22 @@ export class GoodsReceivedNotesService {
     private readonly eventBus: EventBusService,
   ) {}
 
-  list(status?: GoodsReceivedNoteStatus) {
-    return this.prisma.goodsReceivedNote.findMany({
-      where: status ? { status } : undefined,
-      include: { lines: true },
-      orderBy: { createdAt: "desc" },
-    });
+  async list(query: ListGoodsReceivedNotesQuery) {
+    const where = {
+      status: query.status,
+      createdAt: dateRange(query.from, query.to),
+      ...searchAny(query.q, ["goodsReceivedNoteNumber", "poNumber"]),
+    };
+    const [items, total] = await Promise.all([
+      this.prisma.goodsReceivedNote.findMany({
+        where,
+        include: { lines: true },
+        orderBy: { createdAt: "desc" },
+        ...pageArgs(query),
+      }),
+      this.prisma.goodsReceivedNote.count({ where }),
+    ]);
+    return paged(items, total, query);
   }
 
   async findOne(id: string) {

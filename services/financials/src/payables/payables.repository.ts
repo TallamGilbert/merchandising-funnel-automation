@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { BillStatus } from "../generated/prisma";
+import { BillStatus, Prisma } from "../generated/prisma";
 import { JournalDraft } from "../ledger/journal";
 import { PrismaService } from "../prisma/prisma.service";
 
@@ -7,6 +7,15 @@ import { PrismaService } from "../prisma/prisma.service";
 export class PayablesRepository {
   constructor(private readonly prisma: PrismaService) {}
 
+  findPage(where: Prisma.PayableBillWhereInput, page: { skip: number; take: number }) {
+    return this.prisma.payableBill.findMany({ where, orderBy: [{ status: "asc" }, { dueDate: "asc" }], ...page });
+  }
+
+  count(where: Prisma.PayableBillWhereInput) {
+    return this.prisma.payableBill.count({ where });
+  }
+
+  /** Every bill matching the filter — the aging report needs them all. */
   findAll(filter: { status?: BillStatus; supplierId?: string }) {
     return this.prisma.payableBill.findMany({
       where: { status: filter.status, supplierId: filter.supplierId },

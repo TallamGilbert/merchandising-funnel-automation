@@ -1,11 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import { formatDateTime, useLocations } from "@mms/ui";
+import { useState } from "react";
+import { ExportMenu, exportUrl, formatDateTime, Pagination, usePagedList, useLocations } from "@mms/ui";
 import { AppShell, type NavSection } from "../../components/AppShell";
 import { ClipboardListIcon, PackageIcon } from "../../components/icons";
-import { api, type GoodsReceivedNote, type GoodsReceivedNoteStatus } from "../../lib/api";
+import { api, type GoodsReceivedNoteStatus } from "../../lib/api";
 
 const NAV: NavSection[] = [
   {
@@ -19,17 +19,8 @@ const NAV: NavSection[] = [
 
 export default function GoodsReceivedNotesPage() {
   const { data: locations } = useLocations();
-  const [goodsReceivedNotes, setGoodsReceivedNotes] = useState<GoodsReceivedNote[] | null>(null);
   const [statusFilter, setStatusFilter] = useState<GoodsReceivedNoteStatus | "">("");
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    setError(null);
-    api
-      .listGoodsReceivedNotes(statusFilter || undefined)
-      .then(setGoodsReceivedNotes)
-      .catch((err: Error) => setError(err.message));
-  }, [statusFilter]);
+  const list = usePagedList(api.listGoodsReceivedNotes, { status: statusFilter });
 
   return (
     <AppShell
@@ -37,8 +28,10 @@ export default function GoodsReceivedNotesPage() {
       nav={NAV}
       title="Goods received notes"
       subtitle="The system-of-record for possession (FR-3.5). Drafts are still being scanned; finalized GRNs are locked."
+      search={{ value: list.q, onChange: list.setQ, placeholder: "Search GRN or PO number…" }}
+      actions={<ExportMenu href={(format) => exportUrl(api.goodsReceivedNotesUrl, list.params, format)} />}
     >
-      {error && <p className="error">{error}</p>}
+      {list.error && <p className="error">{list.error}</p>}
 
       <div className="row-between">
         <label style={{ maxWidth: 220 }}>
@@ -55,11 +48,11 @@ export default function GoodsReceivedNotesPage() {
       </div>
 
       <div className="card" style={{ padding: 0 }}>
-        {goodsReceivedNotes === null ? (
+        {list.data === null ? (
           <p className="muted" style={{ padding: "1.4rem" }}>
             Loading GRNs…
           </p>
-        ) : goodsReceivedNotes.length === 0 ? (
+        ) : list.items.length === 0 ? (
           <p className="muted" style={{ padding: "1.4rem" }}>
             No GRNs found.
           </p>
@@ -77,7 +70,7 @@ export default function GoodsReceivedNotesPage() {
               </tr>
             </thead>
             <tbody>
-              {goodsReceivedNotes.map((goodsReceivedNote) => {
+              {list.items.map((goodsReceivedNote) => {
                 const flagged = goodsReceivedNote.lines.filter((l) => l.discrepancyType !== "NONE").length;
                 return (
                   <tr key={goodsReceivedNote.id}>
@@ -111,6 +104,7 @@ export default function GoodsReceivedNotesPage() {
             </tbody>
           </table>
         )}
+        <Pagination data={list.data} onPageChange={list.setPage} />
       </div>
     </AppShell>
   );

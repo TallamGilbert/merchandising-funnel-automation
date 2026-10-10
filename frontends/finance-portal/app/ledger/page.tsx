@@ -1,10 +1,19 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Combobox, formatDate, formatDateTime, formatMoney } from "@mms/ui";
+import {
+  Combobox,
+  ExportMenu,
+  exportUrl,
+  formatDate,
+  formatDateTime,
+  formatMoney,
+  Pagination,
+  usePagedList,
+} from "@mms/ui";
 import { AppShell } from "../../components/AppShell";
 import { DateRange, defaultRange, type Range } from "../../components/DateRange";
-import { type Account, api, type EntrySource, type JournalEntry, SOURCE_LABEL, type TrialBalance } from "../../lib/financials-client";
+import { type Account, api, type EntrySource, SOURCE_LABEL, type TrialBalance } from "../../lib/financials-client";
 import { NAV } from "../../lib/nav";
 
 type Tab = "journal" | "trial-balance";
@@ -41,19 +50,9 @@ function Journal({ accounts }: { accounts: Account[] }) {
   const [range, setRange] = useState<Range>(defaultRange);
   const [accountCode, setAccountCode] = useState("");
   const [source, setSource] = useState<EntrySource | "">("");
-  const [entries, setEntries] = useState<JournalEntry[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const accountName = useMemo(() => new Map(accounts.map((a) => [a.code, a.name])), [accounts]);
-
-  useEffect(() => {
-    api
-      .entries({ ...range, accountCode: accountCode || undefined, source: source || undefined })
-      .then((rows) => {
-        setEntries(rows);
-        setError(null);
-      })
-      .catch((err: Error) => setError(err.message));
-  }, [range.from, range.to, accountCode, source]);
+  const list = usePagedList(api.entries, { from: range.from, to: range.to, accountCode, source }, 25);
+  const entries = list.data?.items ?? null;
 
   return (
     <>
@@ -70,6 +69,10 @@ function Journal({ accounts }: { accounts: Account[] }) {
           />
         </label>
         <label>
+          Search
+          <input value={list.q} onChange={(e) => list.setQ(e.target.value)} placeholder="Reference or description…" />
+        </label>
+        <label>
           Source
           <select value={source} onChange={(e) => setSource(e.target.value as EntrySource | "")}>
             <option value="">Everything</option>
@@ -82,7 +85,12 @@ function Journal({ accounts }: { accounts: Account[] }) {
         </label>
       </div>
 
-      {error && <p className="error">{error}</p>}
+      <div className="row-between">
+        <span className="muted">Export has one row per journal line, for every entry that matches.</span>
+        <ExportMenu href={(format) => exportUrl(api.entriesUrl, list.params, format)} />
+      </div>
+
+      {list.error && <p className="error">{list.error}</p>}
 
       {entries === null ? (
         <p className="muted">Loading entries…</p>
@@ -90,7 +98,6 @@ function Journal({ accounts }: { accounts: Account[] }) {
         <p className="card muted">No entries match.</p>
       ) : (
         <>
-          {entries.length === 200 && <p className="muted" style={{ margin: 0 }}>Showing the latest 200 — narrow the dates to see older entries.</p>}
           {entries.map((entry) => (
             <div className="card" key={entry.id} style={{ gap: "0.6rem" }}>
               <div className="row-between">
@@ -126,6 +133,9 @@ function Journal({ accounts }: { accounts: Account[] }) {
               </table>
             </div>
           ))}
+          <div className="card" style={{ padding: 0 }}>
+            <Pagination data={list.data} onPageChange={list.setPage} />
+          </div>
         </>
       )}
     </>

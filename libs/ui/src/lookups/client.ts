@@ -3,6 +3,7 @@
  * pickers. Each app still talks to its own module through its own lib/api.
  */
 import { apiFetch } from "../auth/client";
+import { fetchAllPages, Page, withQuery } from "../lists/page";
 
 const INVENTORY_URL = process.env.NEXT_PUBLIC_INVENTORY_URL ?? "http://localhost:3003";
 const PROCUREMENT_URL = process.env.NEXT_PUBLIC_PROCUREMENT_URL ?? "http://localhost:3002";
@@ -49,11 +50,18 @@ async function get<T>(url: string): Promise<T> {
   return res.json() as Promise<T>;
 }
 
+/** Pickers offer the whole list, so these walk every page. */
 export const lookupApi = {
-  listCatalogProducts: () => get<CatalogProduct[]>(`${INVENTORY_URL}/products`),
-  listStockLevels: (locationCode?: string) =>
-    get<StockLevelSummary[]>(
-      `${INVENTORY_URL}/stock-levels${locationCode ? `?locationCode=${encodeURIComponent(locationCode)}` : ""}`,
+  listCatalogProducts: () =>
+    fetchAllPages((page, pageSize) =>
+      get<Page<CatalogProduct>>(withQuery(`${INVENTORY_URL}/products`, { page, pageSize })),
     ),
-  listPurchaseOrders: () => get<PurchaseOrderSummary[]>(`${PROCUREMENT_URL}/purchase-orders`),
+  listStockLevels: (locationCode?: string) =>
+    fetchAllPages((page, pageSize) =>
+      get<Page<StockLevelSummary>>(withQuery(`${INVENTORY_URL}/stock-levels`, { locationCode, page, pageSize })),
+    ),
+  listPurchaseOrders: () =>
+    fetchAllPages((page, pageSize) =>
+      get<Page<PurchaseOrderSummary>>(withQuery(`${PROCUREMENT_URL}/purchase-orders`, { page, pageSize })),
+    ),
 };

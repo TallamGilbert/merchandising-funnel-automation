@@ -5,6 +5,8 @@ import { use, useEffect, useState } from "react";
 import {
   CurrencySelect,
   DEFAULT_CURRENCY,
+  ExportMenu,
+  exportUrl,
   formatDate,
   formatMoney,
   Modal,
@@ -144,7 +146,10 @@ export default function SupplierPage({
       </section>
 
       <section>
-        <h2>Delivery records</h2>
+        <div className="row-between">
+          <h2>Delivery records</h2>
+          <ExportMenu href={(format) => exportUrl(api.deliveryRecordsUrl(id), {}, format)} />
+        </div>
         <DeliveryRecordsSection
           supplierId={id}
           records={records ?? []}

@@ -44,11 +44,13 @@ describe("aging helpers", () => {
 
 describe("PayablesService", () => {
   let service: PayablesService;
-  let payables: { findAll: jest.Mock; findById: jest.Mock; pay: jest.Mock };
+  let payables: { findAll: jest.Mock; findPage: jest.Mock; count: jest.Mock; findById: jest.Mock; pay: jest.Mock };
 
   beforeEach(() => {
     payables = {
       findAll: jest.fn().mockResolvedValue([]),
+      findPage: jest.fn().mockResolvedValue([]),
+      count: jest.fn().mockResolvedValue(0),
       findById: jest.fn().mockResolvedValue(bill("1", "s1", 995, "2026-10-25T09:00:00Z")),
       pay: jest.fn().mockResolvedValue(true),
     };
@@ -106,9 +108,24 @@ describe("PayablesService", () => {
   });
 
   it("adds how overdue each open bill is", async () => {
-    payables.findAll.mockResolvedValue([bill("2", "s1", 500, "2020-01-01T00:00:00Z")]);
-    const [row] = await service.list({});
-    expect(row.daysOverdue).toBeGreaterThan(90);
-    expect(row.agingBucket).toBe("90+");
+    payables.findPage.mockResolvedValue([bill("2", "s1", 500, "2020-01-01T00:00:00Z")]);
+    payables.count.mockResolvedValue(1);
+    const page = await service.list({ page: 1, pageSize: 20 });
+    expect(page.total).toBe(1);
+    expect(page.items[0].daysOverdue).toBeGreaterThan(90);
+    expect(page.items[0].agingBucket).toBe("90+");
+  });
+
+  it("searches by supplier, PO or GRN number", async () => {
+    await service.list({ page: 1, pageSize: 20, status: BillStatus.OPEN, q: "acme" });
+    expect(payables.count).toHaveBeenCalledWith({
+      status: BillStatus.OPEN,
+      supplierId: undefined,
+      OR: [
+        { supplierName: { contains: "acme", mode: "insensitive" } },
+        { poNumber: { contains: "acme", mode: "insensitive" } },
+        { goodsReceivedNoteNumber: { contains: "acme", mode: "insensitive" } },
+      ],
+    });
   });
 });

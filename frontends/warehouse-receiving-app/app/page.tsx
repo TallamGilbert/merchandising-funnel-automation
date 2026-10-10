@@ -1,8 +1,8 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
-import { formatQuantity, LocationPicker, useFlash } from "@mms/ui";
+import { useState } from "react";
+import { ExportMenu, exportUrl, formatQuantity, LocationPicker, Pagination, useFlash, usePagedList } from "@mms/ui";
 import { AppShell, type NavSection } from "../components/AppShell";
 import { ClipboardListIcon, PackageIcon } from "../components/icons";
 import { api, type ExpectedDelivery, type ExpectedDeliveryStatus } from "../lib/api";
@@ -20,33 +20,9 @@ const NAV: NavSection[] = [
 ];
 
 export default function Page() {
-  const [deliveries, setDeliveries] = useState<ExpectedDelivery[] | null>(null);
   const [statusFilter, setStatusFilter] = useState<ExpectedDeliveryStatus | "">("");
-  const [search, setSearch] = useState("");
-  const [error, setError] = useState<string | null>(null);
   const [receiving, setReceiving] = useState<ExpectedDelivery | null>(null);
-
-  const load = () => {
-    setError(null);
-    api
-      .listExpectedDeliveries(statusFilter || undefined)
-      .then(setDeliveries)
-      .catch((err: Error) => setError(err.message));
-  };
-
-  useEffect(() => {
-    if (!FEATURE_ENABLED) return;
-    load();
-  }, [statusFilter]);
-
-  const visible = useMemo(() => {
-    if (!deliveries) return null;
-    const q = search.trim().toLowerCase();
-    if (!q) return deliveries;
-    return deliveries.filter(
-      (d) => d.poNumber.toLowerCase().includes(q) || d.supplierName.toLowerCase().includes(q),
-    );
-  }, [deliveries, search]);
+  const list = usePagedList(api.listExpectedDeliveries, { status: statusFilter });
 
   if (!FEATURE_ENABLED) {
     return (
@@ -75,7 +51,8 @@ export default function Page() {
       }}
       title="Expected deliveries"
       subtitle="Approved purchase orders the dock should expect. Start receiving when a truck arrives."
-      search={{ value: search, onChange: setSearch, placeholder: "Search PO or supplier…" }}
+      search={{ value: list.q, onChange: list.setQ, placeholder: "Search PO or supplier…" }}
+      actions={<ExportMenu href={(format) => exportUrl(api.expectedDeliveriesUrl, list.params, format)} />}
     >
       {receiving && (
         <StartReceivingForm
@@ -84,7 +61,7 @@ export default function Page() {
         />
       )}
 
-      {error && <p className="error">{error}</p>}
+      {list.error && <p className="error">{list.error}</p>}
 
       <div className="row-between">
         <label style={{ maxWidth: 220 }}>
@@ -102,11 +79,11 @@ export default function Page() {
       </div>
 
       <div className="card" style={{ padding: 0 }}>
-        {visible === null ? (
+        {list.data === null ? (
           <p className="muted" style={{ padding: "1.4rem" }}>
             Loading expected deliveries…
           </p>
-        ) : visible.length === 0 ? (
+        ) : list.items.length === 0 ? (
           <p className="muted" style={{ padding: "1.4rem" }}>
             No expected deliveries found.
           </p>
@@ -122,7 +99,7 @@ export default function Page() {
               </tr>
             </thead>
             <tbody>
-              {visible.map((d) => {
+              {list.items.map((d) => {
                 const outstanding = d.lines.reduce(
                   (sum, l) => sum + Math.max(l.quantityOrdered - l.quantityReceived, 0),
                   0,
@@ -150,6 +127,7 @@ export default function Page() {
             </tbody>
           </table>
         )}
+        <Pagination data={list.data} onPageChange={list.setPage} />
       </div>
     </AppShell>
   );

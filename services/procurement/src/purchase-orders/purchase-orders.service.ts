@@ -9,16 +9,21 @@ import {
 import { ConfigService } from "@nestjs/config";
 import {
   AuthUser,
+  dateRange,
   EventBusService,
   EventRoutingKey,
   GoodsReceivedEvent,
+  pageArgs,
+  paged,
   PurchaseOrderApprovedEvent,
   Role,
+  searchAny,
 } from "@mms/shared";
 import { PurchaseOrderStatus } from "../generated/prisma";
 import { PrismaService } from "../prisma/prisma.service";
 import { VendorManagementClientService } from "../vendor-management-client/vendor-management-client.service";
 import { CreatePurchaseOrderDto } from "./dto/create-purchase-order.dto";
+import { ListPurchaseOrdersQuery } from "./dto/list-purchase-orders.query";
 
 const OPEN_STATUSES: PurchaseOrderStatus[] = [
   PurchaseOrderStatus.APPROVED,
@@ -42,12 +47,22 @@ export class PurchaseOrdersService {
     );
   }
 
-  list(status?: PurchaseOrderStatus) {
-    return this.prisma.purchaseOrder.findMany({
-      where: status ? { status } : undefined,
-      include: { lines: true },
-      orderBy: { createdAt: "desc" },
-    });
+  async list(query: ListPurchaseOrdersQuery) {
+    const where = {
+      status: query.status,
+      createdAt: dateRange(query.from, query.to),
+      ...searchAny(query.q, ["poNumber", "supplierName"]),
+    };
+    const [items, total] = await Promise.all([
+      this.prisma.purchaseOrder.findMany({
+        where,
+        include: { lines: true },
+        orderBy: { createdAt: "desc" },
+        ...pageArgs(query),
+      }),
+      this.prisma.purchaseOrder.count({ where }),
+    ]);
+    return paged(items, total, query);
   }
 
   async findOne(id: string) {

@@ -35,14 +35,33 @@ paths:
     get:
       tags: [products]
       summary: List products (Inventory Control Center)
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+        - in: query
+          name: q
+          description: Search — matches SKU or name.
+          schema: { type: string, maxLength: 100 }
+        - $ref: "#/components/parameters/ExportFormat"
       responses:
         "200":
           description: OK
           content:
             application/json:
               schema:
-                type: array
-                items: { $ref: "#/components/schemas/Product" }
+                type: object
+                required: [items, total, page, pageSize]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/Product" }
+                  total: { type: integer, description: Rows matching the filters }
+                  page: { type: integer }
+                  pageSize: { type: integer }
+            text/csv:
+              schema: { type: string, format: binary }
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema: { type: string, format: binary }
     post:
       tags: [products]
       summary: Create a product master record
@@ -142,14 +161,32 @@ paths:
         - in: query
           name: locationCode
           schema: { type: string }
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+        - in: query
+          name: q
+          description: Search — matches SKU or product name.
+          schema: { type: string, maxLength: 100 }
+        - $ref: "#/components/parameters/ExportFormat"
       responses:
         "200":
           description: OK
           content:
             application/json:
               schema:
-                type: array
-                items: { $ref: "#/components/schemas/StockLevel" }
+                type: object
+                required: [items, total, page, pageSize]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/StockLevel" }
+                  total: { type: integer, description: Rows matching the filters }
+                  page: { type: integer }
+                  pageSize: { type: integer }
+            text/csv:
+              schema: { type: string, format: binary }
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema: { type: string, format: binary }
   /valuation:
     get:
       tags: [valuation]
@@ -162,6 +199,32 @@ paths:
               schema: { $ref: "#/components/schemas/ValuationReport" }
 components:
   parameters:
+    Page:
+      in: query
+      name: page
+      description: 1-based page number.
+      schema: { type: integer, minimum: 1, default: 1 }
+    PageSize:
+      in: query
+      name: pageSize
+      schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+    ExportFormat:
+      in: query
+      name: format
+      description: >
+        Download every matching row (up to 50,000) as a file instead of a
+        page. Paging params are ignored; filters and q apply.
+      schema: { type: string, enum: [csv, xlsx] }
+    From:
+      in: query
+      name: from
+      description: YYYY-MM-DD, inclusive (UTC day).
+      schema: { type: string, format: date }
+    To:
+      in: query
+      name: to
+      description: YYYY-MM-DD, inclusive (UTC day).
+      schema: { type: string, format: date }
     Sku:
       in: path
       name: sku
@@ -222,6 +285,7 @@ components:
       properties:
         productId: { type: string, format: uuid }
         sku: { type: string }
+        productName: { type: string }
         locationCode: { type: string, example: WAREHOUSE-MAIN }
         onHand: { type: integer }
         allocated: { type: integer }

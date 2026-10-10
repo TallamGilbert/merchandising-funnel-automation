@@ -549,3 +549,45 @@ th.num {
     display: none;
   }
 }
+
+/* ---- Paged lists: pagination and export ------------------------------- */
+.mms-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  padding: 0.75rem 1rem;
+  font-size: 0.85rem;
+}
+.mms-pagination-buttons {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+.mms-export {
+  position: relative;
+}
+.mms-export-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 50;
+  min-width: 160px;
+  display: flex;
+  flex-direction: column;
+  padding: 0.3rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 12px 32px rgba(16, 24, 40, 0.12);
+}
+.mms-export-menu a {
+  padding: 0.5rem 0.65rem;
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  text-decoration: none;
+}
+.mms-export-menu a:hover {
+  background: var(--surface-muted);
+}

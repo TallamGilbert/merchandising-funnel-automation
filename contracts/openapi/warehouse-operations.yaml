@@ -108,14 +108,32 @@ paths:
         - in: query
           name: locationCode
           schema: { type: string }
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+        - in: query
+          name: q
+          description: Search — matches SKU, product name, GRN or PO number.
+          schema: { type: string, maxLength: 100 }
+        - $ref: "#/components/parameters/ExportFormat"
       responses:
         "200":
           description: OK
           content:
             application/json:
               schema:
-                type: array
-                items: { $ref: "#/components/schemas/PutawayTask" }
+                type: object
+                required: [items, total, page, pageSize]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/PutawayTask" }
+                  total: { type: integer, description: Rows matching the filters }
+                  page: { type: integer }
+                  pageSize: { type: integer }
+            text/csv:
+              schema: { type: string, format: binary }
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema: { type: string, format: binary }
   /putaway-tasks/{id}:
     get:
       tags: [putaway-tasks]
@@ -182,14 +200,34 @@ paths:
         - in: query
           name: status
           schema: { $ref: "#/components/schemas/TransferStatus" }
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+        - in: query
+          name: q
+          description: Search — matches Transfer number or SKU.
+          schema: { type: string, maxLength: 100 }
+        - $ref: "#/components/parameters/From"
+        - $ref: "#/components/parameters/To"
+        - $ref: "#/components/parameters/ExportFormat"
       responses:
         "200":
           description: OK
           content:
             application/json:
               schema:
-                type: array
-                items: { $ref: "#/components/schemas/Transfer" }
+                type: object
+                required: [items, total, page, pageSize]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/Transfer" }
+                  total: { type: integer, description: Rows matching the filters }
+                  page: { type: integer }
+                  pageSize: { type: integer }
+            text/csv:
+              schema: { type: string, format: binary }
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema: { type: string, format: binary }
     post:
       tags: [transfers]
       summary: >
@@ -250,6 +288,32 @@ paths:
         "404": { description: Not found }
 components:
   parameters:
+    Page:
+      in: query
+      name: page
+      description: 1-based page number.
+      schema: { type: integer, minimum: 1, default: 1 }
+    PageSize:
+      in: query
+      name: pageSize
+      schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+    ExportFormat:
+      in: query
+      name: format
+      description: >
+        Download every matching row (up to 50,000) as a file instead of a
+        page. Paging params are ignored; filters and q apply.
+      schema: { type: string, enum: [csv, xlsx] }
+    From:
+      in: query
+      name: from
+      description: YYYY-MM-DD, inclusive (UTC day).
+      schema: { type: string, format: date }
+    To:
+      in: query
+      name: to
+      description: YYYY-MM-DD, inclusive (UTC day).
+      schema: { type: string, format: date }
     BinCode:
       in: path
       name: code

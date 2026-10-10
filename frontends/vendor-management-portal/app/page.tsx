@@ -1,11 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
-import { useFlash } from "@mms/ui";
+import { useState } from "react";
+import { ExportMenu, exportUrl, Pagination, useFlash, usePagedList } from "@mms/ui";
 import { AppShell, type NavSection } from "../components/AppShell";
 import { PackageIcon } from "../components/icons";
-import { api, type Supplier, type SupplierStatus } from "../lib/api";
+import { api, type SupplierStatus } from "../lib/api";
 
 const FEATURE_ENABLED =
   process.env.NEXT_PUBLIC_FEATURE_VENDOR_MANAGEMENT_ENABLED !== "false";
@@ -18,34 +18,12 @@ const NAV: NavSection[] = [
 ];
 
 export default function Page() {
-  const [suppliers, setSuppliers] = useState<Supplier[] | null>(null);
   const [statusFilter, setStatusFilter] = useState<SupplierStatus | "">("");
-  const [search, setSearch] = useState("");
-  const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const flash = useFlash();
-
-  const load = () => {
-    setError(null);
-    api
-      .listSuppliers(statusFilter || undefined)
-      .then(setSuppliers)
-      .catch((err: Error) => setError(err.message));
-  };
-
-  useEffect(() => {
-    if (!FEATURE_ENABLED) return;
-    load();
-  }, [statusFilter]);
-
-  const visible = useMemo(() => {
-    if (!suppliers) return null;
-    const q = search.trim().toLowerCase();
-    if (!q) return suppliers;
-    return suppliers.filter(
-      (s) => s.name.toLowerCase().includes(q) || s.email.toLowerCase().includes(q),
-    );
-  }, [suppliers, search]);
+  const list = usePagedList(api.listSuppliers, { status: statusFilter });
+  const visible = list.data?.items ?? null;
+  const error = list.error;
 
   if (!FEATURE_ENABLED) {
     return (
@@ -74,11 +52,14 @@ export default function Page() {
       }}
       title="Welcome back"
       subtitle="Browse, add, edit, and archive supplier records."
-      search={{ value: search, onChange: setSearch, placeholder: "Search suppliers…" }}
+      search={{ value: list.q, onChange: list.setQ, placeholder: "Search name, contact or email…" }}
       actions={
-        <button className="primary" onClick={() => setShowForm((v) => !v)}>
-          {showForm ? "Cancel" : "New supplier"}
-        </button>
+        <>
+          <ExportMenu href={(format) => exportUrl(api.suppliersUrl, list.params, format)} />
+          <button className="primary" onClick={() => setShowForm((v) => !v)}>
+            {showForm ? "Cancel" : "New supplier"}
+          </button>
+        </>
       }
     >
       {showForm && (
@@ -86,7 +67,7 @@ export default function Page() {
           onCreated={(name) => {
             setShowForm(false);
             flash.success(`Supplier ${name} created`);
-            load();
+            list.reload();
           }}
         />
       )}
@@ -146,6 +127,7 @@ export default function Page() {
             </tbody>
           </table>
         )}
+        <Pagination data={list.data} onPageChange={list.setPage} />
       </div>
     </AppShell>
   );
