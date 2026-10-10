@@ -25,6 +25,8 @@ enum EntrySource {
   ITEM_RETURNED
   DAY_CLOSED
   BILL_PAYMENT
+  /// A posted stock count or manual adjustment in Inventory (D-19).
+  STOCK_ADJUSTMENT
 }
 
 enum BillStatus {

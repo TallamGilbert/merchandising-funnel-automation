@@ -6,6 +6,7 @@ import {
   ItemReturnedEvent,
   ItemSoldEvent,
   PaymentMethodType,
+  StockAdjustedEvent,
 } from "@mms/shared";
 import { ACCOUNTS } from "../accounts/chart-of-accounts";
 import { EntrySource } from "../generated/prisma";
@@ -238,6 +239,41 @@ export class PostingsService {
           : [
               { accountCode: ACCOUNTS.CASH.code, debit: abs },
               { accountCode: ACCOUNTS.CASH_OVER_SHORT.code, credit: abs },
+            ],
+      }),
+    };
+  }
+
+  /**
+   * D-19 — stock found missing (or extra) by a count or adjustment, valued
+   * at Inventory's unit cost: a net loss is Dr Inventory shrinkage, Cr
+   * Inventory; a net gain is the reverse. Keeps the ledger's Inventory
+   * account in step with Inventory's own valuation.
+   */
+  stockAdjusted(event: StockAdjustedEvent): PostingPlan {
+    const net = sumMoney(event.lines.map((l) => l.quantityDelta * l.unitCost));
+    if (net === 0) return { entry: null };
+
+    const amount = Math.abs(net);
+    const memo = event.lines
+      .map((l) => `${l.sku} ${l.quantityDelta > 0 ? "+" : ""}${l.quantityDelta}`)
+      .join(", ")
+      .slice(0, 250);
+    const loss = net < 0;
+    return {
+      entry: balanced({
+        occurredAt: new Date(event.occurredAt),
+        source: EntrySource.STOCK_ADJUSTMENT,
+        sourceRef: `${event.kind}/${event.reference}`,
+        description: `${event.description} at ${event.locationCode} (${loss ? "shrinkage" : "gain"})`,
+        lines: loss
+          ? [
+              { accountCode: ACCOUNTS.INVENTORY_SHRINKAGE.code, debit: amount, memo },
+              { accountCode: ACCOUNTS.INVENTORY.code, credit: amount },
+            ]
+          : [
+              { accountCode: ACCOUNTS.INVENTORY.code, debit: amount, memo },
+              { accountCode: ACCOUNTS.INVENTORY_SHRINKAGE.code, credit: amount },
             ],
       }),
     };

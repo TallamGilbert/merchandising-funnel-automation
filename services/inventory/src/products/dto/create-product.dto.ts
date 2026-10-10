@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
-import { IsNumber, IsOptional, IsString, Min } from "class-validator";
+import { IsNumber, IsOptional, IsString, MaxLength, Min } from "class-validator";
 
 export class CreateProductDto {
   @ApiProperty()
@@ -38,6 +38,12 @@ export class CreateProductDto {
   @IsNumber()
   @Min(0)
   weightKg?: number;
+
+  @ApiPropertyOptional({ example: "Sofas", description: "Grouping for cycle counts and sales-by-category reports" })
+  @IsOptional()
+  @IsString()
+  @MaxLength(60)
+  category?: string;
 
   @ApiProperty({ description: "Valuation baseline (FR-4.4)" })
   @IsNumber()
