@@ -101,6 +101,15 @@ export class LedgerRepository {
     });
   }
 
+  /** Lines on one account in a period, with when and why they were posted. */
+  async findAccountLinesBetween(accountCode: string, from: Date, to: Date) {
+    const lines = await this.prisma.journalLine.findMany({
+      where: { accountCode, entry: { occurredAt: { gte: from, lt: to } } },
+      select: { debit: true, credit: true, entry: { select: { occurredAt: true, source: true } } },
+    });
+    return lines.map(({ entry, ...line }) => ({ ...line, ...entry }));
+  }
+
   findSaleFactsBetween(from: Date, to: Date) {
     return this.prisma.saleLineFact.findMany({ where: { occurredAt: { gte: from, lt: to } } });
   }

@@ -4,15 +4,17 @@ import { useEffect, useState } from "react";
 import {
   BarChart,
   ChartCard,
+  DateRange,
+  defaultRange,
   formatCompact,
   formatDate,
   formatMoney,
   formatQuantity,
+  type Range,
   TimeSeriesChart,
   useLocations,
 } from "@mms/ui";
 import { AppShell } from "../../components/AppShell";
-import { DateRange, defaultRange, type Range } from "../../components/DateRange";
 import { api, type Profitability, type ProfitGrouping, type ProfitRow } from "../../lib/financials-client";
 import { NAV } from "../../lib/nav";
 

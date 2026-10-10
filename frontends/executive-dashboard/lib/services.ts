@@ -197,7 +197,42 @@ function all<T>(base: string, path: string, filters: Record<string, QueryValue> 
 
 const enc = encodeURIComponent;
 
+export interface SalesReportRow {
+  key: string;
+  label: string;
+  transactions: number;
+  units: number;
+  sales: number;
+  returns: number;
+  net: number;
+}
+
+export interface MovementRow {
+  sku: string;
+  productName: string;
+  locationCode: string;
+  onHand: number;
+  stockValue: number;
+  daysOfCover: number | null;
+  status: "DEAD" | "SLOW" | "OK";
+}
+
+export interface SupplierPerformance {
+  supplierId: string;
+  supplierName: string;
+  purchaseOrders: number;
+  closedOrders: number;
+  fillRate: number | null;
+}
+
 export const services = {
+  /** D-20 reports. */
+  salesReport: (from: string, to: string, groupBy: "hour" | "sku" | "store") =>
+    get<SalesReportRow[]>(url.retailSales, withQuery("/reports/sales", { from, to, groupBy })),
+  stockMovement: () => get<MovementRow[]>(url.inventory, "/reports/stock-movement"),
+  supplierPerformance: (from: string, to: string) =>
+    get<SupplierPerformance[]>(url.procurement, withQuery("/reports/supplier-performance", { from, to })),
+
   salesSummary: (storeId: string, from: string, to: string) =>
     get<SalesSummary>(url.retailSales, `/stores/${enc(storeId)}/sales-summary?from=${from}&to=${to}`),
 

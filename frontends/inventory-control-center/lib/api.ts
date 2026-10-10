@@ -67,6 +67,22 @@ export interface StockCountDetail extends StockCount {
   expectedHidden: boolean;
 }
 
+export type MovementStatus = "DEAD" | "SLOW" | "OK";
+
+export interface MovementRow {
+  sku: string;
+  productName: string;
+  category: string | null;
+  locationCode: string;
+  onHand: number;
+  unitCost: number;
+  stockValue: number;
+  unitsSold: number;
+  lastSaleAt: string | null;
+  daysOfCover: number | null;
+  status: MovementStatus;
+}
+
 export interface CountSuggestion {
   sku: string;
   productName: string;
@@ -154,6 +170,12 @@ export const api = {
   postStockCount: (id: string) => request<StockCountDetail>(`/stock-counts/${id}/post`, { method: "POST" }),
 
   cancelStockCount: (id: string) => request<StockCountDetail>(`/stock-counts/${id}/cancel`, { method: "POST" }),
+
+  stockMovementUrl: `${API_URL}/reports/stock-movement`,
+
+  /** D-20 — slow movers and dead stock. */
+  stockMovement: (params: { locationCode?: string; category?: string; days?: number; slowAfterDays?: number }) =>
+    request<MovementRow[]>(withQuery("/reports/stock-movement", params)),
 
   countSuggestions: (locationCode: string, limit = 20) =>
     request<CountSuggestion[]>(withQuery("/stock-counts/suggestions", { locationCode, limit })),

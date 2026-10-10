@@ -286,6 +286,27 @@ paths:
           description: ''
       tags:
       - reports
+  /reports/vat:
+    get:
+      operationId: ReportsController_vat
+      parameters:
+      - name: from
+        required: true
+        in: query
+        description: YYYY-MM-DD
+        schema:
+          type: string
+      - name: to
+        required: true
+        in: query
+        description: YYYY-MM-DD, inclusive
+        schema:
+          type: string
+      responses:
+        '200':
+          description: ''
+      tags:
+      - reports
   /reports/summary:
     get:
       operationId: ReportsController_summary

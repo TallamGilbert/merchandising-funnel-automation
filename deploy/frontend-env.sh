@@ -34,7 +34,8 @@ module warehouse-receiving-app  receiving            RECEIVING
 module warehouse-floor-app      warehouse-operations WAREHOUSE_OPERATIONS
 module pos-terminal-app         retail-sales         RETAIL_SALES
 module store-manager-dashboard  sales-audit          SALES_AUDIT \
-  "NEXT_PUBLIC_RETAIL_SALES_URL=$(api_url retail-sales)"
+  "NEXT_PUBLIC_RETAIL_SALES_URL=$(api_url retail-sales)" \
+  "NEXT_PUBLIC_INVENTORY_URL=$(api_url inventory)"
 module finance-portal           financials           FINANCIALS
 
 write executive-dashboard \

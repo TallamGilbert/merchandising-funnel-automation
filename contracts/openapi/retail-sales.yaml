@@ -284,6 +284,56 @@ paths:
           description: ''
       tags:
       - sales-summary
+  /reports/sales:
+    get:
+      operationId: SalesReportController_sales
+      parameters:
+      - name: from
+        required: true
+        in: query
+        description: First day, YYYY-MM-DD (UTC, inclusive)
+        schema:
+          example: '2026-10-01'
+          type: string
+      - name: to
+        required: true
+        in: query
+        description: Last day, YYYY-MM-DD (UTC, inclusive)
+        schema:
+          example: '2026-10-31'
+          type: string
+      - name: storeId
+        required: false
+        in: query
+        description: One store; omit for every store
+        schema:
+          example: STORE-1
+          type: string
+      - name: groupBy
+        required: false
+        in: query
+        schema:
+          default: day
+          enum:
+          - cashier
+          - hour
+          - day
+          - sku
+          - store
+          type: string
+      - name: format
+        required: false
+        in: query
+        schema:
+          enum:
+          - csv
+          - xlsx
+          type: string
+      responses:
+        '200':
+          description: ''
+      tags:
+      - reports
 info:
   title: Retail Sales (POS) Service
   description: Point-of-sale transaction engine (FR-6.x). Checks and reserves stock

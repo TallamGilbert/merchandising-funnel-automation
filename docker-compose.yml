@@ -164,6 +164,8 @@ services:
       PORT: ${RETAIL_SALES_PORT:-3006}
       DATABASE_URL: postgresql://retail_sales_svc:${RETAIL_SALES_DB_PASSWORD}@postgres:5432/retail_sales?schema=public
       INVENTORY_GRPC_URL: inventory:${INVENTORY_GRPC_PORT:-5003}
+      # Hour-of-day grouping in the sales report (D-20).
+      REPORT_TIMEZONE: ${REPORT_TIMEZONE:-Africa/Nairobi}
     ports:
       - "${RETAIL_SALES_PORT:-3006}:${RETAIL_SALES_PORT:-3006}"
     working_dir: /workspace/services/retail-sales

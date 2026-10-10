@@ -1,5 +1,5 @@
 import type { NavSection } from "../components/AppShell";
-import { BoxesIcon, ClipboardListIcon, LayersIcon } from "../components/icons";
+import { BoxesIcon, ChartBarIcon, ClipboardListIcon, LayersIcon } from "../components/icons";
 
 export const NAV: NavSection[] = [
   {
@@ -8,6 +8,12 @@ export const NAV: NavSection[] = [
       { label: "Products", href: "/", icon: <BoxesIcon /> },
       { label: "Stock levels", href: "/stock-levels", icon: <LayersIcon /> },
       { label: "Stock counts", href: "/stock-counts", icon: <ClipboardListIcon /> },
+      {
+        label: "Slow & dead stock",
+        href: "/reports",
+        icon: <ChartBarIcon />,
+        roles: ["OWNER", "MANAGER", "BUYER", "ACCOUNTANT"],
+      },
     ],
   },
 ];

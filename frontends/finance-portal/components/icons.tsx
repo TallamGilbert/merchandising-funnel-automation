@@ -91,3 +91,13 @@ export function ExternalLinkIcon({ size = 14 }: IconProps) {
     </svg>
   );
 }
+
+export function PercentIcon({ size = 18 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" {...base}>
+      <path d="M19 5 5 19" />
+      <circle cx="7" cy="7" r="2.5" />
+      <circle cx="17" cy="17" r="2.5" />
+    </svg>
+  );
+}

@@ -21,7 +21,7 @@ interface ExportSpec {
   /** File name without extension, e.g. "purchase-orders". */
   filename: string;
   columns: ExportColumn<never>[];
-  rows?: (items: never[]) => never[];
+  rows?: (items: never[], result: never) => never[];
 }
 
 /**
@@ -32,8 +32,11 @@ interface ExportSpec {
 export function Exportable<T, Item = T>(
   filename: string,
   columns: ExportColumn<T>[],
-  /** Turn the endpoint's items into export rows, e.g. one row per journal line. */
-  rows?: (items: Item[]) => T[],
+  /**
+   * Turn the endpoint's items into export rows, e.g. one row per journal
+   * line. Also gets the whole response, for reports that aren't a list.
+   */
+  rows?: (items: Item[], result: never) => T[],
 ) {
   return applyDecorators(
     SetMetadata(EXPORT_KEY, { filename, columns, rows } as unknown as ExportSpec),
@@ -54,7 +57,7 @@ export class ExportInterceptor implements NestInterceptor {
     return next.handle().pipe(
       map((result: unknown) => {
         const items = (Array.isArray(result) ? result : ((result as { items?: unknown[] })?.items ?? [])) as never[];
-        const rows = spec.rows ? spec.rows(items) : items;
+        const rows = spec.rows ? spec.rows(items, result as never) : items;
         const stamp = new Date().toISOString().slice(0, 10);
         const filename = `${spec.filename}-${stamp}.${format}`;
         const buffer = format === "csv" ? toCsv(spec.columns, rows) : toXlsx(spec.filename, spec.columns, rows);

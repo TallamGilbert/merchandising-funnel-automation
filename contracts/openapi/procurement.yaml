@@ -11,6 +11,7 @@ info:
 servers:
   - url: http://localhost:3002
 tags:
+  - name: reports
   - name: health
   - name: purchase-orders
   - name: reorder-suggestions
@@ -227,6 +228,31 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ReorderSuggestion" }
+  /reports/supplier-performance:
+    get:
+      tags: [reports]
+      summary: >
+        D-20 — per supplier, for POs approved between from and to (approved,
+        sent, partially received or closed): orders, KES spend (other
+        currencies counted, never converted), units ordered vs received,
+        and fill rate on closed POs (over-delivery capped). OWNER, MANAGER,
+        BUYER or ACCOUNTANT.
+      parameters:
+        - { in: query, name: from, required: true, schema: { type: string, format: date } }
+        - { in: query, name: to, required: true, schema: { type: string, format: date } }
+        - $ref: "#/components/parameters/ExportFormat"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/SupplierPerformance" }
+            text/csv:
+              schema: { type: string, format: binary }
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema: { type: string, format: binary }
 components:
   parameters:
     Page:
@@ -261,6 +287,19 @@ components:
       required: true
       schema: { type: string, format: uuid }
   schemas:
+    SupplierPerformance:
+      type: object
+      properties:
+        supplierId: { type: string }
+        supplierName: { type: string }
+        purchaseOrders: { type: integer }
+        openOrders: { type: integer }
+        closedOrders: { type: integer }
+        spendKes: { type: number }
+        otherCurrencyOrders: { type: integer }
+        unitsOrdered: { type: integer }
+        unitsReceived: { type: integer }
+        fillRate: { type: number, nullable: true, description: 0–1 on closed POs; null until one closes }
     PurchaseOrderStatus:
       type: string
       enum:

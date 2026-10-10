@@ -12,8 +12,8 @@ import {
   useFlash,
   usePagedList,
 } from "@mms/ui";
-import { AppShell, type NavSection } from "../components/AppShell";
-import { BellAlertIcon, ClipboardListIcon } from "../components/icons";
+import { AppShell } from "../components/AppShell";
+import { NAV } from "../lib/nav";
 import { ProcurementCharts } from "../components/ProcurementCharts";
 import {
   api,
@@ -25,15 +25,6 @@ import {
 
 const FEATURE_ENABLED = process.env.NEXT_PUBLIC_FEATURE_PROCUREMENT_ENABLED !== "false";
 
-const NAV: NavSection[] = [
-  {
-    label: "Main menu",
-    items: [
-      { label: "Purchase orders", href: "/", icon: <ClipboardListIcon /> },
-      { label: "Reorder suggestions", href: "/reorder-suggestions", icon: <BellAlertIcon /> },
-    ],
-  },
-];
 
 export default function Page() {
   const [statusFilter, setStatusFilter] = useState<PurchaseOrderStatus | "">("");

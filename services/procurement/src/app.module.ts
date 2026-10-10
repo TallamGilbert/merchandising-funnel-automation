@@ -4,6 +4,7 @@ import { HealthModule } from "./health/health.module";
 import { PrismaModule } from "./prisma/prisma.module";
 import { PurchaseOrdersModule } from "./purchase-orders/purchase-orders.module";
 import { ReorderSuggestionsModule } from "./reorder-suggestions/reorder-suggestions.module";
+import { ReportsModule } from "./reports/reports.module";
 
 @Module({
   imports: [
@@ -12,6 +13,7 @@ import { ReorderSuggestionsModule } from "./reorder-suggestions/reorder-suggesti
     HealthModule,
     PurchaseOrdersModule,
     ReorderSuggestionsModule,
+    ReportsModule,
   ],
 })
 export class AppModule {}
