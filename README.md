@@ -154,6 +154,19 @@ Once up:
 - RabbitMQ management UI — http://localhost:15672 (see `.env.example` for credentials)
 - Frontends — `:3101`–`:3108`, plus the Executive Dashboard on `:3109` (see each app's own port in `.env.example`)
 
+**Signing in (D-16, D-17):** every app and API needs a signed-in staff member. Directory issues one session cookie that covers all of them. With the root `.env.example`, every demo staff member signs in with their staff id and the password `demo1234` (`DEMO_STAFF_PASSWORD`):
+
+| Staff id | Role | Uses |
+|---|---|---|
+| `owner-wanjiku` | Owner | everything |
+| `mgr-sam`, `mgr-james` | Manager | approvals, store close, staff |
+| `buyer-jane` | Buyer | suppliers, purchase orders |
+| `acct-mercy` | Accountant | Finance Portal |
+| `cashier-amy` | Cashier | POS |
+| `dock-james`, `picker-lucy` | Warehouse staff | receiving, putaway, picks |
+
+Scripts and `curl` can sign in once and reuse the cookie: `curl -c jar -H 'Content-Type: application/json' -d '{"staffId":"mgr-sam","password":"demo1234"}' localhost:3009/auth/login`, then `curl -b jar localhost:3002/purchase-orders`. A local database seeded before sign-in existed has no passwords for its staff and the old roles; `docker compose down -v` gives you a fresh, seeded one.
+
 **Adding the Directory to an existing local database:** `init-databases.sh` only runs on a fresh Postgres volume. If yours predates the Directory service, create its role and database once:
 
 ```bash

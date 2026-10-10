@@ -5,28 +5,35 @@ import { useEffect, useState } from "react";
 export interface TerminalSettings {
   storeId: string;
   registerId: string;
-  cashierId: string;
 }
 
 const KEY = "mms.pos.terminal";
-const EMPTY: TerminalSettings = { storeId: "", registerId: "", cashierId: "" };
+const EMPTY: TerminalSettings = { storeId: "", registerId: "" };
 
 /**
- * A till's store and register rarely change, and a cashier works a whole
- * shift — so the terminal remembers them on this device. Storage can be
- * unavailable (private mode), in which case they're simply not remembered.
+ * A till's store and register rarely change, so the terminal remembers them
+ * on this device. Until one is chosen, the store defaults to the signed-in
+ * cashier's home store. The cashier is never stored: it's whoever is signed
+ * in. Storage can be unavailable (private mode), in which case nothing is
+ * remembered.
  */
-export function useTerminal(): [TerminalSettings, (patch: Partial<TerminalSettings>) => void] {
+export function useTerminal(
+  homeStoreId?: string | null,
+): [TerminalSettings, (patch: Partial<TerminalSettings>) => void] {
   const [settings, setSettings] = useState<TerminalSettings>(EMPTY);
 
   useEffect(() => {
+    let saved: Partial<TerminalSettings> = {};
     try {
-      const saved = localStorage.getItem(KEY);
-      if (saved) setSettings({ ...EMPTY, ...(JSON.parse(saved) as Partial<TerminalSettings>) });
+      saved = JSON.parse(localStorage.getItem(KEY) ?? "{}") as Partial<TerminalSettings>;
     } catch {
       // not remembered
     }
-  }, []);
+    setSettings({
+      storeId: saved.storeId || homeStoreId || "",
+      registerId: saved.registerId ?? "",
+    });
+  }, [homeStoreId]);
 
   const update = (patch: Partial<TerminalSettings>) => {
     setSettings((prev) => {
@@ -41,4 +48,35 @@ export function useTerminal(): [TerminalSettings, (patch: Partial<TerminalSettin
   };
 
   return [settings, update];
+}
+
+/**
+ * useState that survives a reload of this tab (sessionStorage) — so a sale
+ * in progress isn't lost if the session expires and the cashier signs in
+ * again. Keyed per cashier, so the next person doesn't inherit a cart.
+ */
+export function useTabState<T>(key: string, initial: T): [T, (next: T | ((prev: T) => T)) => void] {
+  const [value, setValue] = useState<T>(initial);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    try {
+      const saved = sessionStorage.getItem(key);
+      if (saved !== null) setValue(JSON.parse(saved) as T);
+    } catch {
+      // not restored
+    }
+    setLoaded(true);
+  }, [key]);
+
+  useEffect(() => {
+    if (!loaded) return;
+    try {
+      sessionStorage.setItem(key, JSON.stringify(value));
+    } catch {
+      // not kept
+    }
+  }, [key, value, loaded]);
+
+  return [value, setValue];
 }

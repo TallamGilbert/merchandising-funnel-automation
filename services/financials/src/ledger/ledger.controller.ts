@@ -1,9 +1,11 @@
 import { Controller, Get, ParseEnumPipe, ParseIntPipe, Query } from "@nestjs/common";
 import { ApiQuery, ApiTags } from "@nestjs/swagger";
+import { Role, Roles } from "@mms/shared";
 import { EntrySource } from "../generated/prisma";
 import { LedgerService } from "./ledger.service";
 
 @ApiTags("ledger")
+@Roles(Role.OWNER, Role.MANAGER, Role.ACCOUNTANT)
 @Controller("ledger")
 export class LedgerController {
   constructor(private readonly ledger: LedgerService) {}

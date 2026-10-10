@@ -1,5 +1,6 @@
 import { BadRequestException, Body, Controller, Get, Param, ParseBoolPipe, Patch, Post, Query } from "@nestjs/common";
 import { ApiQuery, ApiTags } from "@nestjs/swagger";
+import { AuthUser, CurrentUser, Role, Roles } from "@mms/shared";
 import { StaffRole } from "../generated/prisma";
 import { CreateStaffDto } from "./dto/create-staff.dto";
 import { UpdateStaffDto } from "./dto/update-staff.dto";
@@ -23,8 +24,9 @@ export class StaffController {
   }
 
   @Post()
-  create(@Body() dto: CreateStaffDto) {
-    return this.staff.create(dto);
+  @Roles(Role.OWNER, Role.MANAGER)
+  create(@CurrentUser() actor: AuthUser, @Body() dto: CreateStaffDto) {
+    return this.staff.create(actor, dto);
   }
 
   @Get(":id")
@@ -33,8 +35,15 @@ export class StaffController {
   }
 
   @Patch(":id")
-  update(@Param("id") id: string, @Body() dto: UpdateStaffDto) {
-    return this.staff.update(id, dto);
+  @Roles(Role.OWNER, Role.MANAGER)
+  update(@CurrentUser() actor: AuthUser, @Param("id") id: string, @Body() dto: UpdateStaffDto) {
+    return this.staff.update(actor, id, dto);
+  }
+
+  @Post(":id/reset-password")
+  @Roles(Role.OWNER, Role.MANAGER)
+  resetPassword(@CurrentUser() actor: AuthUser, @Param("id") id: string) {
+    return this.staff.resetPassword(actor, id);
   }
 }
 

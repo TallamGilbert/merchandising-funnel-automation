@@ -1,3 +1,5 @@
+import { apiFetch } from "@mms/ui";
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3008";
 
 export type EntrySource = "GOODS_RECEIVED" | "ITEM_SOLD" | "ITEM_RETURNED" | "DAY_CLOSED" | "BILL_PAYMENT";
@@ -110,7 +112,7 @@ export interface InboxEvent {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_URL}${path}`, {
+  const res = await apiFetch(`${API_URL}${path}`, {
     ...init,
     headers: { "Content-Type": "application/json", ...init?.headers },
   });

@@ -116,7 +116,8 @@ export class PutawayService {
    * told the bin's absolute quantity *before* the task is committed locally,
    * so a failed call leaves the task open and the retry cannot double-count.
    */
-  async complete(id: string, dto: CompletePutawayDto) {
+  /** `completedById` is the signed-in user, set by the controller. */
+  async complete(id: string, dto: CompletePutawayDto & { completedById: string }) {
     const task = await this.findOne(id);
     this.assertPending(task);
     if (!task.bin) {

@@ -1,3 +1,5 @@
+import { apiFetch } from "@mms/ui";
+
 const RETAIL_SALES_URL = process.env.NEXT_PUBLIC_RETAIL_SALES_URL ?? "http://localhost:3006";
 
 export interface SalesSummary {
@@ -11,7 +13,7 @@ export interface SalesSummary {
 
 /** Retail Sales owns the transactions, so the charts read its summary directly. */
 export async function getSalesSummary(storeId: string, from: string, to: string): Promise<SalesSummary> {
-  const res = await fetch(
+  const res = await apiFetch(
     `${RETAIL_SALES_URL}/stores/${encodeURIComponent(storeId)}/sales-summary?from=${from}&to=${to}`,
   );
   if (!res.ok) {

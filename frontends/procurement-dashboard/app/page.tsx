@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { Combobox, formatDateTime, formatMoney, StaffPicker, useFlash } from "@mms/ui";
+import { Combobox, formatDateTime, formatMoney, useFlash } from "@mms/ui";
 import { AppShell, type NavSection } from "../components/AppShell";
 import { BellAlertIcon, ClipboardListIcon } from "../components/icons";
 import { ProcurementCharts } from "../components/ProcurementCharts";
@@ -170,7 +170,6 @@ function NewPurchaseOrderForm({ onCreated }: { onCreated: (poNumber: string) => 
   const [suppliers, setSuppliers] = useState<SupplierSummary[] | null>(null);
   const [supplierId, setSupplierId] = useState("");
   const [supplierProducts, setSupplierProducts] = useState<SupplierOfferedProduct[]>([]);
-  const [requestedById, setRequestedById] = useState("");
   const [lines, setLines] = useState<{ sku: string; quantityOrdered: number }[]>([
     { sku: "", quantityOrdered: 1 },
   ]);
@@ -206,7 +205,6 @@ function NewPurchaseOrderForm({ onCreated }: { onCreated: (poNumber: string) => 
     try {
       const po = await api.createPurchaseOrder({
         supplierId,
-        requestedById,
         lines: lines.filter((l) => l.sku),
       });
       onCreated(po.poNumber);
@@ -234,15 +232,6 @@ function NewPurchaseOrderForm({ onCreated }: { onCreated: (poNumber: string) => 
               setSupplierId(value);
               setLines([{ sku: "", quantityOrdered: 1 }]);
             }}
-          />
-        </label>
-        <label>
-          Requested by
-          <StaffPicker
-            required
-            roles={["MANAGER", "OWNER"]}
-            value={requestedById}
-            onChange={setRequestedById}
           />
         </label>
       </div>

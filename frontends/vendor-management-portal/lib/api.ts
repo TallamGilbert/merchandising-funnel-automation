@@ -1,3 +1,5 @@
+import { apiFetch } from "@mms/ui";
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
 export type SupplierStatus = "ACTIVE" | "ARCHIVED";
@@ -42,7 +44,7 @@ export interface SupplierDetail extends Supplier {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_URL}${path}`, {
+  const res = await apiFetch(`${API_URL}${path}`, {
     ...init,
     headers: { "Content-Type": "application/json", ...init?.headers },
   });

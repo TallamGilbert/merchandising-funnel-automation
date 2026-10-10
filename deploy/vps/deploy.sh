@@ -5,6 +5,7 @@ set -euo pipefail
 cd "$(dirname "$0")/../.."
 
 [ -f .env ] || { echo ".env missing — copy .env.production.example to .env and fill it in"; exit 1; }
+if grep -q "CHANGE_ME" .env; then echo ".env still has CHANGE_ME values — fill them in"; exit 1; fi
 [ -f deploy/cloudflared/config.yml ] || { echo "Tunnel not set up — run deploy/vps/setup-tunnel.sh once"; exit 1; }
 
 compose() { docker compose -f docker-compose.yml -f docker-compose.prod.yml "$@"; }

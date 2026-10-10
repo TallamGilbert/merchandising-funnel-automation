@@ -204,14 +204,14 @@ components:
         quantityReceived: { type: integer }
     CreateGoodsReceivedNoteDto:
       type: object
-      required: [poNumber, receivedAtLocation, receivedById]
+      description: The signed-in user is recorded as receivedById (D-16).
+      required: [poNumber, receivedAtLocation]
       properties:
         poNumber: { type: string, example: PO-1001 }
         receivedAtLocation:
           type: string
           description: Location code of the dock the goods arrived at (matches Inventory's locationCode).
           example: WH-MAIN
-        receivedById: { type: string, description: User id of the dock worker. }
     RecordScanDto:
       type: object
       required: [sku, quantity, condition]

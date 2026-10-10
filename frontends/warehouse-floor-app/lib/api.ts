@@ -1,3 +1,5 @@
+import { apiFetch } from "@mms/ui";
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3005";
 
 export type PutawayTaskStatus = "PENDING" | "COMPLETED";
@@ -76,7 +78,7 @@ export interface Transfer {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_URL}${path}`, {
+  const res = await apiFetch(`${API_URL}${path}`, {
     ...init,
     headers: { "Content-Type": "application/json", ...init?.headers },
   });
@@ -101,7 +103,8 @@ export const api = {
       body: JSON.stringify(binCode ? { binCode } : {}),
     }),
 
-  completePutaway: (id: string, data: { completedById: string; scannedBinCode: string }) =>
+  /** Recorded as completed by the signed-in user. */
+  completePutaway: (id: string, data: { scannedBinCode: string }) =>
     request<PutawayTask>(`/putaway-tasks/${id}/complete`, {
       method: "POST",
       body: JSON.stringify(data),
@@ -117,10 +120,10 @@ export const api = {
     quantity: number;
     fromLocationCode: string;
     toLocationCode: string;
-    requestedById: string;
   }) => request<Transfer>("/transfers", { method: "POST", body: JSON.stringify(data) }),
 
-  completePick: (id: string, data: { pickedById: string; scannedBinCode: string }) =>
+  /** Recorded as picked by the signed-in user. */
+  completePick: (id: string, data: { scannedBinCode: string }) =>
     request<Transfer>(`/pick-tasks/${id}/complete`, {
       method: "POST",
       body: JSON.stringify(data),

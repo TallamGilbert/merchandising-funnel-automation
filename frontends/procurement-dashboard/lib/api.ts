@@ -1,3 +1,5 @@
+import { apiFetch } from "@mms/ui";
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3002";
 const VENDOR_MANAGEMENT_URL =
   process.env.NEXT_PUBLIC_VENDOR_MANAGEMENT_URL ?? "http://localhost:3001";
@@ -62,7 +64,7 @@ export interface SupplierOfferedProduct {
 }
 
 async function request<T>(base: string, path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${base}${path}`, {
+  const res = await apiFetch(`${base}${path}`, {
     ...init,
     headers: { "Content-Type": "application/json", ...init?.headers },
   });
@@ -86,9 +88,9 @@ export const api = {
 
   getPurchaseOrder: (id: string) => request<PurchaseOrder>(API_URL, `/purchase-orders/${id}`),
 
+  /** The signed-in user is recorded as the requester. */
   createPurchaseOrder: (data: {
     supplierId: string;
-    requestedById: string;
     lines: { sku: string; quantityOrdered: number }[];
   }) =>
     request<PurchaseOrder>(API_URL, "/purchase-orders", {
@@ -99,11 +101,9 @@ export const api = {
   submit: (id: string) =>
     request<PurchaseOrder>(API_URL, `/purchase-orders/${id}/submit`, { method: "POST" }),
 
-  approve: (id: string, data: { approvedById: string; approverRole: "MANAGER" | "OWNER" }) =>
-    request<PurchaseOrder>(API_URL, `/purchase-orders/${id}/approve`, {
-      method: "POST",
-      body: JSON.stringify(data),
-    }),
+  /** Approves as the signed-in user; the API checks their role against the limit (D-1). */
+  approve: (id: string) =>
+    request<PurchaseOrder>(API_URL, `/purchase-orders/${id}/approve`, { method: "POST" }),
 
   markSent: (id: string) =>
     request<PurchaseOrder>(API_URL, `/purchase-orders/${id}/mark-sent`, { method: "POST" }),

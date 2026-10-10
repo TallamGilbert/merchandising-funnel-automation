@@ -8,6 +8,7 @@ import {
   Query,
 } from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
+import { Role, Roles } from "@mms/shared";
 import { SupplierStatus } from "../generated/prisma";
 import { CreateSupplierDeliveryRecordDto } from "./dto/create-delivery-record.dto";
 import { CreateSupplierProductDto } from "./dto/create-supplier-product.dto";
@@ -31,6 +32,7 @@ export class SuppliersController {
   }
 
   @Post("suppliers")
+  @Roles(Role.OWNER, Role.MANAGER, Role.BUYER)
   create(@Body() dto: CreateSupplierDto) {
     return this.suppliers.create(dto);
   }
@@ -46,16 +48,19 @@ export class SuppliersController {
   }
 
   @Patch("suppliers/:id")
+  @Roles(Role.OWNER, Role.MANAGER, Role.BUYER)
   update(@Param("id") id: string, @Body() dto: UpdateSupplierDto) {
     return this.suppliers.update(id, dto);
   }
 
   @Post("suppliers/:id/archive")
+  @Roles(Role.OWNER, Role.MANAGER, Role.BUYER)
   archive(@Param("id") id: string) {
     return this.suppliers.archive(id);
   }
 
   @Post("suppliers/:id/products")
+  @Roles(Role.OWNER, Role.MANAGER, Role.BUYER)
   addProduct(
     @Param("id") id: string,
     @Body() dto: CreateSupplierProductDto,
@@ -64,6 +69,7 @@ export class SuppliersController {
   }
 
   @Patch("suppliers/:id/products/:productId")
+  @Roles(Role.OWNER, Role.MANAGER, Role.BUYER)
   updateProduct(
     @Param("id") id: string,
     @Param("productId") productId: string,
@@ -81,6 +87,7 @@ export class SuppliersController {
   }
 
   @Post("suppliers/:id/delivery-records")
+  @Roles(Role.OWNER, Role.MANAGER, Role.BUYER)
   addDeliveryRecord(
     @Param("id") id: string,
     @Body() dto: CreateSupplierDeliveryRecordDto,

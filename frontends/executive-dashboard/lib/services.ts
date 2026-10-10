@@ -1,3 +1,5 @@
+import { apiFetch } from "@mms/ui";
+
 /**
  * Read-only access to every module's public REST API. The dashboard never
  * writes; each tab links to the module's own app for that. Types cover only
@@ -26,7 +28,7 @@ export const APP_URL = {
 };
 
 async function get<T>(base: string, path: string): Promise<T> {
-  const res = await fetch(`${base}${path}`);
+  const res = await apiFetch(`${base}${path}`);
   if (!res.ok) {
     const body = await res.json().catch(() => null);
     throw new Error(body?.message ?? `${res.status} ${res.statusText}`);

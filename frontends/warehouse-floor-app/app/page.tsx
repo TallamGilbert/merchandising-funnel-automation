@@ -1,12 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { formatDateTime, StaffPicker, useFlash, useLocations, useStaffNames } from "@mms/ui";
+import { formatDateTime, useFlash, useLocations, useStaffNames } from "@mms/ui";
 import { AppShell, type NavSection } from "../components/AppShell";
 import { BinPicker } from "../components/BinPicker";
 import { BoxesIcon, LayersIcon, PackageIcon } from "../components/icons";
 import { api, type Bin, type PutawayTask, type PutawayTaskStatus } from "../lib/api";
-import { useOperator } from "../lib/operator";
 
 const FEATURE_ENABLED = process.env.NEXT_PUBLIC_FEATURE_WAREHOUSE_OPERATIONS_ENABLED !== "false";
 
@@ -27,7 +26,6 @@ export default function Page() {
   const [search, setSearch] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [bins, setBins] = useState<Bin[]>([]);
-  const [operator, setOperator] = useOperator();
 
   const load = () => {
     setError(null);
@@ -99,10 +97,6 @@ export default function Page() {
             <option value="">All</option>
           </select>
         </label>
-        <label style={{ minWidth: 260 }}>
-          Working as
-          <StaffPicker roles={["WAREHOUSE_STAFF", "MANAGER"]} value={operator} onChange={setOperator} />
-        </label>
       </div>
 
       {visible === null ? (
@@ -114,7 +108,6 @@ export default function Page() {
           <PutawayCard
             key={task.id}
             task={task}
-            operator={operator}
             bins={bins.filter((b) => b.locationCode === task.locationCode)}
             onChanged={load}
           />
@@ -126,12 +119,10 @@ export default function Page() {
 
 function PutawayCard({
   task,
-  operator,
   bins,
   onChanged,
 }: {
   task: PutawayTask;
-  operator: string;
   bins: Bin[];
   onChanged: () => void;
 }) {
@@ -188,7 +179,7 @@ function PutawayCard({
             onSubmit={(e) => {
               e.preventDefault();
               void run(
-                () => api.completePutaway(task.id, { completedById: operator, scannedBinCode }),
+                () => api.completePutaway(task.id, { scannedBinCode }),
                 `${task.quantity} × ${task.sku} put away in ${scannedBinCode}`,
               );
             }}
@@ -212,12 +203,11 @@ function PutawayCard({
                 </datalist>
               </label>
             </div>
-            {!operator && <p className="muted" style={{ margin: 0 }}>Choose who is working above to confirm.</p>}
             <div>
               <button
                 className="primary"
                 type="submit"
-                disabled={busy || !operator}
+                disabled={busy}
                 style={{ padding: "0.75rem 1.5rem" }}
               >
                 {busy ? "Confirming…" : "Confirm putaway"}

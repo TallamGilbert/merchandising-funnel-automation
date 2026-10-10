@@ -1,5 +1,6 @@
 import { Body, Controller, Get, Param, Patch, Post, Put } from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
+import { Role, Roles } from "@mms/shared";
 import { CreateProductDto } from "./dto/create-product.dto";
 import { SetBinLocationDto } from "./dto/set-bin-location.dto";
 import { StockAdjustmentDto } from "./dto/stock-adjustment.dto";
@@ -17,6 +18,7 @@ export class ProductsController {
   }
 
   @Post()
+  @Roles(Role.OWNER, Role.MANAGER)
   create(@Body() dto: CreateProductDto) {
     return this.products.create(dto);
   }
@@ -27,12 +29,14 @@ export class ProductsController {
   }
 
   @Patch(":sku")
+  @Roles(Role.OWNER, Role.MANAGER)
   update(@Param("sku") sku: string, @Body() dto: UpdateProductDto) {
     return this.products.update(sku, dto);
   }
 
   /** FR-5.7 — Warehouse Operations confirms the final bin location after putaway. */
   @Put(":sku/bin-locations/:binCode")
+  @Roles(Role.OWNER, Role.MANAGER, Role.WAREHOUSE_STAFF)
   setBinLocation(
     @Param("sku") sku: string,
     @Param("binCode") binCode: string,
@@ -42,6 +46,7 @@ export class ProductsController {
   }
 
   @Post(":sku/adjustments")
+  @Roles(Role.OWNER, Role.MANAGER)
   adjust(@Param("sku") sku: string, @Body() dto: StockAdjustmentDto) {
     return this.products.adjust(sku, dto);
   }

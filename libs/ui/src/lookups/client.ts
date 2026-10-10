@@ -2,6 +2,8 @@
  * Read-only lookups into other modules' public REST APIs, used to fill
  * pickers. Each app still talks to its own module through its own lib/api.
  */
+import { apiFetch } from "../auth/client";
+
 const INVENTORY_URL = process.env.NEXT_PUBLIC_INVENTORY_URL ?? "http://localhost:3003";
 const PROCUREMENT_URL = process.env.NEXT_PUBLIC_PROCUREMENT_URL ?? "http://localhost:3002";
 
@@ -39,7 +41,7 @@ export interface PurchaseOrderSummary {
 }
 
 async function get<T>(url: string): Promise<T> {
-  const res = await fetch(url);
+  const res = await apiFetch(url);
   if (!res.ok) {
     const body = await res.json().catch(() => null);
     throw new Error(body?.message ?? res.statusText);

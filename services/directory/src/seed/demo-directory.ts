@@ -5,6 +5,7 @@ import { LocationType, StaffRole } from "../generated/prisma";
  * other services' demo flows already record (WH-MAIN, DOCK-1, STORE-1,
  * REG-1, cashier-amy, buyer-jane, mgr-sam, sup-grace, picker-lucy,
  * fork-amos, dock-james), so existing records line up with real names.
+ * With DEMO_STAFF_PASSWORD set, every one of them can sign in with it.
  */
 export const DEMO_DIRECTORY = {
   locations: [
@@ -21,7 +22,8 @@ export const DEMO_DIRECTORY = {
   staff: [
     { id: "owner-wanjiku", name: "Wanjiku Mwangi", role: StaffRole.OWNER, locationCode: null },
     { id: "mgr-sam", name: "Sam Otieno", role: StaffRole.MANAGER, locationCode: "WH-MAIN" },
-    { id: "buyer-jane", name: "Jane Akinyi", role: StaffRole.MANAGER, locationCode: "WH-MAIN" },
+    { id: "buyer-jane", name: "Jane Akinyi", role: StaffRole.BUYER, locationCode: "WH-MAIN" },
+    { id: "acct-mercy", name: "Mercy Wambui", role: StaffRole.ACCOUNTANT, locationCode: null },
     { id: "sup-grace", name: "Grace Chebet", role: StaffRole.MANAGER, locationCode: "WH-MAIN" },
     { id: "mgr-james", name: "James Kariuki", role: StaffRole.MANAGER, locationCode: "STORE-1" },
     { id: "mgr-faith", name: "Faith Njeri", role: StaffRole.MANAGER, locationCode: "STORE-2" },

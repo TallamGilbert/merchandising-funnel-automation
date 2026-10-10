@@ -1,5 +1,6 @@
 import { Controller, Get, Param, Post, Query } from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
+import { Role, Roles } from "@mms/shared";
 import { ReorderSuggestionStatus } from "../generated/prisma";
 import { ReorderSuggestionsService } from "./reorder-suggestions.service";
 
@@ -14,6 +15,7 @@ export class ReorderSuggestionsController {
   }
 
   @Post(":id/dismiss")
+  @Roles(Role.OWNER, Role.MANAGER, Role.BUYER)
   dismiss(@Param("id") id: string) {
     return this.reorderSuggestions.dismiss(id);
   }

@@ -5,6 +5,7 @@ import {
   ServiceUnavailableException,
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
+import { internalFetch } from "@mms/shared";
 
 /**
  * The slice of a Procurement PO that Receiving is allowed to know. Procurement
@@ -47,7 +48,7 @@ export class ProcurementClientService {
     const url = `${this.baseUrl}/purchase-orders/lookup/${encodeURIComponent(poNumber)}`;
     let response: Response;
     try {
-      response = await fetch(url);
+      response = await internalFetch(url);
     } catch (error) {
       this.logger.error(`Procurement unreachable at ${url}: ${(error as Error).message}`);
       throw new ServiceUnavailableException(

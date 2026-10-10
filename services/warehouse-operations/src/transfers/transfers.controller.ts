@@ -1,5 +1,6 @@
 import { Body, Controller, Get, Param, Post, Query } from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
+import { AuthUser, CurrentUser, Role, Roles } from "@mms/shared";
 import { TransferStatus } from "../generated/prisma";
 import { CompletePickDto } from "./dto/complete-pick.dto";
 import { CreateTransferDto } from "./dto/create-transfer.dto";
@@ -16,8 +17,9 @@ export class TransfersController {
   }
 
   @Post("transfers")
-  create(@Body() dto: CreateTransferDto) {
-    return this.transfers.create(dto);
+  @Roles(Role.OWNER, Role.MANAGER)
+  create(@CurrentUser() user: AuthUser, @Body() dto: CreateTransferDto) {
+    return this.transfers.create({ ...dto, requestedById: user.id });
   }
 
   @Get("transfers/:id")
@@ -26,7 +28,8 @@ export class TransfersController {
   }
 
   @Post("pick-tasks/:id/complete")
-  completePick(@Param("id") id: string, @Body() dto: CompletePickDto) {
-    return this.transfers.completePick(id, dto);
+  @Roles(Role.OWNER, Role.MANAGER, Role.WAREHOUSE_STAFF)
+  completePick(@CurrentUser() user: AuthUser, @Param("id") id: string, @Body() dto: CompletePickDto) {
+    return this.transfers.completePick(id, { ...dto, pickedById: user.id });
   }
 }

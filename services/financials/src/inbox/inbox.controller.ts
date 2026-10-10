@@ -1,10 +1,12 @@
 import { Controller, Get, NotFoundException, Param, ParseEnumPipe, Post, Query } from "@nestjs/common";
 import { ApiQuery, ApiTags } from "@nestjs/swagger";
+import { Role, Roles } from "@mms/shared";
 import { InboxStatus } from "../generated/prisma";
 import { InboxProcessor } from "./inbox.processor";
 import { InboxRepository } from "./inbox.repository";
 
 @ApiTags("inbox")
+@Roles(Role.OWNER, Role.MANAGER, Role.ACCOUNTANT)
 @Controller("inbox")
 export class InboxController {
   constructor(
@@ -20,6 +22,7 @@ export class InboxController {
 
   /** After fixing the cause (e.g. creating the missing PO line), try posting again now. */
   @Post(":eventId/retry")
+  @Roles(Role.OWNER, Role.ACCOUNTANT)
   async retry(@Param("eventId") eventId: string) {
     const event = await this.inboxRepository.findById(eventId);
     if (!event) throw new NotFoundException(`Event ${eventId} not found`);

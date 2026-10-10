@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { formatQuantity, LocationPicker, StaffPicker, useFlash } from "@mms/ui";
+import { formatQuantity, LocationPicker, useFlash } from "@mms/ui";
 import { AppShell, type NavSection } from "../components/AppShell";
 import { ClipboardListIcon, PackageIcon } from "../components/icons";
 import { api, type ExpectedDelivery, type ExpectedDeliveryStatus } from "../lib/api";
@@ -165,7 +165,6 @@ function StartReceivingForm({
   const router = useRouter();
   const flash = useFlash();
   const [receivedAtLocation, setReceivedAtLocation] = useState("");
-  const [receivedById, setReceivedById] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -177,7 +176,6 @@ function StartReceivingForm({
       const goodsReceivedNote = await api.createGoodsReceivedNote({
         poNumber: delivery.poNumber,
         receivedAtLocation,
-        receivedById,
       });
       flash.success(`${goodsReceivedNote.goodsReceivedNoteNumber} opened — start scanning`);
       router.push(`/goods-received-notes/${goodsReceivedNote.id}`);
@@ -199,15 +197,6 @@ function StartReceivingForm({
         <label>
           Receiving warehouse
           <LocationPicker type="WAREHOUSE" required value={receivedAtLocation} onChange={setReceivedAtLocation} />
-        </label>
-        <label>
-          Received by
-          <StaffPicker
-            required
-            roles={["WAREHOUSE_STAFF", "MANAGER"]}
-            value={receivedById}
-            onChange={setReceivedById}
-          />
         </label>
       </div>
 

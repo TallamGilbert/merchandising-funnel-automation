@@ -1,31 +1,154 @@
-openapi: 3.0.3
-info:
-  title: Sales Audit Service
-  description: >
-    Scaffold only in this pass — Phase 3 — Retail per PRD Section 7. Routes
-    beyond /health are gated behind this module's feature flag and return
-    503 "not yet implemented" until the module is built. This file will be
-    expanded to the module's full contract (and regenerated from the live
-    /docs-json) when its phase begins, per NFR-4 (contract-first) and the
-    Definition of Done in CONTRIBUTING.md.
-  version: 0.1.0
-servers:
-  - url: http://localhost:3007
-tags:
-  - name: health
+# Generated from the running service: curl localhost:3007/docs-json (see CONTRIBUTING.md, NFR-4).
+openapi: 3.0.0
 paths:
   /health:
     get:
-      tags: [health]
-      summary: Liveness/readiness probe. Always reachable regardless of feature flag state.
+      operationId: HealthController_check
+      parameters: []
       responses:
-        "200":
+        '200':
           description: Service is up.
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  status: { type: string, example: ok }
-                  service: { type: string, example: sales-audit }
-                  timestamp: { type: string, format: date-time }
+      tags:
+      - health
+  /stores/{storeId}/ledger:
+    get:
+      operationId: LedgerController_get
+      parameters:
+      - name: storeId
+        required: true
+        in: path
+        schema:
+          type: string
+      - name: businessDate
+        required: true
+        in: query
+        schema:
+          type: string
+      responses:
+        '200':
+          description: ''
+      tags:
+      - ledger
+  /stores/{storeId}/daily-close:
+    get:
+      operationId: DailyCloseController_get
+      parameters:
+      - name: storeId
+        required: true
+        in: path
+        schema:
+          type: string
+      - name: businessDate
+        required: true
+        in: query
+        schema:
+          type: string
+      responses:
+        '200':
+          description: ''
+      tags:
+      - daily-close
+  /stores/{storeId}/daily-close/count:
+    post:
+      operationId: DailyCloseController_recordCount
+      parameters:
+      - name: storeId
+        required: true
+        in: path
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RecordCountDto'
+      responses:
+        '201':
+          description: ''
+      tags:
+      - daily-close
+  /stores/{storeId}/daily-close/explain:
+    post:
+      operationId: DailyCloseController_explain
+      parameters:
+      - name: storeId
+        required: true
+        in: path
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExplainDiscrepancyDto'
+      responses:
+        '201':
+          description: ''
+      tags:
+      - daily-close
+  /stores/{storeId}/daily-close/close:
+    post:
+      operationId: DailyCloseController_close
+      parameters:
+      - name: storeId
+        required: true
+        in: path
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CloseDailyDto'
+      responses:
+        '201':
+          description: ''
+      tags:
+      - daily-close
+info:
+  title: Sales Audit Service
+  description: Cash-drawer reconciliation against POS transactions (FR-7.x). Keeps
+    a running expected total from ItemSold, blocks store close until discrepancies
+    are explained.
+  version: 0.1.0
+  contact: {}
+tags: []
+servers:
+- url: http://localhost:3007
+components:
+  schemas:
+    RecordCountDto:
+      type: object
+      properties:
+        businessDate:
+          type: string
+          example: '2026-09-24'
+        actualCountedTotal:
+          type: number
+          description: Manager's physical count across all tills (FR-7.2)
+      required:
+      - businessDate
+      - actualCountedTotal
+    ExplainDiscrepancyDto:
+      type: object
+      properties:
+        businessDate:
+          type: string
+          example: '2026-09-24'
+        explanation:
+          type: string
+          description: Manager's explanation for the over/short (FR-7.4)
+      required:
+      - businessDate
+      - explanation
+    CloseDailyDto:
+      type: object
+      properties:
+        businessDate:
+          type: string
+          example: '2026-09-24'
+      required:
+      - businessDate

@@ -1,3 +1,4 @@
+export * from "./auth";
 export * from "./currency";
 export * from "./event-bus";
 export * from "./events";
