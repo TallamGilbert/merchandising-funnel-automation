@@ -11,6 +11,7 @@ const EVENT_LABEL: Record<string, string> = {
   "item-sold": "Sale",
   "item-returned": "Refund",
   "day-closed": "Day close",
+  "stock-adjusted": "Stock adjustment",
 };
 
 const STATUS_LABEL: Record<InboxStatus, string> = {
@@ -31,6 +32,8 @@ function describe(event: InboxEvent): string {
       return `Refund ${p.returnId} at ${p.storeId}`;
     case "day-closed":
       return `${p.storeId} close on ${p.businessDate}`;
+    case "stock-adjusted":
+      return `${p.reference} at ${p.locationCode}`;
     default:
       return event.eventId;
   }

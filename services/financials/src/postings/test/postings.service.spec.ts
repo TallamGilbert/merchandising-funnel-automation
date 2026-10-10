@@ -1,4 +1,10 @@
-import { DayClosedEvent, GoodsReceivedEvent, ItemReturnedEvent, ItemSoldEvent } from "@mms/shared";
+import {
+  DayClosedEvent,
+  GoodsReceivedEvent,
+  ItemReturnedEvent,
+  ItemSoldEvent,
+  StockAdjustedEvent,
+} from "@mms/shared";
 import { EntrySource } from "../../generated/prisma";
 import { JournalDraft } from "../../ledger/journal";
 import { LedgerRepository } from "../../ledger/ledger.repository";
@@ -246,6 +252,55 @@ describe("PostingsService", () => {
 
     it("books nothing for a balanced day", () => {
       expect(service.dayClosed({ ...event, discrepancyAmount: 0 })).toEqual({ entry: null });
+    });
+  });
+
+  describe("stockAdjusted (D-19)", () => {
+    const event: StockAdjustedEvent = {
+      eventId: "e5",
+      occurredAt: "2026-10-10T10:00:00.000Z",
+      kind: "STOCK_COUNT",
+      reference: "SC-1001",
+      locationCode: "WH-MAIN",
+      description: "Stock count SC-1001 — Year end",
+      adjustedById: "mgr-sam",
+      lines: [
+        { sku: "SOFA-1", productName: "Sofa", quantityDelta: -2, unitCost: 5000 },
+        { sku: "LAMP-1", productName: "Lamp", quantityDelta: 1, unitCost: 800.5 },
+      ],
+    };
+
+    it("books a net loss as inventory shrinkage", () => {
+      const plan = service.stockAdjusted(event);
+
+      expect(net(plan.entry)).toEqual({ "6200": 9199.5, "1200": -9199.5 });
+      expect(plan.entry?.source).toBe(EntrySource.STOCK_ADJUSTMENT);
+      expect(plan.entry?.sourceRef).toBe("STOCK_COUNT/SC-1001");
+      expect(plan.entry?.description).toBe("Stock count SC-1001 — Year end at WH-MAIN (shrinkage)");
+      expect(plan.entry?.lines[0].memo).toBe("SOFA-1 -2, LAMP-1 +1");
+    });
+
+    it("books a net gain back into inventory", () => {
+      const plan = service.stockAdjusted({
+        ...event,
+        kind: "MANUAL",
+        reference: "txn-9",
+        lines: [{ sku: "SOFA-1", productName: "Sofa", quantityDelta: 3, unitCost: 5000 }],
+      });
+      expect(net(plan.entry)).toEqual({ "1200": 15000, "6200": -15000 });
+      expect(plan.entry?.sourceRef).toBe("MANUAL/txn-9");
+    });
+
+    it("books nothing when gains and losses cancel out", () => {
+      expect(
+        service.stockAdjusted({
+          ...event,
+          lines: [
+            { sku: "A", productName: "A", quantityDelta: -1, unitCost: 100 },
+            { sku: "B", productName: "B", quantityDelta: 2, unitCost: 50 },
+          ],
+        }),
+      ).toEqual({ entry: null });
     });
   });
 });

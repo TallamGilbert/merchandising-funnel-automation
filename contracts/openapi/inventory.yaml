@@ -14,6 +14,7 @@ tags:
   - name: health
   - name: products
   - name: stock-levels
+  - name: stock-counts
   - name: valuation
 paths:
   /health:
@@ -42,6 +43,10 @@ paths:
           name: q
           description: Search — matches SKU or name.
           schema: { type: string, maxLength: 100 }
+        - in: query
+          name: category
+          description: Exact category, case-insensitive.
+          schema: { type: string }
         - $ref: "#/components/parameters/ExportFormat"
       responses:
         "200":
@@ -138,8 +143,11 @@ paths:
     post:
       tags: [stock-levels]
       summary: >
-        Manual stock adjustment (FR-4.8) — e.g. correcting a count after a
-        physical audit. Writes an InventoryTransaction of type ADJUSTMENT.
+        Manual stock adjustment (FR-4.8) — a one-off correction; whole
+        counts go through /stock-counts. Writes the level change and an
+        InventoryTransaction of type ADJUSTMENT together, and publishes
+        StockAdjusted (kind MANUAL) so Financials books the value (D-19).
+        OWNER or MANAGER.
       parameters:
         - $ref: "#/components/parameters/Sku"
       requestBody:
@@ -187,6 +195,175 @@ paths:
               schema: { type: string, format: binary }
             application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
               schema: { type: string, format: binary }
+  /stock-counts:
+    get:
+      tags: [stock-counts]
+      summary: Stock counts, newest first, with progress and variance totals (D-19)
+      parameters:
+        - in: query
+          name: status
+          schema: { $ref: "#/components/schemas/StockCountStatus" }
+        - in: query
+          name: locationCode
+          schema: { type: string }
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+        - in: query
+          name: q
+          description: Search — matches the count number.
+          schema: { type: string, maxLength: 100 }
+        - $ref: "#/components/parameters/ExportFormat"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, total, page, pageSize]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/StockCount" }
+                  total: { type: integer, description: Rows matching the filters }
+                  page: { type: integer }
+                  pageSize: { type: integer }
+            text/csv:
+              schema: { type: string, format: binary }
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema: { type: string, format: binary }
+    post:
+      tags: [stock-counts]
+      summary: >
+        Start a count (OWNER or MANAGER). FULL counts every product held at
+        the location; CYCLE counts the given SKUs or category. Each line
+        freezes the product's current on-hand as its expected quantity. Only
+        one OPEN or SUBMITTED count per location (409 otherwise).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateStockCountDto" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/StockCountDetail" }
+        "400": { description: Scope doesn't match the type, or nothing to count }
+        "404": { description: Unknown SKU }
+        "409": { description: Another count is still active at this location }
+  /stock-counts/suggestions:
+    get:
+      tags: [stock-counts]
+      summary: >
+        What to cycle-count next at a location: products in stock there,
+        never counted first, then longest since their last posted count,
+        ties by stock value.
+      parameters:
+        - in: query
+          name: locationCode
+          required: true
+          schema: { type: string }
+        - in: query
+          name: limit
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/CountSuggestion" }
+  /stock-counts/{id}:
+    get:
+      tags: [stock-counts]
+      summary: >
+        A count and its lines. On an OPEN blind count, anyone but an OWNER or
+        MANAGER gets expectedQty, variance and the variance totals as null
+        (expectedHidden true).
+      parameters:
+        - $ref: "#/components/parameters/StockCountId"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/StockCountDetail" }
+        "404": { description: Not found }
+  /stock-counts/{id}/lines/{sku}:
+    put:
+      tags: [stock-counts]
+      summary: >
+        Record what was found for a SKU (OWNER, MANAGER or WAREHOUSE_STAFF;
+        count must be OPEN). A repeat entry replaces the earlier one. A SKU
+        not on the count is added, expecting its current on-hand.
+      parameters:
+        - $ref: "#/components/parameters/StockCountId"
+        - $ref: "#/components/parameters/Sku"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RecordCountDto" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/StockCountDetail" }
+        "404": { description: Unknown count or SKU }
+        "409": { description: The count is no longer open }
+  /stock-counts/{id}/submit:
+    post:
+      tags: [stock-counts]
+      summary: OPEN -> SUBMITTED, ready for a manager to review (OWNER, MANAGER or WAREHOUSE_STAFF)
+      parameters:
+        - $ref: "#/components/parameters/StockCountId"
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SubmitStockCountDto" }
+      responses:
+        "201":
+          description: Submitted
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/StockCountDetail" }
+        "400": { description: Lines are uncounted and uncounted is reject }
+        "409": { description: Not open }
+  /stock-counts/{id}/post:
+    post:
+      tags: [stock-counts]
+      summary: >
+        SUBMITTED -> POSTED (OWNER or MANAGER). In one transaction, adds each
+        counted line's variance (counted - expected) to current on-hand and
+        writes an ADJUSTMENT transaction referencing the count number; then
+        publishes StockAdjusted (kind STOCK_COUNT) for Financials. Refuses
+        with 409, changing nothing, if a line would go below zero.
+      parameters:
+        - $ref: "#/components/parameters/StockCountId"
+      responses:
+        "201":
+          description: Posted
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/StockCountDetail" }
+        "409": { description: Not submitted, or a line would go negative }
+  /stock-counts/{id}/cancel:
+    post:
+      tags: [stock-counts]
+      summary: Cancel an OPEN or SUBMITTED count; nothing is adjusted (OWNER or MANAGER)
+      parameters:
+        - $ref: "#/components/parameters/StockCountId"
+      responses:
+        "201":
+          description: Cancelled
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/StockCountDetail" }
+        "409": { description: Already posted or cancelled }
   /valuation:
     get:
       tags: [valuation]
@@ -225,6 +402,11 @@ components:
       name: to
       description: YYYY-MM-DD, inclusive (UTC day).
       schema: { type: string, format: date }
+    StockCountId:
+      in: path
+      name: id
+      required: true
+      schema: { type: string, format: uuid }
     Sku:
       in: path
       name: sku
@@ -243,6 +425,7 @@ components:
         heightCm: { type: number, format: float, nullable: true }
         weightKg: { type: number, format: float, nullable: true }
         unitCost: { type: number, format: float }
+        category: { type: string, nullable: true, example: Sofas }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
     ProductDetail:
@@ -258,6 +441,93 @@ components:
               type: array
               description: Bin locations confirmed by Warehouse Operations (FR-5.7).
               items: { $ref: "#/components/schemas/BinLocation" }
+    StockCountType:
+      type: string
+      enum: [FULL, CYCLE]
+    StockCountStatus:
+      type: string
+      enum: [OPEN, SUBMITTED, POSTED, CANCELLED]
+    StockCount:
+      type: object
+      description: A count with progress and variance totals (variance values at each line's unit cost, KES).
+      properties:
+        id: { type: string, format: uuid }
+        countNumber: { type: string, example: SC-1001 }
+        locationCode: { type: string, example: WH-MAIN }
+        type: { $ref: "#/components/schemas/StockCountType" }
+        status: { $ref: "#/components/schemas/StockCountStatus" }
+        blind: { type: boolean }
+        notes: { type: string, nullable: true }
+        createdById: { type: string }
+        submittedById: { type: string, nullable: true }
+        submittedAt: { type: string, format: date-time, nullable: true }
+        postedById: { type: string, nullable: true }
+        postedAt: { type: string, format: date-time, nullable: true }
+        cancelledById: { type: string, nullable: true }
+        cancelledAt: { type: string, format: date-time, nullable: true }
+        createdAt: { type: string, format: date-time }
+        lineCount: { type: integer }
+        countedLines: { type: integer }
+        linesWithVariance: { type: integer, nullable: true }
+        unitsOver: { type: integer, nullable: true }
+        unitsShort: { type: integer, nullable: true }
+        varianceValue: { type: number, nullable: true }
+    StockCountLine:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        sku: { type: string }
+        productName: { type: string }
+        expectedQty: { type: integer, nullable: true, description: null while hidden on a blind count }
+        countedQty: { type: integer, nullable: true, description: null until counted }
+        variance: { type: integer, nullable: true }
+        countedById: { type: string, nullable: true }
+        countedAt: { type: string, format: date-time, nullable: true }
+        unitCost: { type: number, format: float }
+    StockCountDetail:
+      allOf:
+        - $ref: "#/components/schemas/StockCount"
+        - type: object
+          properties:
+            expectedHidden: { type: boolean }
+            lines:
+              type: array
+              items: { $ref: "#/components/schemas/StockCountLine" }
+    CreateStockCountDto:
+      type: object
+      required: [locationCode, type]
+      properties:
+        locationCode: { type: string, example: WH-MAIN }
+        type: { $ref: "#/components/schemas/StockCountType" }
+        skus:
+          type: array
+          maxItems: 500
+          items: { type: string }
+          description: CYCLE only — the SKUs to count.
+        category: { type: string, description: CYCLE only — every product in this category. }
+        blind: { type: boolean, default: true }
+        notes: { type: string, maxLength: 500 }
+    RecordCountDto:
+      type: object
+      required: [countedQty]
+      properties:
+        countedQty: { type: integer, minimum: 0 }
+    SubmitStockCountDto:
+      type: object
+      properties:
+        uncounted:
+          type: string
+          enum: [reject, skip, zero]
+          default: reject
+          description: Refuse while lines are uncounted, leave them out, or record them as 0 found.
+    CountSuggestion:
+      type: object
+      properties:
+        sku: { type: string }
+        productName: { type: string }
+        onHand: { type: integer }
+        stockValue: { type: number }
+        lastCountedAt: { type: string, format: date-time, nullable: true }
     CreateProductDto:
       type: object
       required: [sku, name, unitCost]
@@ -270,6 +540,10 @@ components:
         heightCm: { type: number, format: float }
         weightKg: { type: number, format: float }
         unitCost: { type: number, format: float }
+        category:
+          type: string
+          maxLength: 60
+          description: Grouping for cycle counts and sales-by-category reports.
     UpdateProductDto:
       type: object
       properties:

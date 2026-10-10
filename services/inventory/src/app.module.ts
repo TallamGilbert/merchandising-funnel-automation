@@ -6,6 +6,7 @@ import { HealthModule } from "./health/health.module";
 import { PrismaModule } from "./prisma/prisma.module";
 import { ProductsModule } from "./products/products.module";
 import { StockModule } from "./stock/stock.module";
+import { StockCountsModule } from "./stock-counts/stock-counts.module";
 import { ValuationModule } from "./valuation/valuation.module";
 
 @Module({
@@ -15,6 +16,7 @@ import { ValuationModule } from "./valuation/valuation.module";
     HealthModule,
     StockModule,
     ProductsModule,
+    StockCountsModule,
     ValuationModule,
     EventsModule,
     InventoryGrpcModule,

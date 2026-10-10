@@ -1,11 +1,12 @@
 import { Body, Controller, Get, Param, Patch, Post, Put, Query } from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
-import { Exportable, ListQueryDto, Role, Roles } from "@mms/shared";
+import { AuthUser, CurrentUser, Exportable, Role, Roles } from "@mms/shared";
 import { Product } from "../generated/prisma";
 import { CreateProductDto } from "./dto/create-product.dto";
 import { SetBinLocationDto } from "./dto/set-bin-location.dto";
 import { StockAdjustmentDto } from "./dto/stock-adjustment.dto";
 import { UpdateProductDto } from "./dto/update-product.dto";
+import { ListProductsQuery } from "./list-products.query";
 import { ProductsService } from "./products.service";
 
 @ApiTags("products")
@@ -17,13 +18,14 @@ export class ProductsController {
   @Exportable<Product>("products", [
     { header: "SKU", value: (p) => p.sku },
     { header: "Name", value: (p) => p.name },
+    { header: "Category", value: (p) => p.category },
     { header: "Unit cost (KES)", value: (p) => Number(p.unitCost) },
     { header: "Length (cm)", value: (p) => (p.lengthCm === null ? null : Number(p.lengthCm)) },
     { header: "Width (cm)", value: (p) => (p.widthCm === null ? null : Number(p.widthCm)) },
     { header: "Height (cm)", value: (p) => (p.heightCm === null ? null : Number(p.heightCm)) },
     { header: "Weight (kg)", value: (p) => (p.weightKg === null ? null : Number(p.weightKg)) },
   ])
-  list(@Query() query: ListQueryDto) {
+  list(@Query() query: ListProductsQuery) {
     return this.products.list(query);
   }
 
@@ -57,7 +59,7 @@ export class ProductsController {
 
   @Post(":sku/adjustments")
   @Roles(Role.OWNER, Role.MANAGER)
-  adjust(@Param("sku") sku: string, @Body() dto: StockAdjustmentDto) {
-    return this.products.adjust(sku, dto);
+  adjust(@CurrentUser() user: AuthUser, @Param("sku") sku: string, @Body() dto: StockAdjustmentDto) {
+    return this.products.adjust(sku, dto, user.id);
   }
 }
