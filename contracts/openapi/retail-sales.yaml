@@ -13,7 +13,38 @@ paths:
   /products:
     get:
       operationId: ProductsController_list
-      parameters: []
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: 1-based page number
+        schema:
+          minimum: 1
+          default: 1
+          type: number
+      - name: pageSize
+        required: false
+        in: query
+        schema:
+          minimum: 1
+          maximum: 100
+          default: 20
+          type: number
+      - name: q
+        required: false
+        in: query
+        description: Free-text search; each endpoint documents what it matches
+        schema:
+          type: string
+      - name: format
+        required: false
+        in: query
+        description: Download every matching row instead of a page
+        schema:
+          enum:
+          - csv
+          - xlsx
+          type: string
       responses:
         '200':
           description: ''
@@ -105,17 +136,75 @@ paths:
     get:
       operationId: TransactionsController_list
       parameters:
+      - name: page
+        required: false
+        in: query
+        description: 1-based page number
+        schema:
+          minimum: 1
+          default: 1
+          type: number
+      - name: pageSize
+        required: false
+        in: query
+        schema:
+          minimum: 1
+          maximum: 100
+          default: 20
+          type: number
+      - name: q
+        required: false
+        in: query
+        description: Free-text search; each endpoint documents what it matches
+        schema:
+          type: string
+      - name: format
+        required: false
+        in: query
+        description: Download every matching row instead of a page
+        schema:
+          enum:
+          - csv
+          - xlsx
+          type: string
+      - name: from
+        required: false
+        in: query
+        description: YYYY-MM-DD, inclusive
+        schema:
+          type: string
+      - name: to
+        required: false
+        in: query
+        description: YYYY-MM-DD, inclusive
+        schema:
+          type: string
       - name: storeId
         required: false
         in: query
         schema:
+          example: STORE-1
           type: string
-      - name: limit
+      - name: registerId
         required: false
         in: query
-        description: Default 50, max 200
         schema:
-          type: number
+          example: REG-1
+          type: string
+      - name: cashierId
+        required: false
+        in: query
+        schema:
+          example: cashier-amy
+          type: string
+      - name: status
+        required: false
+        in: query
+        schema:
+          enum:
+          - COMPLETED
+          - RETURNED
+          type: string
       responses:
         '200':
           description: ''
