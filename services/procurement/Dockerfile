@@ -4,7 +4,9 @@
 # (docker-compose.yml does this for you — see the root README.)
 
 FROM node:20-slim AS base
-RUN corepack enable
+# Pin pnpm: an unpinned corepack pulls the newest pnpm, which refuses to run
+# Prisma/Nest install scripts without an explicit approve-builds list.
+RUN corepack enable && corepack prepare pnpm@9.15.9 --activate
 WORKDIR /workspace
 
 # ---- deps: install the full workspace so pnpm can resolve @mms/shared -----
