@@ -80,6 +80,30 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Supplier" }
+  /suppliers/performance:
+    get:
+      tags: [suppliers]
+      summary: >
+        D-20 — on-time delivery per supplier for deliveries made between from
+        and to: deliveries, on time, late, on-time rate (0–1) and average days
+        late across late deliveries. Least reliable first. OWNER, MANAGER,
+        BUYER or ACCOUNTANT.
+      parameters:
+        - { in: query, name: from, required: true, schema: { type: string, format: date } }
+        - { in: query, name: to, required: true, schema: { type: string, format: date } }
+        - $ref: "#/components/parameters/ExportFormat"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/SupplierOnTime" }
+            text/csv:
+              schema: { type: string, format: binary }
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema: { type: string, format: binary }
   /suppliers/{id}:
     get:
       tags: [suppliers]
@@ -262,6 +286,16 @@ components:
       required: true
       schema: { type: string, format: uuid }
   schemas:
+    SupplierOnTime:
+      type: object
+      properties:
+        supplierId: { type: string }
+        supplierName: { type: string }
+        deliveries: { type: integer }
+        onTime: { type: integer }
+        late: { type: integer }
+        onTimeRate: { type: number }
+        averageDaysLate: { type: number, nullable: true }
     SupplierStatus:
       type: string
       enum: [ACTIVE, ARCHIVED]

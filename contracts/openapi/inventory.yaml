@@ -11,6 +11,7 @@ info:
 servers:
   - url: http://localhost:3003
 tags:
+  - name: reports
   - name: health
   - name: products
   - name: stock-levels
@@ -364,6 +365,34 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/StockCountDetail" }
         "409": { description: Already posted or cancelled }
+  /reports/stock-movement:
+    get:
+      tags: [reports]
+      summary: >
+        D-20 — slow movers and dead stock. Every product held (on hand > 0),
+        with units sold over the window: DEAD if none sold, SLOW if days of
+        cover (on hand ÷ average daily sales) exceed slowAfterDays, else OK.
+        Dead first by stock value, then slowest first. OWNER, MANAGER,
+        BUYER or ACCOUNTANT.
+      parameters:
+        - { in: query, name: locationCode, schema: { type: string } }
+        - { in: query, name: category, description: Exact category, case-insensitive., schema: { type: string } }
+        - { in: query, name: days, schema: { type: integer, minimum: 7, maximum: 365, default: 90 } }
+        - { in: query, name: slowAfterDays, schema: { type: integer, minimum: 1, default: 90 } }
+        - { in: query, name: status, schema: { type: string, enum: [DEAD, SLOW, OK] } }
+        - $ref: "#/components/parameters/ExportFormat"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/MovementRow" }
+            text/csv:
+              schema: { type: string, format: binary }
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema: { type: string, format: binary }
   /valuation:
     get:
       tags: [valuation]
@@ -413,6 +442,20 @@ components:
       required: true
       schema: { type: string }
   schemas:
+    MovementRow:
+      type: object
+      properties:
+        sku: { type: string }
+        productName: { type: string }
+        category: { type: string, nullable: true }
+        locationCode: { type: string }
+        onHand: { type: integer }
+        unitCost: { type: number }
+        stockValue: { type: number }
+        unitsSold: { type: integer, description: Within the window }
+        lastSaleAt: { type: string, format: date-time, nullable: true }
+        daysOfCover: { type: integer, nullable: true, description: null when nothing sold }
+        status: { type: string, enum: [DEAD, SLOW, OK] }
     Product:
       type: object
       properties:
