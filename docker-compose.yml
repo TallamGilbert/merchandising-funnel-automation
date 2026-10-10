@@ -16,6 +16,9 @@ x-common-service-env: &common-service-env
   FEATURE_SALES_AUDIT_ENABLED: ${FEATURE_SALES_AUDIT_ENABLED}
   FEATURE_FINANCIALS_ENABLED: ${FEATURE_FINANCIALS_ENABLED}
   FEATURE_DIRECTORY_ENABLED: ${FEATURE_DIRECTORY_ENABLED:-true}
+  AUTH_JWT_SECRET: ${AUTH_JWT_SECRET}
+  CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:*}
+  SWAGGER_ENABLED: ${SWAGGER_ENABLED:-true}
 
 x-depends-on-infra: &depends-on-infra
   postgres:
@@ -209,6 +212,12 @@ services:
       PORT: ${DIRECTORY_PORT:-3009}
       DATABASE_URL: postgresql://directory_svc:${DIRECTORY_DB_PASSWORD}@postgres:5432/directory?schema=public
       DIRECTORY_SEED_DEMO: ${DIRECTORY_SEED_DEMO:-true}
+      DEMO_STAFF_PASSWORD: ${DEMO_STAFF_PASSWORD:-}
+      BOOTSTRAP_OWNER_ID: ${BOOTSTRAP_OWNER_ID:-}
+      BOOTSTRAP_OWNER_PASSWORD: ${BOOTSTRAP_OWNER_PASSWORD:-}
+      BOOTSTRAP_OWNER_NAME: ${BOOTSTRAP_OWNER_NAME:-}
+      COOKIE_SECURE: ${COOKIE_SECURE:-true}
+      COOKIE_DOMAIN: ${COOKIE_DOMAIN:-}
     ports:
       - "${DIRECTORY_PORT:-3009}:${DIRECTORY_PORT:-3009}"
     working_dir: /workspace/services/directory

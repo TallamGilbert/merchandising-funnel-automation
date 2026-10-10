@@ -76,8 +76,11 @@ Then on the VPS:
 cd /opt/mms
 cp .env.production.example .env && chmod 600 .env
 # replace every CHANGE_ME with:  openssl rand -hex 24
+# set CORS_ORIGINS and COOKIE_DOMAIN to your DOMAIN, and pick BOOTSTRAP_OWNER_ID
 nano .env
 ```
+
+`deploy/vps/deploy.sh` refuses to run while any `CHANGE_ME` is left.
 
 > The DB passwords are applied only when the Postgres volume is first
 > created. Set them **before** the first deploy.
@@ -99,7 +102,13 @@ writes `deploy/cloudflared/config.yml`. The credentials stay in
 ```bash
 cd /opt/mms && bash deploy/vps/deploy.sh
 curl https://directory-api.example.com/health      # from anywhere → 200
+curl https://procurement-api.example.com/purchase-orders   # → 401 without a session
 ```
+
+Then open any app (e.g. `https://dashboard.example.com`) and sign in as
+`BOOTSTRAP_OWNER_ID` with `BOOTSTRAP_OWNER_PASSWORD`. You'll be asked to choose
+a new password; after that, add your staff on the Store Manager Dashboard's
+Staff page (each new person gets a one-time temporary password to hand over).
 
 The first build compiles 9 images and takes a while. Later deploys reuse the layer cache.
 
@@ -156,11 +165,10 @@ Roll back a frontend: `cd frontends/<app> && pnpm exec wrangler rollback`.
 
 ## Known gaps before real production use
 
-- **The APIs have no authentication.** Anyone who finds `sales-api.$DOMAIN`
-  can read and write data. Fine for a demo; not for a real business. The
-  quickest stopgap is Cloudflare Access on the frontend and API hostnames.
-- **CORS allows any origin** (`app.enableCors()` in each service). Once auth
-  exists, restrict it to `https://*.$DOMAIN`.
+- **Staff see every store's data.** Permissions depend on role only (D-17);
+  limiting cashiers and managers to their own store is not built yet.
+- **Changing `AUTH_JWT_SECRET` signs everyone out**, and every service must get
+  the same value (they all read the one `.env`).
 - **Schema changes use `prisma db push`** (no committed migrations yet). In
   production the `--accept-data-loss` flag is removed, so a change that would
   drop data makes the service fail to start instead of losing the data. Move to
