@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
@@ -8,7 +9,7 @@ import {
   Query,
 } from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
-import { Exportable, ListQueryDto, Role, Roles } from "@mms/shared";
+import { DateRangeQueryDto, Exportable, ListQueryDto, Role, Roles } from "@mms/shared";
 import { Supplier, SupplierDeliveryRecord } from "../generated/prisma";
 import { CreateSupplierDeliveryRecordDto } from "./dto/create-delivery-record.dto";
 import { CreateSupplierProductDto } from "./dto/create-supplier-product.dto";
@@ -16,6 +17,7 @@ import { CreateSupplierDto } from "./dto/create-supplier.dto";
 import { UpdateSupplierProductDto } from "./dto/update-supplier-product.dto";
 import { UpdateSupplierDto } from "./dto/update-supplier.dto";
 import { ListSuppliersQuery } from "./dto/list-suppliers.query";
+import { OnTimeRow } from "./on-time";
 import { SuppliersService } from "./suppliers.service";
 
 @ApiTags("suppliers")
@@ -42,6 +44,22 @@ export class SuppliersController {
   @Roles(Role.OWNER, Role.MANAGER, Role.BUYER)
   create(@Body() dto: CreateSupplierDto) {
     return this.suppliers.create(dto);
+  }
+
+  /** Above suppliers/:id so "performance" isn't read as an id. */
+  @Get("suppliers/performance")
+  @Roles(Role.OWNER, Role.MANAGER, Role.BUYER, Role.ACCOUNTANT)
+  @Exportable<OnTimeRow>("supplier-on-time", [
+    { header: "Supplier", value: (r) => r.supplierName },
+    { header: "Deliveries", value: (r) => r.deliveries },
+    { header: "On time", value: (r) => r.onTime },
+    { header: "Late", value: (r) => r.late },
+    { header: "On-time rate", value: (r) => r.onTimeRate },
+    { header: "Average days late", value: (r) => r.averageDaysLate },
+  ])
+  onTime(@Query() query: DateRangeQueryDto) {
+    if (!query.from || !query.to) throw new BadRequestException("from and to are required (YYYY-MM-DD)");
+    return this.suppliers.onTime(query);
   }
 
   @Get("suppliers/by-sku/:sku")

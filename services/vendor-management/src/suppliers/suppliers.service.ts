@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
-import { ListQueryDto, pageArgs, paged, searchAny } from "@mms/shared";
+import { DateRangeQueryDto, dateRange, ListQueryDto, pageArgs, paged, searchAny } from "@mms/shared";
 import { SupplierStatus } from "../generated/prisma";
 import { PrismaService } from "../prisma/prisma.service";
 import { CreateSupplierDeliveryRecordDto } from "./dto/create-delivery-record.dto";
@@ -8,6 +8,7 @@ import { CreateSupplierDto } from "./dto/create-supplier.dto";
 import { ListSuppliersQuery } from "./dto/list-suppliers.query";
 import { UpdateSupplierProductDto } from "./dto/update-supplier-product.dto";
 import { UpdateSupplierDto } from "./dto/update-supplier.dto";
+import { onTimePerformance } from "./on-time";
 
 @Injectable()
 export class SuppliersService {
@@ -20,6 +21,21 @@ export class SuppliersService {
       this.prisma.supplier.count({ where }),
     ]);
     return paged(items, total, query);
+  }
+
+  /** D-20 — on-time delivery per supplier for deliveries made between from and to. */
+  async onTime(query: DateRangeQueryDto) {
+    const deliveries = await this.prisma.supplierDeliveryRecord.findMany({
+      where: { actualDeliveryDate: dateRange(query.from, query.to) },
+      select: {
+        supplierId: true,
+        expectedDate: true,
+        actualDeliveryDate: true,
+        onTime: true,
+        supplier: { select: { name: true } },
+      },
+    });
+    return onTimePerformance(deliveries.map(({ supplier, ...d }) => ({ ...d, supplierName: supplier.name })));
   }
 
   async create(dto: CreateSupplierDto) {
