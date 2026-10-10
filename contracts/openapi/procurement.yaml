@@ -92,16 +92,13 @@ paths:
     post:
       tags: [purchase-orders]
       summary: >
-        Pending Approval -> Approved (FR-2.3, D-1). Requires MANAGER role
-        below PO_APPROVAL_THRESHOLD_KES, OWNER role at/above it. Publishes
-        PurchaseOrderApproved on success (FR-2.6).
+        Pending Approval -> Approved (FR-2.3, D-1). The signed-in user is
+        the approver and their role comes from the session (D-16): MANAGER
+        below PO_APPROVAL_THRESHOLD_KES, OWNER at/above it; any other role
+        gets 403. No request body. Publishes PurchaseOrderApproved on success
+        (FR-2.6).
       parameters:
         - $ref: "#/components/parameters/PurchaseOrderId"
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: "#/components/schemas/ApprovePurchaseOrderDto" }
       responses:
         "200":
           description: OK
@@ -249,10 +246,10 @@ components:
         updatedAt: { type: string, format: date-time }
     CreatePurchaseOrderDto:
       type: object
-      required: [supplierId, requestedById, lines]
+      description: The signed-in user is recorded as requestedById (D-16).
+      required: [supplierId, lines]
       properties:
         supplierId: { type: string, format: uuid }
-        requestedById: { type: string }
         lines:
           type: array
           items:
@@ -261,12 +258,6 @@ components:
             properties:
               sku: { type: string }
               quantityOrdered: { type: integer }
-    ApprovePurchaseOrderDto:
-      type: object
-      required: [approvedById, approverRole]
-      properties:
-        approvedById: { type: string }
-        approverRole: { type: string, enum: [MANAGER, OWNER] }
     ReorderSuggestion:
       type: object
       properties:

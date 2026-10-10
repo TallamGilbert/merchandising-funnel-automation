@@ -343,19 +343,19 @@ components:
         binCode: { type: string, description: Omit to run automatic selection. }
     CompletePutawayDto:
       type: object
-      required: [completedById, scannedBinCode]
+      description: The signed-in user is recorded as completedById (D-16).
+      required: [scannedBinCode]
       properties:
-        completedById: { type: string }
         scannedBinCode: { type: string }
     CreateTransferDto:
       type: object
-      required: [sku, quantity, fromLocationCode, toLocationCode, requestedById]
+      description: OWNER or MANAGER only; the signed-in user is recorded as requestedById (D-16, D-17).
+      required: [sku, quantity, fromLocationCode, toLocationCode]
       properties:
         sku: { type: string }
         quantity: { type: integer, minimum: 1 }
         fromLocationCode: { type: string, example: WH-MAIN }
         toLocationCode: { type: string, example: STORE-1 }
-        requestedById: { type: string }
     Transfer:
       type: object
       properties:
@@ -384,7 +384,7 @@ components:
         pickedAt: { type: string, format: date-time, nullable: true }
     CompletePickDto:
       type: object
-      required: [pickedById, scannedBinCode]
+      description: The signed-in user is recorded as pickedById (D-16).
+      required: [scannedBinCode]
       properties:
-        pickedById: { type: string }
         scannedBinCode: { type: string }

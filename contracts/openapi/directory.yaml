@@ -171,6 +171,68 @@ paths:
           description: ''
       tags:
       - staff
+  /staff/{id}/reset-password:
+    post:
+      operationId: StaffController_resetPassword
+      parameters:
+      - name: id
+        required: true
+        in: path
+        schema:
+          type: string
+      responses:
+        '201':
+          description: ''
+      tags:
+      - staff
+  /auth/login:
+    post:
+      operationId: AuthController_login
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginDto'
+      responses:
+        '200':
+          description: ''
+      tags:
+      - auth
+  /auth/logout:
+    post:
+      operationId: AuthController_logout
+      parameters: []
+      responses:
+        '204':
+          description: ''
+      tags:
+      - auth
+  /auth/me:
+    get:
+      operationId: AuthController_me
+      parameters: []
+      responses:
+        '200':
+          description: ''
+      tags:
+      - auth
+  /auth/change-password:
+    post:
+      operationId: AuthController_changePassword
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChangePasswordDto'
+      responses:
+        '200':
+          description: ''
+      tags:
+      - auth
 info:
   title: Directory Service
   description: Reference directory of staff (with roles), stores/warehouses and registers
@@ -236,6 +298,8 @@ components:
           enum:
           - OWNER
           - MANAGER
+          - BUYER
+          - ACCOUNTANT
           - CASHIER
           - WAREHOUSE_STAFF
         locationCode:
@@ -256,6 +320,8 @@ components:
           enum:
           - OWNER
           - MANAGER
+          - BUYER
+          - ACCOUNTANT
           - CASHIER
           - WAREHOUSE_STAFF
         locationCode:
@@ -264,3 +330,26 @@ components:
           description: null clears the home location
         active:
           type: boolean
+    LoginDto:
+      type: object
+      properties:
+        staffId:
+          type: string
+          example: mgr-sam
+          description: Staff id
+        password:
+          type: string
+      required:
+      - staffId
+      - password
+    ChangePasswordDto:
+      type: object
+      properties:
+        currentPassword:
+          type: string
+        newPassword:
+          type: string
+          minLength: 8
+      required:
+      - currentPassword
+      - newPassword

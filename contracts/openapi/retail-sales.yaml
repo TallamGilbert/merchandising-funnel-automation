@@ -1,31 +1,347 @@
-openapi: 3.0.3
-info:
-  title: Retail Sales (POS) Service
-  description: >
-    Scaffold only in this pass — Phase 3 — Retail per PRD Section 7. Routes
-    beyond /health are gated behind this module's feature flag and return
-    503 "not yet implemented" until the module is built. This file will be
-    expanded to the module's full contract (and regenerated from the live
-    /docs-json) when its phase begins, per NFR-4 (contract-first) and the
-    Definition of Done in CONTRIBUTING.md.
-  version: 0.1.0
-servers:
-  - url: http://localhost:3006
-tags:
-  - name: health
+# Generated from the running service: curl localhost:3006/docs-json (see CONTRIBUTING.md, NFR-4).
+openapi: 3.0.0
 paths:
   /health:
     get:
-      tags: [health]
-      summary: Liveness/readiness probe. Always reachable regardless of feature flag state.
+      operationId: HealthController_check
+      parameters: []
       responses:
-        "200":
+        '200':
           description: Service is up.
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  status: { type: string, example: ok }
-                  service: { type: string, example: retail-sales }
-                  timestamp: { type: string, format: date-time }
+      tags:
+      - health
+  /products:
+    get:
+      operationId: ProductsController_list
+      parameters: []
+      responses:
+        '200':
+          description: ''
+      tags:
+      - products
+    post:
+      operationId: ProductsController_create
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateProductDto'
+      responses:
+        '201':
+          description: ''
+      tags:
+      - products
+  /products/{sku}:
+    get:
+      operationId: ProductsController_findOne
+      parameters:
+      - name: sku
+        required: true
+        in: path
+        schema:
+          type: string
+      responses:
+        '200':
+          description: ''
+      tags:
+      - products
+    patch:
+      operationId: ProductsController_update
+      parameters:
+      - name: sku
+        required: true
+        in: path
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateProductDto'
+      responses:
+        '200':
+          description: ''
+      tags:
+      - products
+  /products/{sku}/promotions:
+    post:
+      operationId: ProductsController_addPromotion
+      parameters:
+      - name: sku
+        required: true
+        in: path
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePromotionDto'
+      responses:
+        '201':
+          description: ''
+      tags:
+      - products
+  /checkout:
+    post:
+      operationId: CheckoutController_process
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CheckoutDto'
+      responses:
+        '201':
+          description: ''
+      tags:
+      - checkout
+  /transactions:
+    get:
+      operationId: TransactionsController_list
+      parameters:
+      - name: storeId
+        required: false
+        in: query
+        schema:
+          type: string
+      - name: limit
+        required: false
+        in: query
+        description: Default 50, max 200
+        schema:
+          type: number
+      responses:
+        '200':
+          description: ''
+      tags:
+      - transactions
+  /transactions/{id}:
+    get:
+      operationId: TransactionsController_findOne
+      parameters:
+      - name: id
+        required: true
+        in: path
+        schema:
+          type: string
+      responses:
+        '200':
+          description: ''
+      tags:
+      - transactions
+  /returns:
+    post:
+      operationId: ReturnsController_process
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateReturnDto'
+      responses:
+        '201':
+          description: ''
+      tags:
+      - returns
+  /stores/{storeId}/expected-total:
+    get:
+      operationId: ExpectedTotalController_get
+      parameters:
+      - name: storeId
+        required: true
+        in: path
+        schema:
+          type: string
+      - name: businessDate
+        required: true
+        in: query
+        schema:
+          type: string
+      responses:
+        '200':
+          description: ''
+      tags:
+      - expected-total
+  /stores/{storeId}/sales-summary:
+    get:
+      operationId: SalesSummaryController_get
+      parameters:
+      - name: storeId
+        required: true
+        in: path
+        schema:
+          type: string
+      - name: from
+        required: true
+        in: query
+        description: First business date, YYYY-MM-DD
+        schema:
+          type: string
+      - name: to
+        required: true
+        in: query
+        description: Last business date (inclusive), YYYY-MM-DD
+        schema:
+          type: string
+      responses:
+        '200':
+          description: ''
+      tags:
+      - sales-summary
+info:
+  title: Retail Sales (POS) Service
+  description: Point-of-sale transaction engine (FR-6.x). Checks and reserves stock
+    with Inventory over gRPC before completing a sale, publishes ItemSold/ItemReturned.
+  version: 0.1.0
+  contact: {}
+tags: []
+servers:
+- url: http://localhost:3006
+components:
+  schemas:
+    CreateProductDto:
+      type: object
+      properties:
+        sku:
+          type: string
+          example: SKU-1
+        name:
+          type: string
+          example: Oak Chair
+        unitPrice:
+          type: number
+          description: Retail selling price per unit
+          example: 149.99
+        taxRatePct:
+          type: number
+          description: Sales tax rate, as a percentage
+          example: 7.5
+      required:
+      - sku
+      - name
+      - unitPrice
+    UpdateProductDto:
+      type: object
+      properties:
+        name:
+          type: string
+          example: Oak Chair
+        unitPrice:
+          type: number
+          description: Retail selling price per unit
+          example: 149.99
+        taxRatePct:
+          type: number
+          description: Sales tax rate, as a percentage
+          example: 7.5
+    CreatePromotionDto:
+      type: object
+      properties:
+        discountPct:
+          type: number
+          description: Percentage discount off the subtotal
+          example: 15
+        startsAt:
+          type: string
+          example: '2026-09-01T00:00:00.000Z'
+        endsAt:
+          type: string
+          example: '2026-09-30T23:59:59.000Z'
+      required:
+      - discountPct
+      - startsAt
+      - endsAt
+    CheckoutLineDto:
+      type: object
+      properties:
+        sku:
+          type: string
+          example: SKU-1
+        quantity:
+          type: number
+          minimum: 1
+          example: 1
+      required:
+      - sku
+      - quantity
+    CheckoutPaymentDto:
+      type: object
+      properties:
+        method:
+          type: string
+          enum:
+          - CASH
+          - CARD
+          - GIFT_CARD
+        amount:
+          type: number
+          minimum: 0
+      required:
+      - method
+      - amount
+    CheckoutDto:
+      type: object
+      properties:
+        storeId:
+          type: string
+          example: STORE-1
+        registerId:
+          type: string
+          example: REG-1
+        locationCode:
+          type: string
+          description: Inventory location code this register sells from (matches Inventory's
+            locationCode)
+          example: STORE-1
+        lines:
+          type: array
+          items:
+            $ref: '#/components/schemas/CheckoutLineDto'
+        payments:
+          type: array
+          items:
+            $ref: '#/components/schemas/CheckoutPaymentDto'
+      required:
+      - storeId
+      - registerId
+      - locationCode
+      - lines
+      - payments
+    ReturnLineDto:
+      type: object
+      properties:
+        transactionLineId:
+          type: string
+        quantityReturned:
+          type: number
+          minimum: 1
+      required:
+      - transactionLineId
+      - quantityReturned
+    CreateReturnDto:
+      type: object
+      properties:
+        originalTransactionId:
+          type: string
+        storeId:
+          type: string
+          example: STORE-1
+        registerId:
+          type: string
+          example: REG-1
+        lines:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReturnLineDto'
+      required:
+      - originalTransactionId
+      - storeId
+      - registerId
+      - lines
