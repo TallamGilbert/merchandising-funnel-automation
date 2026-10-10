@@ -1,0 +1,67 @@
+# Production overrides for the VPS. Layered on top of docker-compose.yml:
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+# (deploy/vps/deploy.sh does this for you). Needs Docker Compose >= 2.24 for !reset.
+#
+# Nothing is published on the host: the only way in is the Cloudflare Tunnel
+# (cloudflared dials OUT to Cloudflare and forwards each *-api hostname to a
+# service on the compose network — see deploy/cloudflared/). Postgres, RabbitMQ
+# and the Inventory gRPC port stay internal. Reach the RabbitMQ UI with
+#   ssh -L 15672:127.0.0.1:15672 <vps>   then open http://localhost:15672
+
+# Same as dev, minus --accept-data-loss: a schema change that would drop data
+# fails the container start instead of silently dropping it.
+x-migrate-and-start: &migrate-and-start
+  sh -c "pnpm exec prisma db push --skip-generate && node dist/main.js"
+
+x-service: &service
+  ports: !reset []
+  restart: unless-stopped
+  command: *migrate-and-start
+
+services:
+  postgres:
+    ports: !reset []
+    restart: unless-stopped
+
+  rabbitmq:
+    # RabbitMQ keys its data dir by node name (rabbit@<hostname>); pin it so
+    # the volume below is reused across container recreates.
+    hostname: rabbitmq
+    ports: !override
+      - "127.0.0.1:15672:15672"
+    restart: unless-stopped
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+
+  vendor-management: *service
+  procurement: *service
+  inventory: *service
+  receiving: *service
+  warehouse-operations: *service
+  retail-sales: *service
+  sales-audit: *service
+  financials: *service
+  directory: *service
+
+  cloudflared:
+    image: cloudflare/cloudflared:2026.9.3
+    command: tunnel --no-autoupdate --config /etc/cloudflared/config.yml run
+    volumes:
+      # config.yml + credentials.json, written once by deploy/vps/setup-tunnel.sh
+      - ./deploy/cloudflared:/etc/cloudflared:ro
+    restart: unless-stopped
+    depends_on:
+      - vendor-management
+      - procurement
+      - inventory
+      - receiving
+      - warehouse-operations
+      - retail-sales
+      - sales-audit
+      - financials
+      - directory
+
+volumes:
+  # Durable queues survive a container recreate, so events published while a
+  # consumer is restarting are not lost.
+  rabbitmq-data:
