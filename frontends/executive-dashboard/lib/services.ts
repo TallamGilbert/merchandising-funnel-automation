@@ -1,4 +1,4 @@
-import { apiFetch } from "@mms/ui";
+import { apiFetch, fetchAllPages, type Page, type QueryValue, withQuery } from "@mms/ui";
 
 /**
  * Read-only access to every module's public REST API. The dashboard never
@@ -187,6 +187,14 @@ export interface AgingReport {
   totalOutstanding: number;
 }
 
+/**
+ * Every row of a paged list. The dashboard totals whole lists (open POs,
+ * stock on hand, pending putaways), so a single page would undercount.
+ */
+function all<T>(base: string, path: string, filters: Record<string, QueryValue> = {}): Promise<T[]> {
+  return fetchAllPages((page, pageSize) => get<Page<T>>(base, withQuery(path, { ...filters, page, pageSize })));
+}
+
 const enc = encodeURIComponent;
 
 export const services = {
@@ -194,20 +202,19 @@ export const services = {
     get<SalesSummary>(url.retailSales, `/stores/${enc(storeId)}/sales-summary?from=${from}&to=${to}`),
 
   valuation: () => get<Valuation>(url.inventory, "/valuation"),
-  stockLevels: () => get<StockLevel[]>(url.inventory, "/stock-levels"),
+  stockLevels: () => all<StockLevel>(url.inventory, "/stock-levels"),
 
-  purchaseOrders: () => get<PurchaseOrder[]>(url.procurement, "/purchase-orders"),
-  reorderSuggestions: () => get<ReorderSuggestion[]>(url.procurement, "/reorder-suggestions?status=NEW"),
+  purchaseOrders: () => all<PurchaseOrder>(url.procurement, "/purchase-orders"),
+  reorderSuggestions: () => all<ReorderSuggestion>(url.procurement, "/reorder-suggestions", { status: "NEW" }),
 
-  expectedDeliveries: () => get<ExpectedDelivery[]>(url.receiving, "/expected-deliveries"),
-  goodsReceivedNotes: () => get<GoodsReceivedNote[]>(url.receiving, "/goods-received-notes"),
+  expectedDeliveries: () => all<ExpectedDelivery>(url.receiving, "/expected-deliveries"),
+  goodsReceivedNotes: () => all<GoodsReceivedNote>(url.receiving, "/goods-received-notes"),
 
-  pendingPutaways: () => get<PutawayTask[]>(url.warehouse, "/putaway-tasks?status=PENDING"),
-  transfersPicking: () => get<Transfer[]>(url.warehouse, "/transfers?status=PICKING"),
+  pendingPutaways: () => all<PutawayTask>(url.warehouse, "/putaway-tasks", { status: "PENDING" }),
+  transfersPicking: () => all<Transfer>(url.warehouse, "/transfers", { status: "PICKING" }),
   utilization: () => get<ZoneUtilization[]>(url.warehouse, "/bins/utilization"),
 
-  suppliers: () =>
-    get<{ items: Supplier[] }>(url.vendorManagement, "/suppliers?status=ACTIVE&pageSize=100").then((r) => r.items),
+  suppliers: () => all<Supplier>(url.vendorManagement, "/suppliers", { status: "ACTIVE" }),
   supplier: (id: string) => get<SupplierDetail>(url.vendorManagement, `/suppliers/${enc(id)}`),
 
   dailyClose: (storeId: string, businessDate: string) =>

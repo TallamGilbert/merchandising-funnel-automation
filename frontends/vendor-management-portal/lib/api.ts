@@ -1,4 +1,4 @@
-import { apiFetch } from "@mms/ui";
+import { apiFetch, type ListParams, type Page, withQuery } from "@mms/ui";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
@@ -60,12 +60,12 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const api = {
-  listSuppliers: async (status?: SupplierStatus) => {
-    const query = new URLSearchParams({ pageSize: "100" });
-    if (status) query.set("status", status);
-    const res = await request<{ items: Supplier[] }>(`/suppliers?${query}`);
-    return res.items;
-  },
+  suppliersUrl: `${API_URL}/suppliers`,
+
+  /** `q` matches the name, contact or email; filter: status. */
+  listSuppliers: (params: ListParams) => request<Page<Supplier>>(withQuery("/suppliers", params)),
+
+  deliveryRecordsUrl: (supplierId: string) => `${API_URL}/suppliers/${supplierId}/delivery-records`,
 
   createSupplier: (data: {
     name: string;

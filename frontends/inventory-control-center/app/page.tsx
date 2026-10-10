@@ -1,12 +1,21 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
-import { formatDateTime, formatMoney, usePolling, useFlash } from "@mms/ui";
+import { useEffect, useState } from "react";
+import {
+  ExportMenu,
+  exportUrl,
+  formatDateTime,
+  formatMoney,
+  Pagination,
+  usePagedList,
+  usePolling,
+  useFlash,
+} from "@mms/ui";
 import { AppShell, type NavSection } from "../components/AppShell";
 import { BoxesIcon, LayersIcon } from "../components/icons";
 import { InventoryCharts } from "../components/InventoryCharts";
-import { api, type Product, type ValuationReport } from "../lib/api";
+import { api, type ValuationReport } from "../lib/api";
 
 const FEATURE_ENABLED = process.env.NEXT_PUBLIC_FEATURE_INVENTORY_ENABLED !== "false";
 
@@ -21,35 +30,10 @@ const NAV: NavSection[] = [
 ];
 
 export default function Page() {
-  const [products, setProducts] = useState<Product[] | null>(null);
-  const [search, setSearch] = useState("");
-  const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const flash = useFlash();
-
-  const load = () => {
-    api
-      .listProducts()
-      .then((rows) => {
-        setProducts(rows);
-        setError(null);
-      })
-      .catch((err: Error) => setError(err.message));
-  };
-
-  useEffect(() => {
-    if (FEATURE_ENABLED) load();
-  }, []);
-  usePolling(load, 10000, FEATURE_ENABLED);
-
-  const visible = useMemo(() => {
-    if (!products) return null;
-    const q = search.trim().toLowerCase();
-    if (!q) return products;
-    return products.filter(
-      (p) => p.name.toLowerCase().includes(q) || p.sku.toLowerCase().includes(q),
-    );
-  }, [products, search]);
+  const list = usePagedList(api.listProducts);
+  usePolling(list.reload, 10000, FEATURE_ENABLED);
 
   if (!FEATURE_ENABLED) {
     return (
@@ -78,11 +62,14 @@ export default function Page() {
       }}
       title="Welcome back"
       subtitle="Browse stock levels, perform adjustments, and view valuation."
-      search={{ value: search, onChange: setSearch, placeholder: "Search products…" }}
+      search={{ value: list.q, onChange: list.setQ, placeholder: "Search SKU or name…" }}
       actions={
-        <button className="primary" onClick={() => setShowForm((v) => !v)}>
-          {showForm ? "Cancel" : "New product"}
-        </button>
+        <>
+          <ExportMenu href={(format) => exportUrl(api.productsUrl, list.params, format)} />
+          <button className="primary" onClick={() => setShowForm((v) => !v)}>
+            {showForm ? "Cancel" : "New product"}
+          </button>
+        </>
       }
     >
       {showForm && (
@@ -90,23 +77,23 @@ export default function Page() {
           onCreated={(name) => {
             setShowForm(false);
             flash.success(`Product ${name} created`);
-            load();
+            list.reload();
           }}
         />
       )}
 
-      {error && <p className="error">{error}</p>}
+      {list.error && <p className="error">{list.error}</p>}
 
       <ValuationSummary />
 
       <InventoryCharts />
 
       <div className="card" style={{ padding: 0 }}>
-        {visible === null ? (
+        {list.data === null ? (
           <p className="muted" style={{ padding: "1.4rem" }}>
             Loading products…
           </p>
-        ) : visible.length === 0 ? (
+        ) : list.items.length === 0 ? (
           <p className="muted" style={{ padding: "1.4rem" }}>
             No products found.
           </p>
@@ -121,7 +108,7 @@ export default function Page() {
               </tr>
             </thead>
             <tbody>
-              {visible.map((p) => (
+              {list.items.map((p) => (
                 <tr key={p.id}>
                   <td>
                     <code>{p.sku}</code>
@@ -136,6 +123,7 @@ export default function Page() {
             </tbody>
           </table>
         )}
+        <Pagination data={list.data} onPageChange={list.setPage} />
       </div>
     </AppShell>
   );

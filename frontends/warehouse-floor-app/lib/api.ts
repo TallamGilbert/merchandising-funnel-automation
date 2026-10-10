@@ -1,4 +1,4 @@
-import { apiFetch } from "@mms/ui";
+import { apiFetch, type ListParams, type Page, withQuery } from "@mms/ui";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3005";
 
@@ -94,8 +94,11 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const api = {
-  listPutawayTasks: (status?: PutawayTaskStatus) =>
-    request<PutawayTask[]>(`/putaway-tasks${status ? `?status=${status}` : ""}`),
+  putawayTasksUrl: `${API_URL}/putaway-tasks`,
+  transfersUrl: `${API_URL}/transfers`,
+
+  /** Oldest first. `q` matches the SKU, product, GRN or PO number; filters: status, locationCode. */
+  listPutawayTasks: (params: ListParams) => request<Page<PutawayTask>>(withQuery("/putaway-tasks", params)),
 
   assignBin: (id: string, binCode?: string) =>
     request<PutawayTask>(`/putaway-tasks/${id}/assign`, {
@@ -110,8 +113,8 @@ export const api = {
       body: JSON.stringify(data),
     }),
 
-  listTransfers: (status?: TransferStatus) =>
-    request<Transfer[]>(`/transfers${status ? `?status=${status}` : ""}`),
+  /** Newest first. `q` matches the transfer number or SKU; filters: status, from, to. */
+  listTransfers: (params: ListParams) => request<Page<Transfer>>(withQuery("/transfers", params)),
 
   getTransfer: (id: string) => request<Transfer>(`/transfers/${id}`),
 

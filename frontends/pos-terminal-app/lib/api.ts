@@ -1,4 +1,4 @@
-import { apiFetch } from "@mms/ui";
+import { apiFetch, fetchAllPages, type Page, withQuery } from "@mms/ui";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3006";
 
@@ -73,7 +73,11 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const api = {
-  listProducts: () => request<Product[]>("/products"),
+  productsUrl: `${API_URL}/products`,
+
+  /** The whole price list — the till's catalog. */
+  listProducts: () =>
+    fetchAllPages((page, pageSize) => request<Page<Product>>(withQuery("/products", { page, pageSize }))),
 
   getProduct: (sku: string) => request<Product>(`/products/${encodeURIComponent(sku)}`),
 
@@ -89,8 +93,9 @@ export const api = {
       body: JSON.stringify(data),
     }),
 
+  /** The store's 100 newest sales — what a cashier picks from for a return. */
   listRecentTransactions: (storeId?: string) =>
-    request<Transaction[]>(`/transactions?limit=100${storeId ? `&storeId=${encodeURIComponent(storeId)}` : ""}`),
+    request<Page<Transaction>>(withQuery("/transactions", { storeId, pageSize: 100 })).then((page) => page.items),
 
   getTransaction: (id: string) => request<Transaction>(`/transactions/${id}`),
 

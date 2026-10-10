@@ -1,4 +1,4 @@
-import { apiFetch } from "@mms/ui";
+import { apiFetch, fetchAllPages, type ListParams, type Page, withQuery } from "@mms/ui";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3003";
 
@@ -19,7 +19,8 @@ export interface Product {
 export interface StockLevel {
   id: string;
   productId: string;
-  sku?: string;
+  sku: string;
+  productName: string;
   locationCode: string;
   onHand: number;
   allocated: number;
@@ -64,7 +65,11 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const api = {
-  listProducts: () => request<Product[]>("/products"),
+  productsUrl: `${API_URL}/products`,
+  stockLevelsUrl: `${API_URL}/stock-levels`,
+
+  /** `q` matches the SKU or name. */
+  listProducts: (params: ListParams) => request<Page<Product>>(withQuery("/products", params)),
 
   getProduct: (sku: string) => request<ProductDetail>(`/products/${sku}`),
 
@@ -101,8 +106,12 @@ export const api = {
       body: JSON.stringify(data),
     }),
 
-  listStockLevels: (locationCode?: string) =>
-    request<StockLevel[]>(`/stock-levels${locationCode ? `?locationCode=${locationCode}` : ""}`),
+  /** `q` matches the SKU or product name; filter: locationCode. */
+  listStockLevels: (params: ListParams) => request<Page<StockLevel>>(withQuery("/stock-levels", params)),
+
+  /** Every stock level — for the per-location chart. */
+  allStockLevels: () =>
+    fetchAllPages((page, pageSize) => request<Page<StockLevel>>(withQuery("/stock-levels", { page, pageSize }))),
 
   valuationReport: () => request<ValuationReport>("/valuation"),
 };
