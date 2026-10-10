@@ -1,4 +1,4 @@
-import { apiFetch } from "@mms/ui";
+import { apiFetch, fetchAllPages, type ListParams, type Page, withQuery } from "@mms/ui";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3002";
 const VENDOR_MANAGEMENT_URL =
@@ -80,10 +80,16 @@ async function request<T>(base: string, path: string, init?: RequestInit): Promi
 }
 
 export const api = {
-  listPurchaseOrders: (status?: PurchaseOrderStatus) =>
-    request<PurchaseOrder[]>(
-      API_URL,
-      `/purchase-orders${status ? `?status=${status}` : ""}`,
+  purchaseOrdersUrl: `${API_URL}/purchase-orders`,
+
+  /** `q` matches the PO number or supplier; filters: status, from, to. */
+  listPurchaseOrders: (params: ListParams) =>
+    request<Page<PurchaseOrder>>(API_URL, withQuery("/purchase-orders", params)),
+
+  /** Every PO — for the charts, which total the whole book. */
+  allPurchaseOrders: () =>
+    fetchAllPages((page, pageSize) =>
+      request<Page<PurchaseOrder>>(API_URL, withQuery("/purchase-orders", { page, pageSize })),
     ),
 
   getPurchaseOrder: (id: string) => request<PurchaseOrder>(API_URL, `/purchase-orders/${id}`),
@@ -108,11 +114,11 @@ export const api = {
   markSent: (id: string) =>
     request<PurchaseOrder>(API_URL, `/purchase-orders/${id}/mark-sent`, { method: "POST" }),
 
-  listReorderSuggestions: (status?: ReorderSuggestionStatus) =>
-    request<ReorderSuggestion[]>(
-      API_URL,
-      `/reorder-suggestions${status ? `?status=${status}` : ""}`,
-    ),
+  reorderSuggestionsUrl: `${API_URL}/reorder-suggestions`,
+
+  /** `q` matches the SKU; filter: status. */
+  listReorderSuggestions: (params: ListParams) =>
+    request<Page<ReorderSuggestion>>(API_URL, withQuery("/reorder-suggestions", params)),
 
   dismissReorderSuggestion: (id: string) =>
     request<ReorderSuggestion>(API_URL, `/reorder-suggestions/${id}/dismiss`, {

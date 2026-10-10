@@ -1,8 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
-import { Combobox, formatDateTime, formatMoney, useFlash } from "@mms/ui";
+import { useEffect, useState } from "react";
+import {
+  Combobox,
+  ExportMenu,
+  exportUrl,
+  formatDateTime,
+  formatMoney,
+  Pagination,
+  useFlash,
+  usePagedList,
+} from "@mms/ui";
 import { AppShell, type NavSection } from "../components/AppShell";
 import { BellAlertIcon, ClipboardListIcon } from "../components/icons";
 import { ProcurementCharts } from "../components/ProcurementCharts";
@@ -27,34 +36,22 @@ const NAV: NavSection[] = [
 ];
 
 export default function Page() {
-  const [orders, setOrders] = useState<PurchaseOrder[] | null>(null);
   const [statusFilter, setStatusFilter] = useState<PurchaseOrderStatus | "">("");
-  const [search, setSearch] = useState("");
-  const [error, setError] = useState<string | null>(null);
+  const [allOrders, setAllOrders] = useState<PurchaseOrder[] | null>(null);
   const [showForm, setShowForm] = useState(false);
   const flash = useFlash();
+  const list = usePagedList(api.listPurchaseOrders, { status: statusFilter });
 
-  const loadOrders = () => {
-    setError(null);
+  const loadChartData = () => {
     api
-      .listPurchaseOrders(statusFilter || undefined)
-      .then(setOrders)
-      .catch((err: Error) => setError(err.message));
+      .allPurchaseOrders()
+      .then(setAllOrders)
+      .catch(() => setAllOrders(null));
   };
 
   useEffect(() => {
-    if (!FEATURE_ENABLED) return;
-    loadOrders();
-  }, [statusFilter]);
-
-  const visible = useMemo(() => {
-    if (!orders) return null;
-    const q = search.trim().toLowerCase();
-    if (!q) return orders;
-    return orders.filter(
-      (po) => po.poNumber.toLowerCase().includes(q) || po.supplierName.toLowerCase().includes(q),
-    );
-  }, [orders, search]);
+    if (FEATURE_ENABLED) loadChartData();
+  }, []);
 
   if (!FEATURE_ENABLED) {
     return (
@@ -83,11 +80,14 @@ export default function Page() {
       }}
       title="Welcome back"
       subtitle="Create purchase orders, route approvals, and view open orders."
-      search={{ value: search, onChange: setSearch, placeholder: "Search purchase orders…" }}
+      search={{ value: list.q, onChange: list.setQ, placeholder: "Search PO number or supplier…" }}
       actions={
-        <button className="primary" onClick={() => setShowForm((v) => !v)}>
-          {showForm ? "Cancel" : "New purchase order"}
-        </button>
+        <>
+          <ExportMenu href={(format) => exportUrl(api.purchaseOrdersUrl, list.params, format)} />
+          <button className="primary" onClick={() => setShowForm((v) => !v)}>
+            {showForm ? "Cancel" : "New purchase order"}
+          </button>
+        </>
       }
     >
       {showForm && (
@@ -95,14 +95,15 @@ export default function Page() {
           onCreated={(poNumber) => {
             setShowForm(false);
             flash.success(`Draft ${poNumber} created`);
-            loadOrders();
+            list.reload();
+            loadChartData();
           }}
         />
       )}
 
-      {error && <p className="error">{error}</p>}
+      {list.error && <p className="error">{list.error}</p>}
 
-      {orders && !statusFilter && <ProcurementCharts orders={orders} />}
+      {allOrders && !statusFilter && !list.q && <ProcurementCharts orders={allOrders} />}
 
       <div className="row-between">
         <label style={{ maxWidth: 220 }}>
@@ -123,11 +124,11 @@ export default function Page() {
       </div>
 
       <div className="card" style={{ padding: 0 }}>
-        {visible === null ? (
+        {list.data === null ? (
           <p className="muted" style={{ padding: "1.4rem" }}>
             Loading purchase orders…
           </p>
-        ) : visible.length === 0 ? (
+        ) : list.items.length === 0 ? (
           <p className="muted" style={{ padding: "1.4rem" }}>
             No purchase orders found.
           </p>
@@ -144,7 +145,7 @@ export default function Page() {
               </tr>
             </thead>
             <tbody>
-              {visible.map((po) => (
+              {list.items.map((po) => (
                 <tr key={po.id}>
                   <td>{po.poNumber}</td>
                   <td>{po.supplierName}</td>
@@ -161,6 +162,7 @@ export default function Page() {
             </tbody>
           </table>
         )}
+        <Pagination data={list.data} onPageChange={list.setPage} />
       </div>
     </AppShell>
   );
