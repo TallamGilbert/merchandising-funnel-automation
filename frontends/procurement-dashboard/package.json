@@ -2,16 +2,19 @@
   "name": "@mms/procurement-dashboard",
   "version": "0.1.0",
   "private": true,
-  "description": "Procurement Dashboard \u2014 Create purchase orders, route approvals, and view open orders.",
+  "description": "Procurement Dashboard — Create purchase orders, route approvals, and view open orders.",
   "scripts": {
     "dev": "next dev -p 3102",
     "build": "next build",
     "start": "next start -p 3102",
-    "lint": "eslint \"app/**/*.{ts,tsx}\""
+    "lint": "eslint \"app/**/*.{ts,tsx}\"",
+    "preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
+    "deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy"
   },
   "dependencies": {
     "@mms/ui": "workspace:*",
-    "next": "^16.3.4",
+    "@opennextjs/cloudflare": "^1.20.7",
+    "next": "^16.3.8",
     "react": "^19.3.0",
     "react-dom": "^19.3.0"
   },
@@ -19,6 +22,7 @@
     "@types/node": "^20.14.15",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
-    "typescript": "^5.5.4"
+    "typescript": "^5.5.4",
+    "wrangler": "^4.145.0"
   }
 }

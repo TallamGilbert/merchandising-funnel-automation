@@ -2,16 +2,19 @@
   "name": "@mms/store-manager-dashboard",
   "version": "0.1.0",
   "private": true,
-  "description": "Store Manager Dashboard \u2014 Enter cash counts, compare against expected totals, and close registers.",
+  "description": "Store Manager Dashboard — Enter cash counts, compare against expected totals, and close registers.",
   "scripts": {
     "dev": "next dev -p 3107",
     "build": "next build",
     "start": "next start -p 3107",
-    "lint": "eslint \"app/**/*.{ts,tsx}\""
+    "lint": "eslint \"app/**/*.{ts,tsx}\"",
+    "preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
+    "deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy"
   },
   "dependencies": {
     "@mms/ui": "workspace:*",
-    "next": "^16.3.4",
+    "@opennextjs/cloudflare": "^1.20.7",
+    "next": "^16.3.8",
     "react": "^19.3.0",
     "react-dom": "^19.3.0"
   },
@@ -19,6 +22,7 @@
     "@types/node": "^20.14.15",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
-    "typescript": "^5.5.4"
+    "typescript": "^5.5.4",
+    "wrangler": "^4.145.0"
   }
 }
