@@ -1,0 +1,108 @@
+name: Deploy
+
+# Runs after CI goes green on main (or by hand from the Actions tab).
+# Backend first, then frontends — so a new frontend never talks to an old API.
+# One-time setup (secrets, VPS, tunnel) is in docs/DEPLOYMENT.md.
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+env:
+  NODE_VERSION: "20.17.0"
+  PNPM_VERSION: "9"
+  DOMAIN: ${{ vars.DOMAIN }}
+  VPS_APP_DIR: ${{ vars.VPS_APP_DIR || '/opt/mms' }}
+
+jobs:
+  backend:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - name: Configure SSH
+        run: |
+          install -m 700 -d ~/.ssh
+          echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          echo "${{ secrets.VPS_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
+          cat >> ~/.ssh/config <<EOF
+          Host vps
+            HostName ${{ secrets.VPS_HOST }}
+            User ${{ secrets.VPS_USER }}
+            Port ${{ vars.VPS_SSH_PORT || 22 }}
+            IdentityFile ~/.ssh/id_deploy
+          EOF
+
+      # Only what the service images need. Excluded paths are also protected
+      # from --delete, so the VPS-only .env and tunnel credentials survive.
+      - name: Sync code to VPS
+        run: |
+          rsync -az --delete \
+            --exclude '.git/' --exclude 'node_modules/' --exclude 'frontends/' \
+            --exclude 'dist/' --exclude 'services/*/src/generated/' \
+            --exclude '/.env' --exclude 'services/*/.env' \
+            --exclude 'deploy/cloudflared/' \
+            ./ "vps:${VPS_APP_DIR}/"
+
+      - name: Build and restart services
+        run: ssh vps "bash ${VPS_APP_DIR}/deploy/vps/deploy.sh"
+
+  frontends:
+    needs: backend
+    runs-on: ubuntu-latest
+    environment: production
+    strategy:
+      fail-fast: false
+      matrix:
+        app:
+          - vendor-management-portal
+          - procurement-dashboard
+          - inventory-control-center
+          - warehouse-receiving-app
+          - warehouse-floor-app
+          - pos-terminal-app
+          - store-manager-dashboard
+          - finance-portal
+          - executive-dashboard
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      # Full install: @mms/ui gets its React types from its own devDependencies,
+      # which a filtered install skips.
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Write production env (bakes API URLs into the build)
+        run: bash deploy/frontend-env.sh
+
+      - name: Build and deploy to Cloudflare Workers
+        working-directory: frontends/${{ matrix.app }}
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          source ../../deploy/hosts.sh
+          pnpm exec opennextjs-cloudflare build
+          pnpm exec opennextjs-cloudflare deploy --domain "${APP_HOST[${{ matrix.app }}]}"

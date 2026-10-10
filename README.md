@@ -220,6 +220,12 @@ CI (`.github/workflows/ci.yml`) runs both: a fast `lint-build-unit-test` job on 
 
 ---
 
+## Deployment
+
+Frontends run on Cloudflare Workers, and the backend runs on a VPS behind a Cloudflare Tunnel. Every green push to `main` deploys both. Setup and day-to-day operations are in [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md).
+
+---
+
 ## Contributing
 
 Branch naming, PR scope, and the per-module Definition of Done live in [`CONTRIBUTING.md`](CONTRIBUTING.md). Short version: one module or one significant feature per PR, feature-flagged correctly for its phase, contracts updated alongside the code, tests green in CI, this README's module table updated if a module's status changed.
