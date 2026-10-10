@@ -2,7 +2,13 @@ import { apiFetch, type ListParams, type Page, withQuery } from "@mms/ui";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3008";
 
-export type EntrySource = "GOODS_RECEIVED" | "ITEM_SOLD" | "ITEM_RETURNED" | "DAY_CLOSED" | "BILL_PAYMENT";
+export type EntrySource =
+  | "GOODS_RECEIVED"
+  | "ITEM_SOLD"
+  | "ITEM_RETURNED"
+  | "DAY_CLOSED"
+  | "BILL_PAYMENT"
+  | "STOCK_ADJUSTMENT";
 export type BillStatus = "OPEN" | "PAID";
 export type InboxStatus = "PENDING" | "POSTED" | "NEEDS_ATTENTION";
 export type AgingBucket = "current" | "1-30" | "31-60" | "61-90" | "90+";
@@ -14,6 +20,7 @@ export const SOURCE_LABEL: Record<EntrySource, string> = {
   ITEM_RETURNED: "Refund",
   DAY_CLOSED: "Day close",
   BILL_PAYMENT: "Bill payment",
+  STOCK_ADJUSTMENT: "Stock count / adjustment",
 };
 
 export interface Account {

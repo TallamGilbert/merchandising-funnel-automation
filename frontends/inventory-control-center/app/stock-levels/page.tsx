@@ -11,19 +11,10 @@ import {
   usePagedList,
   usePolling,
 } from "@mms/ui";
-import { AppShell, type NavSection } from "../../components/AppShell";
-import { BoxesIcon, LayersIcon } from "../../components/icons";
+import { AppShell } from "../../components/AppShell";
+import { NAV } from "../../lib/nav";
 import { api } from "../../lib/api";
 
-const NAV: NavSection[] = [
-  {
-    label: "Main menu",
-    items: [
-      { label: "Products", href: "/", icon: <BoxesIcon /> },
-      { label: "Stock levels", href: "/stock-levels", icon: <LayersIcon /> },
-    ],
-  },
-];
 
 export default function StockLevelsPage() {
   const [locationFilter, setLocationFilter] = useState("");

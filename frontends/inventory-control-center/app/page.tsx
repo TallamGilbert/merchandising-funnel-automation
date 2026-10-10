@@ -12,22 +12,13 @@ import {
   usePolling,
   useFlash,
 } from "@mms/ui";
-import { AppShell, type NavSection } from "../components/AppShell";
-import { BoxesIcon, LayersIcon } from "../components/icons";
+import { AppShell } from "../components/AppShell";
+import { NAV } from "../lib/nav";
 import { InventoryCharts } from "../components/InventoryCharts";
 import { api, type ValuationReport } from "../lib/api";
 
 const FEATURE_ENABLED = process.env.NEXT_PUBLIC_FEATURE_INVENTORY_ENABLED !== "false";
 
-const NAV: NavSection[] = [
-  {
-    label: "Main menu",
-    items: [
-      { label: "Products", href: "/", icon: <BoxesIcon /> },
-      { label: "Stock levels", href: "/stock-levels", icon: <LayersIcon /> },
-    ],
-  },
-];
 
 export default function Page() {
   const [showForm, setShowForm] = useState(false);
@@ -159,6 +150,7 @@ function NewProductForm({ onCreated }: { onCreated: (name: string) => void }) {
   const [sku, setSku] = useState("");
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
+  const [category, setCategory] = useState("");
   const [unitCost, setUnitCost] = useState(0);
   const [weightKg, setWeightKg] = useState<number | "">("");
   const [error, setError] = useState<string | null>(null);
@@ -173,6 +165,7 @@ function NewProductForm({ onCreated }: { onCreated: (name: string) => void }) {
         sku,
         name,
         description: description || undefined,
+        category: category.trim() || undefined,
         unitCost,
         weightKg: weightKg === "" ? undefined : weightKg,
       });
@@ -201,6 +194,10 @@ function NewProductForm({ onCreated }: { onCreated: (name: string) => void }) {
         <label>
           Description
           <input value={description} onChange={(e) => setDescription(e.target.value)} />
+        </label>
+        <label>
+          Category
+          <input value={category} onChange={(e) => setCategory(e.target.value)} placeholder="e.g. Sofas" />
         </label>
         <label>
           Weight (kg)
