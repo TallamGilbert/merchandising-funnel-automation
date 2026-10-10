@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
-import { FlashProvider } from "@mms/ui";
+import { AuthGate, AuthProvider, FlashProvider } from "@mms/ui";
 import "@mms/ui/styles.css";
 import "./globals.css";
 
@@ -17,7 +17,13 @@ export default function RootLayout({
   return (
     <html lang="en" className={inter.variable}>
       <body>
-        <FlashProvider>{children}</FlashProvider>
+        <FlashProvider>
+          <AuthProvider>
+            <AuthGate appName="Point of Sale Terminal" allow={["OWNER", "MANAGER", "CASHIER"]}>
+              {children}
+            </AuthGate>
+          </AuthProvider>
+        </FlashProvider>
       </body>
     </html>
   );

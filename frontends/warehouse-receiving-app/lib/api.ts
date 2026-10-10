@@ -1,3 +1,5 @@
+import { apiFetch } from "@mms/ui";
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3004";
 
 export type ExpectedDeliveryStatus = "EXPECTED" | "PARTIALLY_RECEIVED" | "RECEIVED";
@@ -51,7 +53,7 @@ export interface GoodsReceivedNote {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_URL}${path}`, {
+  const res = await apiFetch(`${API_URL}${path}`, {
     ...init,
     headers: { "Content-Type": "application/json", ...init?.headers },
   });
@@ -75,7 +77,8 @@ export const api = {
 
   getGoodsReceivedNote: (id: string) => request<GoodsReceivedNote>(`/goods-received-notes/${id}`),
 
-  createGoodsReceivedNote: (data: { poNumber: string; receivedAtLocation: string; receivedById: string }) =>
+  /** Recorded as received by the signed-in user. */
+  createGoodsReceivedNote: (data: { poNumber: string; receivedAtLocation: string }) =>
     request<GoodsReceivedNote>("/goods-received-notes", { method: "POST", body: JSON.stringify(data) }),
 
   recordScan: (

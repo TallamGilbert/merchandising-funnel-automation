@@ -7,7 +7,7 @@ import {
   formatDateTime,
   LocationPicker,
   ProductPicker,
-  StaffPicker,
+  useCurrentUser,
   useFlash,
   useLocations,
 } from "@mms/ui";
@@ -31,6 +31,8 @@ export default function TransfersPage() {
   const [statusFilter, setStatusFilter] = useState<TransferStatus | "">("");
   const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
+  // A supervisor raises a transfer; warehouse staff pick it.
+  const canCreate = ["OWNER", "MANAGER"].includes(useCurrentUser().role);
   const { data: locations } = useLocations();
   const locationName = (code: string) => locations.find((l) => l.code === code)?.name ?? code;
 
@@ -49,12 +51,14 @@ export default function TransfersPage() {
       title="Transfers"
       subtitle="Move stock between locations, e.g. warehouse to showroom (FR-5.4). Pickers are directed bin by bin."
       actions={
-        <button className="primary" onClick={() => setShowForm((v) => !v)}>
-          {showForm ? "Cancel" : "New transfer"}
-        </button>
+        canCreate && (
+          <button className="primary" onClick={() => setShowForm((v) => !v)}>
+            {showForm ? "Cancel" : "New transfer"}
+          </button>
+        )
       }
     >
-      {showForm && <NewTransferForm />}
+      {canCreate && showForm && <NewTransferForm />}
 
       {error && <p className="error">{error}</p>}
 
@@ -127,7 +131,6 @@ function NewTransferForm() {
   const [quantity, setQuantity] = useState(1);
   const [fromLocationCode, setFromLocationCode] = useState("");
   const [toLocationCode, setToLocationCode] = useState("");
-  const [requestedById, setRequestedById] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -145,7 +148,6 @@ function NewTransferForm() {
         quantity,
         fromLocationCode,
         toLocationCode,
-        requestedById,
       });
       flash.success(`${transfer.transferNumber} created — picks are ready`);
       router.push(`/transfers/${transfer.id}`);
@@ -183,10 +185,6 @@ function NewTransferForm() {
         <label>
           To
           <LocationPicker required value={toLocationCode} onChange={setToLocationCode} />
-        </label>
-        <label>
-          Requested by
-          <StaffPicker required roles={["MANAGER", "OWNER"]} value={requestedById} onChange={setRequestedById} />
         </label>
       </div>
 

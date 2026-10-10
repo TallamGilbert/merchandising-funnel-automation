@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ReactNode, useState } from "react";
+import { StaffRole, useAuth, UserMenu } from "@mms/ui";
 import { ChevronsLeftIcon, LogoIcon, SearchIcon } from "./icons";
 
 export interface NavItem {
@@ -10,6 +11,8 @@ export interface NavItem {
   href: string;
   icon: ReactNode;
   badge?: string;
+  /** Only these roles see the item; omit to show it to everyone who can use the app. */
+  roles?: StaffRole[];
 }
 
 export interface NavSection {
@@ -51,6 +54,13 @@ export function AppShell({
 }) {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
+  const { user } = useAuth();
+  const visibleNav = nav
+    .map((section) => ({
+      ...section,
+      items: section.items.filter((item) => !item.roles || (user && item.roles.includes(user.role))),
+    }))
+    .filter((section) => section.items.length > 0);
 
   return (
     <div className="shell">
@@ -72,7 +82,7 @@ export function AppShell({
           </button>
         </div>
 
-        {nav.map((section) => (
+        {visibleNav.map((section) => (
           <div className="nav-section" key={section.label}>
             <div className="nav-section-label">{section.label}</div>
             {section.items.map((item) => {
@@ -124,7 +134,10 @@ export function AppShell({
           ) : (
             <div />
           )}
-          {actions && <div className="actions">{actions}</div>}
+          <div className="actions">
+            {actions}
+            <UserMenu />
+          </div>
         </div>
 
         <div className="page-body">

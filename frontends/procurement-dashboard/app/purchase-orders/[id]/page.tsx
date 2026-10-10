@@ -7,8 +7,7 @@ import {
   formatMoney,
   Modal,
   STAFF_ROLE_LABEL,
-  StaffPicker,
-  type StaffMember,
+  useCurrentUser,
   useFlash,
   useStaffNames,
 } from "@mms/ui";
@@ -90,12 +89,7 @@ export default function PurchaseOrderPage({
             </button>
           )}
           {po.status === "PENDING_APPROVAL" && (
-            <ApproveButton
-              busy={busy}
-              onApprove={(approvedById, approverRole) =>
-                run(() => api.approve(po.id, { approvedById, approverRole }), `${po.poNumber} approved`)
-              }
-            />
+            <ApproveButton busy={busy} onApprove={() => run(() => api.approve(po.id), `${po.poNumber} approved`)} />
           )}
           {po.status === "APPROVED" && (
             <button className="primary" disabled={busy} onClick={() => run(() => api.markSent(po.id), `${po.poNumber} marked as sent`)}>
@@ -169,58 +163,36 @@ export default function PurchaseOrderPage({
   );
 }
 
-function ApproveButton({
-  busy,
-  onApprove,
-}: {
-  busy: boolean;
-  onApprove: (approvedById: string, approverRole: "MANAGER" | "OWNER") => void;
-}) {
+function ApproveButton({ busy, onApprove }: { busy: boolean; onApprove: () => void }) {
+  const user = useCurrentUser();
   const [open, setOpen] = useState(false);
-  const [approvedById, setApprovedById] = useState("");
-  const [approver, setApprover] = useState<StaffMember | null>(null);
-  // Only managers and owners are offered, so the role always fits D-1.
-  const approverRole = approver?.role === "OWNER" ? "OWNER" : "MANAGER";
-
-  const close = () => {
-    setOpen(false);
-    setApprovedById("");
-    setApprover(null);
-  };
+  // Buyers raise POs; only managers and owners approve them (D-1).
+  if (user.role !== "MANAGER" && user.role !== "OWNER") {
+    return <span className="badge">Awaiting manager approval</span>;
+  }
 
   return (
     <>
       <button className="primary" onClick={() => setOpen(true)}>
         Approve
       </button>
-      <Modal open={open} title="Approve purchase order" onClose={close}>
+      <Modal open={open} title="Approve purchase order" onClose={() => setOpen(false)}>
         <form
           onSubmit={(e) => {
             e.preventDefault();
-            onApprove(approvedById, approverRole);
-            close();
+            onApprove();
+            setOpen(false);
           }}
         >
-          <label>
-            Approver
-            <StaffPicker
-              required
-              roles={["MANAGER", "OWNER"]}
-              value={approvedById}
-              onChange={setApprovedById}
-              onSelectMember={setApprover}
-            />
-          </label>
           <p className="muted" style={{ margin: 0 }}>
-            {approver
-              ? `Approving as ${STAFF_ROLE_LABEL[approver.role]}. Managers can approve orders below the approval limit; larger orders need an owner.`
-              : "Pick who is approving — their role comes from the staff directory."}
+            You&apos;re approving as {user.name} ({STAFF_ROLE_LABEL[user.role]}).
+            {user.role === "MANAGER" && " Managers can approve orders below the approval limit; larger orders need an owner."}
           </p>
           <div className="mms-modal-footer">
-            <button type="button" onClick={close}>
+            <button type="button" onClick={() => setOpen(false)}>
               Cancel
             </button>
-            <button className="primary" type="submit" disabled={busy || !approvedById}>
+            <button className="primary" type="submit" disabled={busy}>
               Approve
             </button>
           </div>

@@ -1,3 +1,5 @@
+import { apiFetch } from "@mms/ui";
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3006";
 
 export type PaymentMethodType = "CASH" | "CARD" | "GIFT_CARD";
@@ -55,7 +57,7 @@ export interface Transaction {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_URL}${path}`, {
+  const res = await apiFetch(`${API_URL}${path}`, {
     ...init,
     headers: { "Content-Type": "application/json", ...init?.headers },
   });
@@ -95,7 +97,6 @@ export const api = {
   checkout: (data: {
     storeId: string;
     registerId: string;
-    cashierId: string;
     locationCode: string;
     lines: { sku: string; quantity: number }[];
     payments: { method: PaymentMethodType; amount: number }[];
