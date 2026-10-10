@@ -83,6 +83,7 @@ paths:
           - ITEM_RETURNED
           - DAY_CLOSED
           - BILL_PAYMENT
+          - STOCK_ADJUSTMENT
           type: string
       responses:
         '200':
