@@ -49,7 +49,8 @@ export class TransfersService {
    * smaller bins before larger ones. Quantities already promised to other
    * open picks are not offered twice.
    */
-  async create(dto: CreateTransferDto) {
+  /** `requestedById` is the signed-in user, set by the controller. */
+  async create(dto: CreateTransferDto & { requestedById: string }) {
     if (dto.fromLocationCode === dto.toLocationCode) {
       throw new BadRequestException("Source and destination locations must differ");
     }
@@ -134,7 +135,7 @@ export class TransfersService {
    * completion: if the transfer is still open with nothing left to pick, it
    * finishes the transfer instead of rejecting the call.
    */
-  async completePick(id: string, dto: CompletePickDto) {
+  async completePick(id: string, dto: CompletePickDto & { pickedById: string }) {
     const pick = await this.prisma.pickTask.findUnique({
       where: { id },
       include: { bin: true },

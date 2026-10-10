@@ -24,10 +24,6 @@ export class CreatePurchaseOrderDto {
   @IsString()
   supplierId!: string;
 
-  @ApiProperty({ description: "User id of the buyer creating this PO" })
-  @IsString()
-  requestedById!: string;
-
   @ApiProperty({ type: [CreatePurchaseOrderLineDto] })
   @ValidateNested({ each: true })
   @Type(() => CreatePurchaseOrderLineDto)

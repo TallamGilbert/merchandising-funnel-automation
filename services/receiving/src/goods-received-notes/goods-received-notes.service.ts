@@ -53,7 +53,8 @@ export class GoodsReceivedNotesService {
    * line per SKU still outstanding, using Receiving's own running totals
    * (Procurement does not track received quantity).
    */
-  async create(dto: CreateGoodsReceivedNoteDto) {
+  /** `receivedById` is the signed-in user, set by the controller. */
+  async create(dto: CreateGoodsReceivedNoteDto & { receivedById: string }) {
     const po = await this.procurement.findOpenPo(dto.poNumber);
     const expected = await this.expectedDeliveries.recordFromProcurement(po);
 

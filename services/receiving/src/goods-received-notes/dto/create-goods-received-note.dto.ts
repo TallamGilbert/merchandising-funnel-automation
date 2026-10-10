@@ -12,8 +12,4 @@ export class CreateGoodsReceivedNoteDto {
   })
   @IsString()
   receivedAtLocation!: string;
-
-  @ApiProperty({ description: "User id of the dock worker" })
-  @IsString()
-  receivedById!: string;
 }

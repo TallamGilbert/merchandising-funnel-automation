@@ -1,10 +1,12 @@
 import { Body, Controller, Get, Param, ParseEnumPipe, Post, Query } from "@nestjs/common";
 import { ApiQuery, ApiTags } from "@nestjs/swagger";
+import { Role, Roles } from "@mms/shared";
 import { BillStatus } from "../generated/prisma";
 import { PayBillDto } from "./dto/pay-bill.dto";
 import { PayablesService } from "./payables.service";
 
 @ApiTags("payables")
+@Roles(Role.OWNER, Role.MANAGER, Role.ACCOUNTANT)
 @Controller("payables")
 export class PayablesController {
   constructor(private readonly payables: PayablesService) {}
@@ -26,6 +28,7 @@ export class PayablesController {
   }
 
   @Post(":id/pay")
+  @Roles(Role.OWNER, Role.ACCOUNTANT)
   pay(@Param("id") id: string, @Body() dto: PayBillDto) {
     return this.payables.pay(id, dto.paymentReference, dto.paidOn);
   }

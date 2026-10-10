@@ -1,10 +1,9 @@
 import { BadRequestException, ForbiddenException } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import { EventBusService, EventRoutingKey, GoodsReceivedEvent } from "@mms/shared";
+import { EventBusService, EventRoutingKey, GoodsReceivedEvent, Role } from "@mms/shared";
 import { PurchaseOrderStatus } from "../../generated/prisma";
 import { PrismaService } from "../../prisma/prisma.service";
 import { VendorManagementClientService } from "../../vendor-management-client/vendor-management-client.service";
-import { ApproverRole } from "../dto/approve-purchase-order.dto";
 import { PurchaseOrdersService } from "../purchase-orders.service";
 
 describe("PurchaseOrdersService", () => {
@@ -62,16 +61,19 @@ describe("PurchaseOrdersService", () => {
       lines: [],
     });
 
-    await service.create({
-      supplierId: "supplier-1",
-      requestedById: "buyer-1",
-      lines: [{ sku: "SKU-1", quantityOrdered: 2 }],
-    });
+    await service.create(
+      {
+        supplierId: "supplier-1",
+        lines: [{ sku: "SKU-1", quantityOrdered: 2 }],
+      },
+      "buyer-1",
+    );
 
     expect(prisma.purchaseOrder.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
           poNumber: "PO-1001",
+          requestedById: "buyer-1",
           supplierName: "Acme Furniture",
           paymentTermsDays: 30,
           totalAmount: 2000,
@@ -84,11 +86,7 @@ describe("PurchaseOrdersService", () => {
     vendorManagement.findSuppliersForSku.mockResolvedValue([]);
 
     await expect(
-      service.create({
-        supplierId: "supplier-1",
-        requestedById: "buyer-1",
-        lines: [{ sku: "SKU-1", quantityOrdered: 2 }],
-      }),
+      service.create({ supplierId: "supplier-1", lines: [{ sku: "SKU-1", quantityOrdered: 2 }] }, "buyer-1"),
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 
@@ -101,13 +99,48 @@ describe("PurchaseOrdersService", () => {
     });
 
     await expect(
-      service.approve("po-1", {
-        approvedById: "manager-1",
-        approverRole: ApproverRole.MANAGER,
-      }),
+      service.approve("po-1", { id: "manager-1", role: Role.MANAGER }),
     ).rejects.toBeInstanceOf(ForbiddenException);
     expect(eventBus.publish).not.toHaveBeenCalled();
   });
+
+  it("lets a manager approve a PO below the threshold (D-1)", async () => {
+    prisma.purchaseOrder.findUnique.mockResolvedValue({
+      id: "po-1",
+      status: PurchaseOrderStatus.PENDING_APPROVAL,
+      totalAmount: 99999,
+      lines: [],
+    });
+    prisma.purchaseOrder.update.mockResolvedValue({
+      id: "po-1",
+      poNumber: "PO-1001",
+      approvedAt: new Date("2026-01-01T00:00:00.000Z"),
+      lines: [],
+    });
+
+    await service.approve("po-1", { id: "manager-1", role: Role.MANAGER });
+
+    expect(prisma.purchaseOrder.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ approvedById: "manager-1" }) }),
+    );
+  });
+
+  it.each([Role.BUYER, Role.CASHIER, "SERVICE" as const])(
+    "never lets a %s approve, whatever the amount",
+    async (role) => {
+      prisma.purchaseOrder.findUnique.mockResolvedValue({
+        id: "po-1",
+        status: PurchaseOrderStatus.PENDING_APPROVAL,
+        totalAmount: 10,
+        lines: [],
+      });
+
+      await expect(service.approve("po-1", { id: "someone", role })).rejects.toBeInstanceOf(
+        ForbiddenException,
+      );
+      expect(prisma.purchaseOrder.update).not.toHaveBeenCalled();
+    },
+  );
 
   it("approves and publishes PurchaseOrderApproved when the role is sufficient", async () => {
     prisma.purchaseOrder.findUnique.mockResolvedValue({
@@ -128,14 +161,11 @@ describe("PurchaseOrdersService", () => {
       lines: [],
     });
 
-    await service.approve("po-1", {
-      approvedById: "owner-1",
-      approverRole: ApproverRole.OWNER,
-    });
+    await service.approve("po-1", { id: "owner-1", role: Role.OWNER });
 
     expect(eventBus.publish).toHaveBeenCalledWith(
       EventRoutingKey.PURCHASE_ORDER_APPROVED,
-      expect.objectContaining({ poNumber: "PO-1001", supplierId: "supplier-1" }),
+      expect.objectContaining({ poNumber: "PO-1001", supplierId: "supplier-1", approvedById: "owner-1" }),
     );
   });
 

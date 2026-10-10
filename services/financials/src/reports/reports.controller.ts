@@ -1,5 +1,6 @@
 import { BadRequestException, Controller, Get, Query } from "@nestjs/common";
 import { ApiQuery, ApiTags } from "@nestjs/swagger";
+import { Role, Roles } from "@mms/shared";
 import { ProfitGrouping, ReportsService } from "./reports.service";
 
 const GROUPINGS: ProfitGrouping[] = ["product", "store", "day"];
@@ -10,6 +11,7 @@ function required(from?: string, to?: string): [string, string] {
 }
 
 @ApiTags("reports")
+@Roles(Role.OWNER, Role.MANAGER, Role.ACCOUNTANT)
 @Controller("reports")
 export class ReportsController {
   constructor(private readonly reports: ReportsService) {}

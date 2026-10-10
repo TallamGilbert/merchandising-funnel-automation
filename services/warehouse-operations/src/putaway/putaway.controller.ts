@@ -1,5 +1,6 @@
 import { Body, Controller, Get, Param, Post, Query } from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
+import { AuthUser, CurrentUser, Role, Roles } from "@mms/shared";
 import { PutawayTaskStatus } from "../generated/prisma";
 import { AssignBinDto } from "./dto/assign-bin.dto";
 import { CompletePutawayDto } from "./dto/complete-putaway.dto";
@@ -24,12 +25,14 @@ export class PutawayController {
   }
 
   @Post("putaway-tasks/:id/assign")
+  @Roles(Role.OWNER, Role.MANAGER, Role.WAREHOUSE_STAFF)
   assign(@Param("id") id: string, @Body() dto: AssignBinDto) {
     return this.putaway.assign(id, dto);
   }
 
   @Post("putaway-tasks/:id/complete")
-  complete(@Param("id") id: string, @Body() dto: CompletePutawayDto) {
-    return this.putaway.complete(id, dto);
+  @Roles(Role.OWNER, Role.MANAGER, Role.WAREHOUSE_STAFF)
+  complete(@CurrentUser() user: AuthUser, @Param("id") id: string, @Body() dto: CompletePutawayDto) {
+    return this.putaway.complete(id, { ...dto, completedById: user.id });
   }
 }

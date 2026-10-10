@@ -1,7 +1,7 @@
 import { Body, Controller, Get, Param, Post, Query } from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
+import { AuthUser, CurrentUser, Role, Roles } from "@mms/shared";
 import { PurchaseOrderStatus } from "../generated/prisma";
-import { ApprovePurchaseOrderDto } from "./dto/approve-purchase-order.dto";
 import { CreatePurchaseOrderDto } from "./dto/create-purchase-order.dto";
 import { PurchaseOrdersService } from "./purchase-orders.service";
 
@@ -16,8 +16,9 @@ export class PurchaseOrdersController {
   }
 
   @Post("purchase-orders")
-  create(@Body() dto: CreatePurchaseOrderDto) {
-    return this.purchaseOrders.create(dto);
+  @Roles(Role.OWNER, Role.MANAGER, Role.BUYER)
+  create(@CurrentUser() user: AuthUser, @Body() dto: CreatePurchaseOrderDto) {
+    return this.purchaseOrders.create(dto, user.id);
   }
 
   @Get("purchase-orders/lookup/:poNumber")
@@ -36,16 +37,19 @@ export class PurchaseOrdersController {
   }
 
   @Post("purchase-orders/:id/submit")
+  @Roles(Role.OWNER, Role.MANAGER, Role.BUYER)
   submit(@Param("id") id: string) {
     return this.purchaseOrders.submit(id);
   }
 
   @Post("purchase-orders/:id/approve")
-  approve(@Param("id") id: string, @Body() dto: ApprovePurchaseOrderDto) {
-    return this.purchaseOrders.approve(id, dto);
+  @Roles(Role.OWNER, Role.MANAGER)
+  approve(@CurrentUser() user: AuthUser, @Param("id") id: string) {
+    return this.purchaseOrders.approve(id, user);
   }
 
   @Post("purchase-orders/:id/mark-sent")
+  @Roles(Role.OWNER, Role.MANAGER, Role.BUYER)
   markSent(@Param("id") id: string) {
     return this.purchaseOrders.markSent(id);
   }
