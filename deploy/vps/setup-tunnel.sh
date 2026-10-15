@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # ONE-TIME, on the VPS, from the app directory (e.g. /opt/mms):
 #   DOMAIN=example.com bash deploy/vps/setup-tunnel.sh
+#   (add HOST_PREFIX=mms- if you use one — see deploy/hosts.sh)
 #
 # 1. Logs cloudflared into your Cloudflare account (prints a URL — open it in
 #    any browser and pick $DOMAIN's zone).

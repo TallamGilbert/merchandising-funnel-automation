@@ -17,6 +17,15 @@ describe("originPattern", () => {
     expect(re.test("http://finance.example.com")).toBe(false);
   });
 
+  it("matches a prefixed label without letting in the rest of the domain", () => {
+    const re = originPattern("https://mms-*.example.com");
+    expect(re.test("https://mms-pos.example.com")).toBe(true);
+    expect(re.test("https://mms-dashboard.example.com")).toBe(true);
+    expect(re.test("https://www.example.com")).toBe(false);
+    expect(re.test("https://example.com")).toBe(false);
+    expect(re.test("https://a.mms-pos.example.com")).toBe(false);
+  });
+
   it("matches any port", () => {
     const re = originPattern("http://localhost:*");
     expect(re.test("http://localhost:3102")).toBe(true);

@@ -1,9 +1,9 @@
 # Deploying to production
 
 ```
- browser ──► pos.$DOMAIN, finance.$DOMAIN, …      Cloudflare Workers (9 Next.js apps, OpenNext)
+ browser ──► mms-pos.reduzer.co.ke, mms-finance…   Cloudflare Workers (9 Next.js apps, OpenNext)
     │
-    └─────► sales-api.$DOMAIN, finance-api.$DOMAIN, …
+    └─────► mms-sales-api.reduzer.co.ke, …
                  │  Cloudflare edge (TLS)
                  ▼
             Cloudflare Tunnel ──(outbound only)── VPS: cloudflared ─► 9 NestJS services
@@ -16,20 +16,32 @@
 - **Backend** is the existing `docker-compose.yml` plus
   [`docker-compose.prod.yml`](../docker-compose.prod.yml), which publishes **no
   ports** — traffic arrives only through the tunnel. Only SSH needs to be open.
-- **Every hostname** is defined once in [`deploy/hosts.sh`](../deploy/hosts.sh).
+- **Every hostname** is defined once in [`deploy/hosts.sh`](../deploy/hosts.sh)
+  from `DOMAIN` and an optional `HOST_PREFIX`.
+
+### Hostnames: `DOMAIN=reduzer.co.ke`, `HOST_PREFIX=mms-`
+
+The system shares the `reduzer.co.ke` zone with other sites, so every app and
+API gets an `mms-` name directly under it (`mms-pos.reduzer.co.ke`), not a
+deeper subdomain (`pos.mms.reduzer.co.ke`). Cloudflare's free Universal SSL
+certificate covers only one level below the zone. Two levels would fail HTTPS
+on the API hostnames unless you pay for Advanced Certificate Manager.
+
+None of these names may already have a DNS record: the tunnel setup overwrites
+`mms-*-api` records, and Workers custom domains refuse a name that is taken.
 
 | App | URL | API it calls |
 |---|---|---|
-| Vendor Management Portal | `vendors.$DOMAIN` | `vendors-api.$DOMAIN` |
-| Procurement Dashboard | `procurement.$DOMAIN` | `procurement-api.$DOMAIN` |
-| Inventory Control Center | `inventory.$DOMAIN` | `inventory-api.$DOMAIN` |
-| Warehouse Receiving App | `receiving.$DOMAIN` | `receiving-api.$DOMAIN` |
-| Warehouse Floor App | `warehouse.$DOMAIN` | `warehouse-api.$DOMAIN` |
-| POS Terminal App | `pos.$DOMAIN` | `sales-api.$DOMAIN` |
-| Store Manager Dashboard | `stores.$DOMAIN` | `audit-api.$DOMAIN` |
-| Finance Portal | `finance.$DOMAIN` | `finance-api.$DOMAIN` |
-| Executive Dashboard | `dashboard.$DOMAIN` | all of them |
-| (pickers, every app) | — | `directory-api.$DOMAIN` |
+| Vendor Management Portal | `mms-vendors.reduzer.co.ke` | `mms-vendors-api.reduzer.co.ke` |
+| Procurement Dashboard | `mms-procurement.reduzer.co.ke` | `mms-procurement-api.reduzer.co.ke` |
+| Inventory Control Center | `mms-inventory.reduzer.co.ke` | `mms-inventory-api.reduzer.co.ke` |
+| Warehouse Receiving App | `mms-receiving.reduzer.co.ke` | `mms-receiving-api.reduzer.co.ke` |
+| Warehouse Floor App | `mms-warehouse.reduzer.co.ke` | `mms-warehouse-api.reduzer.co.ke` |
+| POS Terminal App | `mms-pos.reduzer.co.ke` | `mms-sales-api.reduzer.co.ke` |
+| Store Manager Dashboard | `mms-stores.reduzer.co.ke` | `mms-audit-api.reduzer.co.ke` |
+| Finance Portal | `mms-finance.reduzer.co.ke` | `mms-finance-api.reduzer.co.ke` |
+| Executive Dashboard | `mms-dashboard.reduzer.co.ke` | all of them |
+| (pickers, every app) | — | `mms-directory-api.reduzer.co.ke` |
 
 After setup, **every push to `main` that passes CI deploys automatically**
 ([`.github/workflows/deploy.yml`](../.github/workflows/deploy.yml)): backend
@@ -40,7 +52,9 @@ Actions tab ("Deploy" → Run workflow).
 
 ### 1. VPS
 
-Needs Docker with Compose **≥ 2.24** (`docker compose version`) and `rsync`.
+Needs Docker with Compose **≥ 2.24** (`docker compose version`) and `rsync`,
+and **at least 4 GB of RAM** (or 2 GB plus swap): the VPS builds all 9 service
+images itself and then runs 9 Node processes next to Postgres and RabbitMQ.
 
 ```bash
 # on the VPS, as a sudo user
@@ -76,7 +90,8 @@ Then on the VPS:
 cd /opt/mms
 cp .env.production.example .env && chmod 600 .env
 # replace every CHANGE_ME with:  openssl rand -hex 24
-# set CORS_ORIGINS and COOKIE_DOMAIN to your DOMAIN, and pick BOOTSTRAP_OWNER_ID
+# CORS_ORIGINS / COOKIE_DOMAIN are already set for mms-*.reduzer.co.ke;
+# pick BOOTSTRAP_OWNER_ID, and set DIRECTORY_SEED_DEMO=false for real data
 nano .env
 ```
 
@@ -89,10 +104,10 @@ nano .env
 
 ```bash
 cd /opt/mms
-DOMAIN=example.com bash deploy/vps/setup-tunnel.sh
+DOMAIN=reduzer.co.ke HOST_PREFIX=mms- bash deploy/vps/setup-tunnel.sh
 ```
 
-It prints a login URL. Open it in any browser and pick your domain. The script
+It prints a login URL. Open it in any browser and pick `reduzer.co.ke`. The script
 then creates the `mms` tunnel, adds a DNS record for each `*-api` hostname, and
 writes `deploy/cloudflared/config.yml`. The credentials stay in
 `deploy/cloudflared/`, which is gitignored and never overwritten by deploys.
@@ -101,11 +116,11 @@ writes `deploy/cloudflared/config.yml`. The credentials stay in
 
 ```bash
 cd /opt/mms && bash deploy/vps/deploy.sh
-curl https://directory-api.example.com/health      # from anywhere → 200
-curl https://procurement-api.example.com/purchase-orders   # → 401 without a session
+curl https://mms-directory-api.reduzer.co.ke/health      # from anywhere → 200
+curl https://mms-procurement-api.reduzer.co.ke/purchase-orders   # → 401 without a session
 ```
 
-Then open any app (e.g. `https://dashboard.example.com`) and sign in as
+Then open any app (e.g. `https://mms-dashboard.reduzer.co.ke`) and sign in as
 `BOOTSTRAP_OWNER_ID` with `BOOTSTRAP_OWNER_PASSWORD`. You'll be asked to choose
 a new password; after that, add your staff on the Store Manager Dashboard's
 Staff page (each new person gets a one-time temporary password to hand over).
@@ -115,7 +130,7 @@ The first build compiles 9 images and takes a while. Later deploys reuse the lay
 ### 6. Cloudflare API token
 
 Cloudflare dashboard → My Profile → API Tokens → **Create Token** → the
-"Edit Cloudflare Workers" template. Under Zone Resources, pick your domain, then
+"Edit Cloudflare Workers" template. Under Zone Resources, pick `reduzer.co.ke`, then
 add **Zone → DNS → Edit** (custom domains create DNS records). Copy the
 **Account ID** from the dashboard sidebar too.
 
@@ -125,7 +140,8 @@ Settings → Environments → **New environment** `production`, then add:
 
 | Kind | Name | Value |
 |---|---|---|
-| Variable | `DOMAIN` | `example.com` |
+| Variable | `DOMAIN` | `reduzer.co.ke` |
+| Variable | `HOST_PREFIX` | `mms-` |
 | Variable | `VPS_APP_DIR` | `/opt/mms` (optional, this is the default) |
 | Variable | `VPS_SSH_PORT` | only if SSH isn't on 22 |
 | Secret | `VPS_HOST` | VPS IP or hostname |
@@ -135,7 +151,7 @@ Settings → Environments → **New environment** `production`, then add:
 | Secret | `CLOUDFLARE_API_TOKEN` | token from step 6 |
 | Secret | `CLOUDFLARE_ACCOUNT_ID` | account ID from step 6 |
 
-Then Actions → **Deploy** → Run workflow. When it's green, open `https://dashboard.$DOMAIN`.
+Then Actions → **Deploy** → Run workflow. When it's green, open `https://mms-dashboard.reduzer.co.ke`.
 
 ## Day to day
 
@@ -156,9 +172,9 @@ dc exec -T postgres pg_dumpall -U mms_root | gzip > ~/mms-$(date +%F).sql.gz
 Deploy a single frontend by hand (needs `wrangler login` or `CLOUDFLARE_API_TOKEN`):
 
 ```bash
-DOMAIN=example.com bash deploy/frontend-env.sh
+DOMAIN=reduzer.co.ke HOST_PREFIX=mms- bash deploy/frontend-env.sh
 cd frontends/pos-terminal-app
-pnpm exec opennextjs-cloudflare build && pnpm exec opennextjs-cloudflare deploy --domain pos.example.com
+pnpm exec opennextjs-cloudflare build && pnpm exec opennextjs-cloudflare deploy --domain mms-pos.reduzer.co.ke
 ```
 
 Roll back a frontend: `cd frontends/<app> && pnpm exec wrangler rollback`.
@@ -174,3 +190,9 @@ Roll back a frontend: `cd frontends/<app> && pnpm exec wrangler rollback`.
   drop data makes the service fail to start instead of losing the data. Move to
   `prisma migrate deploy` once the schemas settle.
 - **`DIRECTORY_SEED_DEMO=true`** seeds demo stores and staff. Set it to `false` for real data.
+- **The session cookie is scoped to `.reduzer.co.ke`**, because every `mms-*`
+  app and API must share it. It is httpOnly, so other sites on the domain
+  can't read it in the browser, but browsers send it to them. Don't run
+  untrusted code on any `reduzer.co.ke` hostname.
+- **Backups are manual** (the `pg_dumpall` line above). Put it in a nightly
+  cron job, copied off the VPS, before real data goes in.

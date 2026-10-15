@@ -4,19 +4,23 @@
 #
 # Every name is ONE level below $DOMAIN (e.g. inventory-api.example.com, not
 # api.inventory.example.com) so Cloudflare's free Universal SSL cert covers it.
+# To share the zone with other sites, put the apps under a name prefix instead
+# of a deeper subdomain: HOST_PREFIX=mms- gives mms-pos.example.com and
+# mms-sales-api.example.com.
 : "${DOMAIN:?DOMAIN must be set, e.g. DOMAIN=example.com}"
+HOST_PREFIX="${HOST_PREFIX:-}"
 
 # Backend service -> "<public hostname> <compose service>:<port>"
 declare -A API_HOST=(
-  [vendor-management]="vendors-api.${DOMAIN}"
-  [procurement]="procurement-api.${DOMAIN}"
-  [inventory]="inventory-api.${DOMAIN}"
-  [receiving]="receiving-api.${DOMAIN}"
-  [warehouse-operations]="warehouse-api.${DOMAIN}"
-  [retail-sales]="sales-api.${DOMAIN}"
-  [sales-audit]="audit-api.${DOMAIN}"
-  [financials]="finance-api.${DOMAIN}"
-  [directory]="directory-api.${DOMAIN}"
+  [vendor-management]="${HOST_PREFIX}vendors-api.${DOMAIN}"
+  [procurement]="${HOST_PREFIX}procurement-api.${DOMAIN}"
+  [inventory]="${HOST_PREFIX}inventory-api.${DOMAIN}"
+  [receiving]="${HOST_PREFIX}receiving-api.${DOMAIN}"
+  [warehouse-operations]="${HOST_PREFIX}warehouse-api.${DOMAIN}"
+  [retail-sales]="${HOST_PREFIX}sales-api.${DOMAIN}"
+  [sales-audit]="${HOST_PREFIX}audit-api.${DOMAIN}"
+  [financials]="${HOST_PREFIX}finance-api.${DOMAIN}"
+  [directory]="${HOST_PREFIX}directory-api.${DOMAIN}"
 )
 declare -A API_PORT=(
   [vendor-management]=3001
@@ -32,15 +36,15 @@ declare -A API_PORT=(
 
 # Frontend (frontends/<dir>) -> public hostname (a Worker custom domain)
 declare -A APP_HOST=(
-  [vendor-management-portal]="vendors.${DOMAIN}"
-  [procurement-dashboard]="procurement.${DOMAIN}"
-  [inventory-control-center]="inventory.${DOMAIN}"
-  [warehouse-receiving-app]="receiving.${DOMAIN}"
-  [warehouse-floor-app]="warehouse.${DOMAIN}"
-  [pos-terminal-app]="pos.${DOMAIN}"
-  [store-manager-dashboard]="stores.${DOMAIN}"
-  [finance-portal]="finance.${DOMAIN}"
-  [executive-dashboard]="dashboard.${DOMAIN}"
+  [vendor-management-portal]="${HOST_PREFIX}vendors.${DOMAIN}"
+  [procurement-dashboard]="${HOST_PREFIX}procurement.${DOMAIN}"
+  [inventory-control-center]="${HOST_PREFIX}inventory.${DOMAIN}"
+  [warehouse-receiving-app]="${HOST_PREFIX}receiving.${DOMAIN}"
+  [warehouse-floor-app]="${HOST_PREFIX}warehouse.${DOMAIN}"
+  [pos-terminal-app]="${HOST_PREFIX}pos.${DOMAIN}"
+  [store-manager-dashboard]="${HOST_PREFIX}stores.${DOMAIN}"
+  [finance-portal]="${HOST_PREFIX}finance.${DOMAIN}"
+  [executive-dashboard]="${HOST_PREFIX}dashboard.${DOMAIN}"
 )
 
 api_url() { echo "https://${API_HOST[$1]}"; }

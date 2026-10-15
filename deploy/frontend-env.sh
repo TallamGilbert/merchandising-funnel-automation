@@ -4,7 +4,7 @@
 # run before building. .env.production.local beats a dev .env.local, so this
 # is safe to run on a dev machine too (both files are gitignored).
 #
-#   DOMAIN=example.com bash deploy/frontend-env.sh
+#   DOMAIN=example.com [HOST_PREFIX=mms-] bash deploy/frontend-env.sh
 set -euo pipefail
 cd "$(dirname "$0")/.."
 source deploy/hosts.sh
