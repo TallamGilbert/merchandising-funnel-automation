@@ -11,11 +11,11 @@ WORKDIR /workspace
 
 # ---- deps: install the full workspace so pnpm can resolve @mms/shared -----
 FROM base AS deps
-COPY package.json pnpm-workspace.yaml tsconfig.base.json ./
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml tsconfig.base.json ./
 COPY libs/shared ./libs/shared
 COPY services/receiving ./services/receiving
 COPY contracts ./contracts
-RUN pnpm install --no-frozen-lockfile
+RUN pnpm install --frozen-lockfile
 
 # ---- build: compile @mms/shared then this service --------------------------
 FROM deps AS build
