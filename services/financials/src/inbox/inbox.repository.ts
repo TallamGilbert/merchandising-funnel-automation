@@ -1,6 +1,8 @@
 import { Injectable } from "@nestjs/common";
+import { pageArgs, paged, searchAny } from "@mms/shared";
 import { InboxStatus, Prisma } from "../generated/prisma";
 import { PrismaService } from "../prisma/prisma.service";
+import { ListInboxQuery } from "./list-inbox.query";
 
 @Injectable()
 export class InboxRepository {
@@ -48,12 +50,13 @@ export class InboxRepository {
     });
   }
 
-  list(status?: InboxStatus) {
-    return this.prisma.inboxEvent.findMany({
-      where: { status },
-      orderBy: { receivedAt: "desc" },
-      take: 200,
-    });
+  async list(query: ListInboxQuery) {
+    const where = { status: query.status, ...searchAny(query.q, ["eventId", "routingKey"]) };
+    const [items, total] = await Promise.all([
+      this.prisma.inboxEvent.findMany({ where, orderBy: { receivedAt: "desc" }, ...pageArgs(query) }),
+      this.prisma.inboxEvent.count({ where }),
+    ]);
+    return paged(items, total, query);
   }
 
   countByStatus() {

@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   type CatalogProduct,
+  ExportMenu,
+  exportUrl,
   formatDate,
   formatMoney,
   formatQuantity,
@@ -80,9 +82,12 @@ export default function PricesPage() {
       subtitle="What each product sells for at the till. A product needs a price here before the POS can sell it."
       search={{ value: search, onChange: setSearch, placeholder: "Search the price list…" }}
       actions={
-        <button className="primary" onClick={() => setEditing({ mode: "create" })}>
-          Add to price list
-        </button>
+        <>
+          <ExportMenu href={(format) => exportUrl(api.productsUrl, { q: search }, format)} />
+          <button className="primary" onClick={() => setEditing({ mode: "create" })}>
+            Add to price list
+          </button>
+        </>
       }
     >
       {error && <p className="error">{error}</p>}

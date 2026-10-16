@@ -1,4 +1,5 @@
 import { BadRequestException } from "@nestjs/common";
+import { AuthUser } from "@mms/shared";
 import { DailyCloseController } from "../daily-close.controller";
 import { DailyCloseService } from "../daily-close.service";
 
@@ -36,8 +37,8 @@ describe("DailyCloseController", () => {
     expect(dailyClose.explainDiscrepancy).toHaveBeenCalledWith("STORE-1", "2026-09-24", "Till miscount");
   });
 
-  it("closes the day for the manager", async () => {
-    await controller.close("STORE-1", { businessDate: "2026-09-24", closedByManagerId: "mgr-1" });
+  it("closes the day as the signed-in manager", async () => {
+    await controller.close({ id: "mgr-1" } as AuthUser, "STORE-1", { businessDate: "2026-09-24" });
     expect(dailyClose.close).toHaveBeenCalledWith("STORE-1", "2026-09-24", "mgr-1");
   });
 });

@@ -5,6 +5,7 @@ import {
   GoodsReceivedEvent,
   ItemReturnedEvent,
   ItemSoldEvent,
+  StockAdjustedEvent,
 } from "@mms/shared";
 import { UnbalancedEntryError } from "../ledger/journal";
 import { LedgerRepository } from "../ledger/ledger.repository";
@@ -97,6 +98,8 @@ export class InboxProcessor implements OnModuleInit, OnModuleDestroy {
         return this.postings.itemReturned(payload as ItemReturnedEvent);
       case EventRoutingKey.DAY_CLOSED:
         return this.postings.dayClosed(payload as DayClosedEvent);
+      case EventRoutingKey.STOCK_ADJUSTED:
+        return this.postings.stockAdjusted(payload as StockAdjustedEvent);
       default:
         throw new PermanentPostingError(`No posting rule for ${routingKey}`);
     }

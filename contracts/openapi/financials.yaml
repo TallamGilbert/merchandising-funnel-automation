@@ -23,10 +23,41 @@ paths:
     get:
       operationId: LedgerController_entries
       parameters:
+      - name: page
+        required: false
+        in: query
+        description: 1-based page number
+        schema:
+          minimum: 1
+          default: 1
+          type: number
+      - name: pageSize
+        required: false
+        in: query
+        schema:
+          minimum: 1
+          maximum: 100
+          default: 20
+          type: number
+      - name: q
+        required: false
+        in: query
+        description: Free-text search; each endpoint documents what it matches
+        schema:
+          type: string
+      - name: format
+        required: false
+        in: query
+        description: Download every matching row instead of a page
+        schema:
+          enum:
+          - csv
+          - xlsx
+          type: string
       - name: from
         required: false
         in: query
-        description: YYYY-MM-DD
+        description: YYYY-MM-DD, inclusive
         schema:
           type: string
       - name: to
@@ -38,7 +69,9 @@ paths:
       - name: accountCode
         required: false
         in: query
+        description: Only entries with a line on this account
         schema:
+          example: '1200'
           type: string
       - name: source
         required: false
@@ -50,13 +83,8 @@ paths:
           - ITEM_RETURNED
           - DAY_CLOSED
           - BILL_PAYMENT
+          - STOCK_ADJUSTMENT
           type: string
-      - name: limit
-        required: false
-        in: query
-        description: Default 100, max 500
-        schema:
-          type: number
       responses:
         '200':
           description: ''
@@ -81,6 +109,37 @@ paths:
     get:
       operationId: InboxController_list
       parameters:
+      - name: page
+        required: false
+        in: query
+        description: 1-based page number
+        schema:
+          minimum: 1
+          default: 1
+          type: number
+      - name: pageSize
+        required: false
+        in: query
+        schema:
+          minimum: 1
+          maximum: 100
+          default: 20
+          type: number
+      - name: q
+        required: false
+        in: query
+        description: Free-text search; each endpoint documents what it matches
+        schema:
+          type: string
+      - name: format
+        required: false
+        in: query
+        description: Download every matching row instead of a page
+        schema:
+          enum:
+          - csv
+          - xlsx
+          type: string
       - name: status
         required: false
         in: query
@@ -113,6 +172,37 @@ paths:
     get:
       operationId: PayablesController_list
       parameters:
+      - name: page
+        required: false
+        in: query
+        description: 1-based page number
+        schema:
+          minimum: 1
+          default: 1
+          type: number
+      - name: pageSize
+        required: false
+        in: query
+        schema:
+          minimum: 1
+          maximum: 100
+          default: 20
+          type: number
+      - name: q
+        required: false
+        in: query
+        description: Free-text search; each endpoint documents what it matches
+        schema:
+          type: string
+      - name: format
+        required: false
+        in: query
+        description: Download every matching row instead of a page
+        schema:
+          enum:
+          - csv
+          - xlsx
+          type: string
       - name: status
         required: false
         in: query
@@ -190,6 +280,27 @@ paths:
           - product
           - store
           - day
+          type: string
+      responses:
+        '200':
+          description: ''
+      tags:
+      - reports
+  /reports/vat:
+    get:
+      operationId: ReportsController_vat
+      parameters:
+      - name: from
+        required: true
+        in: query
+        description: YYYY-MM-DD
+        schema:
+          type: string
+      - name: to
+        required: true
+        in: query
+        description: YYYY-MM-DD, inclusive
+        schema:
           type: string
       responses:
         '200':

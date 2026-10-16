@@ -1,3 +1,5 @@
+import { apiFetch } from "@mms/ui";
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3007";
 
 export type DailyCloseStatus = "OPEN" | "BLOCKED_ON_EXPLANATION" | "CLOSED";
@@ -31,7 +33,7 @@ export interface StoreDayLedger {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_URL}${path}`, {
+  const res = await apiFetch(`${API_URL}${path}`, {
     ...init,
     headers: { "Content-Type": "application/json", ...init?.headers },
   });
@@ -71,9 +73,10 @@ export const api = {
       body: JSON.stringify({ businessDate, explanation }),
     }),
 
-  closeDay: (storeId: string, businessDate: string, closedByManagerId: string) =>
+  /** Closed by the signed-in manager. */
+  closeDay: (storeId: string, businessDate: string) =>
     request<DailyClose>(`/stores/${encodeURIComponent(storeId)}/daily-close/close`, {
       method: "POST",
-      body: JSON.stringify({ businessDate, closedByManagerId }),
+      body: JSON.stringify({ businessDate }),
     }),
 };

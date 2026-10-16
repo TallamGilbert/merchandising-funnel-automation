@@ -2,18 +2,22 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
+  ExportMenu,
+  exportUrl,
   formatDateTime,
   LocationPicker,
+  Pagination,
   ProductPicker,
-  StaffPicker,
+  useCurrentUser,
   useFlash,
   useLocations,
+  usePagedList,
 } from "@mms/ui";
 import { AppShell, type NavSection } from "../../components/AppShell";
 import { BoxesIcon, LayersIcon, PackageIcon } from "../../components/icons";
-import { api, type Transfer, type TransferStatus } from "../../lib/api";
+import { api, type TransferStatus } from "../../lib/api";
 
 const NAV: NavSection[] = [
   {
@@ -27,20 +31,14 @@ const NAV: NavSection[] = [
 ];
 
 export default function TransfersPage() {
-  const [transfers, setTransfers] = useState<Transfer[] | null>(null);
   const [statusFilter, setStatusFilter] = useState<TransferStatus | "">("");
-  const [error, setError] = useState<string | null>(null);
+  const list = usePagedList(api.listTransfers, { status: statusFilter });
+  const transfers = list.data?.items ?? null;
   const [showForm, setShowForm] = useState(false);
+  // A supervisor raises a transfer; warehouse staff pick it.
+  const canCreate = ["OWNER", "MANAGER"].includes(useCurrentUser().role);
   const { data: locations } = useLocations();
   const locationName = (code: string) => locations.find((l) => l.code === code)?.name ?? code;
-
-  useEffect(() => {
-    setError(null);
-    api
-      .listTransfers(statusFilter || undefined)
-      .then(setTransfers)
-      .catch((err: Error) => setError(err.message));
-  }, [statusFilter]);
 
   return (
     <AppShell
@@ -48,15 +46,21 @@ export default function TransfersPage() {
       nav={NAV}
       title="Transfers"
       subtitle="Move stock between locations, e.g. warehouse to showroom (FR-5.4). Pickers are directed bin by bin."
+      search={{ value: list.q, onChange: list.setQ, placeholder: "Search transfer or SKU…" }}
       actions={
-        <button className="primary" onClick={() => setShowForm((v) => !v)}>
-          {showForm ? "Cancel" : "New transfer"}
-        </button>
+        <>
+          <ExportMenu href={(format) => exportUrl(api.transfersUrl, list.params, format)} />
+          {canCreate && (
+            <button className="primary" onClick={() => setShowForm((v) => !v)}>
+              {showForm ? "Cancel" : "New transfer"}
+            </button>
+          )}
+        </>
       }
     >
-      {showForm && <NewTransferForm />}
+      {canCreate && showForm && <NewTransferForm />}
 
-      {error && <p className="error">{error}</p>}
+      {list.error && <p className="error">{list.error}</p>}
 
       <div className="row-between">
         <label style={{ maxWidth: 220 }}>
@@ -115,6 +119,7 @@ export default function TransfersPage() {
             </tbody>
           </table>
         )}
+        <Pagination data={list.data} onPageChange={list.setPage} />
       </div>
     </AppShell>
   );
@@ -127,7 +132,6 @@ function NewTransferForm() {
   const [quantity, setQuantity] = useState(1);
   const [fromLocationCode, setFromLocationCode] = useState("");
   const [toLocationCode, setToLocationCode] = useState("");
-  const [requestedById, setRequestedById] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -145,7 +149,6 @@ function NewTransferForm() {
         quantity,
         fromLocationCode,
         toLocationCode,
-        requestedById,
       });
       flash.success(`${transfer.transferNumber} created — picks are ready`);
       router.push(`/transfers/${transfer.id}`);
@@ -183,10 +186,6 @@ function NewTransferForm() {
         <label>
           To
           <LocationPicker required value={toLocationCode} onChange={setToLocationCode} />
-        </label>
-        <label>
-          Requested by
-          <StaffPicker required roles={["MANAGER", "OWNER"]} value={requestedById} onChange={setRequestedById} />
         </label>
       </div>
 

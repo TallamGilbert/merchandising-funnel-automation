@@ -8,16 +8,22 @@ import {
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import {
+  AuthUser,
+  dateRange,
   EventBusService,
   EventRoutingKey,
   GoodsReceivedEvent,
+  pageArgs,
+  paged,
   PurchaseOrderApprovedEvent,
+  Role,
+  searchAny,
 } from "@mms/shared";
 import { PurchaseOrderStatus } from "../generated/prisma";
 import { PrismaService } from "../prisma/prisma.service";
 import { VendorManagementClientService } from "../vendor-management-client/vendor-management-client.service";
-import { ApprovePurchaseOrderDto, ApproverRole } from "./dto/approve-purchase-order.dto";
 import { CreatePurchaseOrderDto } from "./dto/create-purchase-order.dto";
+import { ListPurchaseOrdersQuery } from "./dto/list-purchase-orders.query";
 
 const OPEN_STATUSES: PurchaseOrderStatus[] = [
   PurchaseOrderStatus.APPROVED,
@@ -41,12 +47,22 @@ export class PurchaseOrdersService {
     );
   }
 
-  list(status?: PurchaseOrderStatus) {
-    return this.prisma.purchaseOrder.findMany({
-      where: status ? { status } : undefined,
-      include: { lines: true },
-      orderBy: { createdAt: "desc" },
-    });
+  async list(query: ListPurchaseOrdersQuery) {
+    const where = {
+      status: query.status,
+      createdAt: dateRange(query.from, query.to),
+      ...searchAny(query.q, ["poNumber", "supplierName"]),
+    };
+    const [items, total] = await Promise.all([
+      this.prisma.purchaseOrder.findMany({
+        where,
+        include: { lines: true },
+        orderBy: { createdAt: "desc" },
+        ...pageArgs(query),
+      }),
+      this.prisma.purchaseOrder.count({ where }),
+    ]);
+    return paged(items, total, query);
   }
 
   async findOne(id: string) {
@@ -85,7 +101,7 @@ export class PurchaseOrdersService {
   }
 
   /** FR-2.1/FR-2.2 — prices and freezes a draft PO from Vendor Management's live offer. */
-  async create(dto: CreatePurchaseOrderDto) {
+  async create(dto: CreatePurchaseOrderDto, requestedById: string) {
     const pricedLines = await Promise.all(
       dto.lines.map(async (line) => {
         const offers = await this.vendorManagement.findSuppliersForSku(line.sku);
@@ -123,7 +139,7 @@ export class PurchaseOrdersService {
         paymentTermsDays: firstOffer.paymentTermsDays,
         currency: firstOffer.currency,
         totalAmount,
-        requestedById: dto.requestedById,
+        requestedById,
         lines: {
           create: pricedLines.map((line) => ({
             sku: line.sku,
@@ -147,15 +163,19 @@ export class PurchaseOrdersService {
     });
   }
 
-  /** FR-2.3/D-1 — value-based approval threshold, then publishes PurchaseOrderApproved (FR-2.6). */
-  async approve(id: string, dto: ApprovePurchaseOrderDto) {
+  /**
+   * FR-2.3/D-1 — value-based approval threshold, then publishes
+   * PurchaseOrderApproved (FR-2.6). The approver is the signed-in user and
+   * their role comes from the session token, never from the request (D-16).
+   */
+  async approve(id: string, approver: Pick<AuthUser, "id" | "role">) {
     const po = await this.findOne(id);
     this.assertStatus(po, PurchaseOrderStatus.PENDING_APPROVAL);
 
-    if (
-      Number(po.totalAmount) >= this.approvalThresholdKes &&
-      dto.approverRole !== ApproverRole.OWNER
-    ) {
+    if (approver.role !== Role.OWNER && approver.role !== Role.MANAGER) {
+      throw new ForbiddenException("Only a manager or owner can approve a PO (D-1)");
+    }
+    if (Number(po.totalAmount) >= this.approvalThresholdKes && approver.role !== Role.OWNER) {
       throw new ForbiddenException(
         `POs at or above ${this.approvalThresholdKes} require OWNER approval (D-1)`,
       );
@@ -166,7 +186,7 @@ export class PurchaseOrdersService {
       where: { id },
       data: {
         status: PurchaseOrderStatus.APPROVED,
-        approvedById: dto.approvedById,
+        approvedById: approver.id,
         approvedAt,
       },
       include: { lines: true },
@@ -180,7 +200,7 @@ export class PurchaseOrdersService {
       supplierName: approved.supplierName,
       paymentTermsDays: approved.paymentTermsDays,
       currency: approved.currency,
-      approvedById: dto.approvedById,
+      approvedById: approver.id,
       approvedAt: approvedAt.toISOString(),
       lines: approved.lines.map((line) => ({
         sku: line.sku,

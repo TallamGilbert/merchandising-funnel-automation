@@ -1,7 +1,18 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { BarChart, ChartCard, formatDate, formatMoney, Modal, useFlash } from "@mms/ui";
+import {
+  BarChart,
+  ChartCard,
+  ExportMenu,
+  exportUrl,
+  formatDate,
+  formatMoney,
+  Modal,
+  Pagination,
+  useFlash,
+  usePagedList,
+} from "@mms/ui";
 import { AppShell } from "../../components/AppShell";
 import { type AgingBucket, type AgingReport, api, type BillStatus, type PayableBill } from "../../lib/financials-client";
 import { NAV } from "../../lib/nav";
@@ -22,31 +33,28 @@ function todayIso(): string {
 export default function PayablesPage() {
   const flash = useFlash();
   const [aging, setAging] = useState<AgingReport | null>(null);
-  const [bills, setBills] = useState<PayableBill[] | null>(null);
   const [status, setStatus] = useState<BillStatus | "">("OPEN");
-  const [search, setSearch] = useState("");
   const [paying, setPaying] = useState<PayableBill | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [agingError, setAgingError] = useState<string | null>(null);
+  const list = usePagedList(api.payables, { status });
+  const bills = list.data?.items ?? null;
+  const visible = list.items;
+  const error = list.error ?? agingError;
 
-  const load = () => {
-    Promise.all([api.aging(), api.payables(status || undefined)])
-      .then(([report, list]) => {
+  const loadAging = () => {
+    api
+      .aging()
+      .then((report) => {
         setAging(report);
-        setBills(list);
-        setError(null);
+        setAgingError(null);
       })
-      .catch((err: Error) => setError(err.message));
+      .catch((err: Error) => setAgingError(err.message));
   };
-  useEffect(load, [status]);
-
-  const q = search.trim().toLowerCase();
-  const visible = (bills ?? []).filter(
-    (b) =>
-      !q ||
-      b.supplierName.toLowerCase().includes(q) ||
-      b.poNumber.toLowerCase().includes(q) ||
-      b.goodsReceivedNoteNumber.toLowerCase().includes(q),
-  );
+  useEffect(loadAging, []);
+  const load = () => {
+    loadAging();
+    list.reload();
+  };
 
   return (
     <AppShell
@@ -54,7 +62,8 @@ export default function PayablesPage() {
       nav={NAV}
       title="Accounts payable"
       subtitle="What's owed to each supplier and when it's due (FR-8.4). A bill is raised automatically for every goods received note."
-      search={{ value: search, onChange: setSearch, placeholder: "Search supplier, PO or GRN…" }}
+      search={{ value: list.q, onChange: list.setQ, placeholder: "Search supplier, PO or GRN…" }}
+      actions={<ExportMenu href={(format) => exportUrl(api.payablesUrl, list.params, format)} />}
     >
       {error && <p className="error">{error}</p>}
 
@@ -175,6 +184,7 @@ export default function PayablesPage() {
             </tbody>
           </table>
         )}
+        <Pagination data={list.data} onPageChange={list.setPage} />
       </div>
 
       {paying && (

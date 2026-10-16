@@ -5,6 +5,7 @@ import {
   ServiceUnavailableException,
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
+import { internalFetch } from "@mms/shared";
 
 export interface ExpectedTotalResponse {
   storeId: string;
@@ -32,7 +33,7 @@ export class RetailSalesClientService {
     const url = `${this.baseUrl}/stores/${encodeURIComponent(storeId)}/expected-total?businessDate=${encodeURIComponent(businessDate)}`;
     let response: Response;
     try {
-      response = await fetch(url);
+      response = await internalFetch(url);
     } catch (error) {
       this.logger.error(`Retail Sales unreachable at ${url}: ${(error as Error).message}`);
       throw new ServiceUnavailableException(

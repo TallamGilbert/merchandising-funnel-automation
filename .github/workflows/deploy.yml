@@ -18,6 +18,7 @@ env:
   NODE_VERSION: "20.17.0"
   PNPM_VERSION: "9"
   DOMAIN: ${{ vars.DOMAIN }}
+  HOST_PREFIX: ${{ vars.HOST_PREFIX }}
   VPS_APP_DIR: ${{ vars.VPS_APP_DIR || '/opt/mms' }}
 
 jobs:

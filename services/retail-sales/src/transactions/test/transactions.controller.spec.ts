@@ -4,19 +4,20 @@ import { TransactionsService } from "../transactions.service";
 
 describe("TransactionsController", () => {
   let controller: TransactionsController;
-  let transactions: { findOne: jest.Mock; listRecent: jest.Mock };
+  let transactions: { findOne: jest.Mock; list: jest.Mock };
 
   beforeEach(() => {
     transactions = {
       findOne: jest.fn().mockResolvedValue({ id: "txn-1" }),
-      listRecent: jest.fn().mockResolvedValue([]),
+      list: jest.fn().mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 20 }),
     };
     controller = new TransactionsController(transactions as unknown as TransactionsService);
   });
 
-  it("lists recent transactions for a store", async () => {
-    await controller.list("STORE-1", 20);
-    expect(transactions.listRecent).toHaveBeenCalledWith("STORE-1", 20);
+  it("lists transactions with the query's filters", async () => {
+    const query = { page: 1, pageSize: 20, storeId: "STORE-1" };
+    await controller.list(query);
+    expect(transactions.list).toHaveBeenCalledWith(query);
   });
 
   it("returns the transaction by id", async () => {

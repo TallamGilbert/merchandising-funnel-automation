@@ -1,3 +1,4 @@
+import { internalFetch } from "@mms/shared";
 import { PermanentPostingError, TransientPostingError } from "../postings/posting-errors";
 
 /**
@@ -7,7 +8,7 @@ import { PermanentPostingError, TransientPostingError } from "../postings/postin
 export async function getJson<T>(url: string, what: string): Promise<T> {
   let response: Response;
   try {
-    response = await fetch(url);
+    response = await internalFetch(url);
   } catch (error) {
     throw new TransientPostingError(`${what}: service unreachable (${(error as Error).message})`);
   }

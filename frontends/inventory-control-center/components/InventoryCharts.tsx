@@ -14,7 +14,7 @@ export function InventoryCharts() {
 
   const load = () => {
     api.valuationReport().then(setReport).catch(() => setReport(null));
-    api.listStockLevels().then(setLevels).catch(() => setLevels(null));
+    api.allStockLevels().then(setLevels).catch(() => setLevels(null));
   };
   useEffect(load, []);
   usePolling(load, 10000);

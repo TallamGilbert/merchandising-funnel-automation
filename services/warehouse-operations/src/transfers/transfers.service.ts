@@ -6,8 +6,12 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import {
+  dateRange,
   EventBusService,
   EventRoutingKey,
+  pageArgs,
+  paged,
+  searchAny,
   StockTransferredEvent,
 } from "@mms/shared";
 import { PickTaskStatus, TransferStatus } from "../generated/prisma";
@@ -15,6 +19,7 @@ import { InventoryClientService } from "../inventory-client/inventory-client.ser
 import { PrismaService } from "../prisma/prisma.service";
 import { CompletePickDto } from "./dto/complete-pick.dto";
 import { CreateTransferDto } from "./dto/create-transfer.dto";
+import { ListTransfersQuery } from "./list-transfers.query";
 
 @Injectable()
 export class TransfersService {
@@ -26,12 +31,22 @@ export class TransfersService {
     private readonly eventBus: EventBusService,
   ) {}
 
-  list(status?: TransferStatus) {
-    return this.prisma.transfer.findMany({
-      where: status ? { status } : undefined,
-      include: { picks: { include: { bin: true } } },
-      orderBy: { createdAt: "desc" },
-    });
+  async list(query: ListTransfersQuery) {
+    const where = {
+      status: query.status,
+      createdAt: dateRange(query.from, query.to),
+      ...searchAny(query.q, ["transferNumber", "sku"]),
+    };
+    const [items, total] = await Promise.all([
+      this.prisma.transfer.findMany({
+        where,
+        include: { picks: { include: { bin: true } } },
+        orderBy: { createdAt: "desc" },
+        ...pageArgs(query),
+      }),
+      this.prisma.transfer.count({ where }),
+    ]);
+    return paged(items, total, query);
   }
 
   async findOne(id: string) {
@@ -49,7 +64,8 @@ export class TransfersService {
    * smaller bins before larger ones. Quantities already promised to other
    * open picks are not offered twice.
    */
-  async create(dto: CreateTransferDto) {
+  /** `requestedById` is the signed-in user, set by the controller. */
+  async create(dto: CreateTransferDto & { requestedById: string }) {
     if (dto.fromLocationCode === dto.toLocationCode) {
       throw new BadRequestException("Source and destination locations must differ");
     }
@@ -134,7 +150,7 @@ export class TransfersService {
    * completion: if the transfer is still open with nothing left to pick, it
    * finishes the transfer instead of rejecting the call.
    */
-  async completePick(id: string, dto: CompletePickDto) {
+  async completePick(id: string, dto: CompletePickDto & { pickedById: string }) {
     const pick = await this.prisma.pickTask.findUnique({
       where: { id },
       include: { bin: true },

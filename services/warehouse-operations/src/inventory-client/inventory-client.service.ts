@@ -5,6 +5,7 @@ import {
   ServiceUnavailableException,
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
+import { internalFetch } from "@mms/shared";
 
 /**
  * The slice of an Inventory product that Warehouse Operations is allowed to
@@ -101,7 +102,7 @@ export class InventoryClientService {
 
   private async request(url: string, init?: RequestInit): Promise<Response> {
     try {
-      return await fetch(url, init);
+      return await internalFetch(url, init);
     } catch (error) {
       this.logger.error(`Inventory unreachable at ${url}: ${(error as Error).message}`);
       throw new ServiceUnavailableException(

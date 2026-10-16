@@ -1,3 +1,5 @@
+import { apiFetch, fetchAllPages, MMS_APPS, type Page, type QueryValue, withQuery } from "@mms/ui";
+
 /**
  * Read-only access to every module's public REST API. The dashboard never
  * writes; each tab links to the module's own app for that. Types cover only
@@ -15,18 +17,18 @@ const url = {
 };
 
 export const APP_URL = {
-  vendorManagement: process.env.NEXT_PUBLIC_VENDOR_MANAGEMENT_APP_URL ?? "http://localhost:3101",
-  procurement: process.env.NEXT_PUBLIC_PROCUREMENT_APP_URL ?? "http://localhost:3102",
-  inventory: process.env.NEXT_PUBLIC_INVENTORY_APP_URL ?? "http://localhost:3103",
-  receiving: process.env.NEXT_PUBLIC_RECEIVING_APP_URL ?? "http://localhost:3104",
-  warehouse: process.env.NEXT_PUBLIC_WAREHOUSE_APP_URL ?? "http://localhost:3105",
-  pos: process.env.NEXT_PUBLIC_POS_APP_URL ?? "http://localhost:3106",
-  storeManager: process.env.NEXT_PUBLIC_STORE_MANAGER_APP_URL ?? "http://localhost:3107",
-  finance: process.env.NEXT_PUBLIC_FINANCE_APP_URL ?? "http://localhost:3108",
+  vendorManagement: MMS_APPS.vendors.url,
+  procurement: MMS_APPS.procurement.url,
+  inventory: MMS_APPS.inventory.url,
+  receiving: MMS_APPS.receiving.url,
+  warehouse: MMS_APPS.warehouse.url,
+  pos: MMS_APPS.pos.url,
+  storeManager: MMS_APPS.stores.url,
+  finance: MMS_APPS.finance.url,
 };
 
 async function get<T>(base: string, path: string): Promise<T> {
-  const res = await fetch(`${base}${path}`);
+  const res = await apiFetch(`${base}${path}`);
   if (!res.ok) {
     const body = await res.json().catch(() => null);
     throw new Error(body?.message ?? `${res.status} ${res.statusText}`);
@@ -185,27 +187,69 @@ export interface AgingReport {
   totalOutstanding: number;
 }
 
+/**
+ * Every row of a paged list. The dashboard totals whole lists (open POs,
+ * stock on hand, pending putaways), so a single page would undercount.
+ */
+function all<T>(base: string, path: string, filters: Record<string, QueryValue> = {}): Promise<T[]> {
+  return fetchAllPages((page, pageSize) => get<Page<T>>(base, withQuery(path, { ...filters, page, pageSize })));
+}
+
 const enc = encodeURIComponent;
 
+export interface SalesReportRow {
+  key: string;
+  label: string;
+  transactions: number;
+  units: number;
+  sales: number;
+  returns: number;
+  net: number;
+}
+
+export interface MovementRow {
+  sku: string;
+  productName: string;
+  locationCode: string;
+  onHand: number;
+  stockValue: number;
+  daysOfCover: number | null;
+  status: "DEAD" | "SLOW" | "OK";
+}
+
+export interface SupplierPerformance {
+  supplierId: string;
+  supplierName: string;
+  purchaseOrders: number;
+  closedOrders: number;
+  fillRate: number | null;
+}
+
 export const services = {
+  /** D-20 reports. */
+  salesReport: (from: string, to: string, groupBy: "hour" | "sku" | "store") =>
+    get<SalesReportRow[]>(url.retailSales, withQuery("/reports/sales", { from, to, groupBy })),
+  stockMovement: () => get<MovementRow[]>(url.inventory, "/reports/stock-movement"),
+  supplierPerformance: (from: string, to: string) =>
+    get<SupplierPerformance[]>(url.procurement, withQuery("/reports/supplier-performance", { from, to })),
+
   salesSummary: (storeId: string, from: string, to: string) =>
     get<SalesSummary>(url.retailSales, `/stores/${enc(storeId)}/sales-summary?from=${from}&to=${to}`),
 
   valuation: () => get<Valuation>(url.inventory, "/valuation"),
-  stockLevels: () => get<StockLevel[]>(url.inventory, "/stock-levels"),
+  stockLevels: () => all<StockLevel>(url.inventory, "/stock-levels"),
 
-  purchaseOrders: () => get<PurchaseOrder[]>(url.procurement, "/purchase-orders"),
-  reorderSuggestions: () => get<ReorderSuggestion[]>(url.procurement, "/reorder-suggestions?status=NEW"),
+  purchaseOrders: () => all<PurchaseOrder>(url.procurement, "/purchase-orders"),
+  reorderSuggestions: () => all<ReorderSuggestion>(url.procurement, "/reorder-suggestions", { status: "NEW" }),
 
-  expectedDeliveries: () => get<ExpectedDelivery[]>(url.receiving, "/expected-deliveries"),
-  goodsReceivedNotes: () => get<GoodsReceivedNote[]>(url.receiving, "/goods-received-notes"),
+  expectedDeliveries: () => all<ExpectedDelivery>(url.receiving, "/expected-deliveries"),
+  goodsReceivedNotes: () => all<GoodsReceivedNote>(url.receiving, "/goods-received-notes"),
 
-  pendingPutaways: () => get<PutawayTask[]>(url.warehouse, "/putaway-tasks?status=PENDING"),
-  transfersPicking: () => get<Transfer[]>(url.warehouse, "/transfers?status=PICKING"),
+  pendingPutaways: () => all<PutawayTask>(url.warehouse, "/putaway-tasks", { status: "PENDING" }),
+  transfersPicking: () => all<Transfer>(url.warehouse, "/transfers", { status: "PICKING" }),
   utilization: () => get<ZoneUtilization[]>(url.warehouse, "/bins/utilization"),
 
-  suppliers: () =>
-    get<{ items: Supplier[] }>(url.vendorManagement, "/suppliers?status=ACTIVE&pageSize=100").then((r) => r.items),
+  suppliers: () => all<Supplier>(url.vendorManagement, "/suppliers", { status: "ACTIVE" }),
   supplier: (id: string) => get<SupplierDetail>(url.vendorManagement, `/suppliers/${enc(id)}`),
 
   dailyClose: (storeId: string, businessDate: string) =>

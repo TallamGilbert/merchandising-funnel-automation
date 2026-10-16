@@ -1,5 +1,5 @@
 import type { NavSection } from "../components/AppShell";
-import { ClipboardCheckIcon, StoreIcon, UsersIcon } from "../components/icons";
+import { ChartBarIcon, ClipboardCheckIcon, StoreIcon, UsersIcon } from "../components/icons";
 
 export const NAV: NavSection[] = [
   {
@@ -7,6 +7,7 @@ export const NAV: NavSection[] = [
     items: [
       { label: "Overview", href: "/", icon: <StoreIcon /> },
       { label: "Close register", href: "/close", icon: <ClipboardCheckIcon /> },
+      { label: "Reports", href: "/reports", icon: <ChartBarIcon /> },
       { label: "Staff", href: "/staff", icon: <UsersIcon /> },
     ],
   },

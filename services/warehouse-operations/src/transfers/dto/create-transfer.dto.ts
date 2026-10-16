@@ -18,8 +18,4 @@ export class CreateTransferDto {
   @ApiProperty({ example: "STORE-1" })
   @IsString()
   toLocationCode!: string;
-
-  @ApiProperty({ description: "User id of the supervisor requesting the transfer" })
-  @IsString()
-  requestedById!: string;
 }

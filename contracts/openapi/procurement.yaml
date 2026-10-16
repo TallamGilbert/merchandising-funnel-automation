@@ -11,6 +11,7 @@ info:
 servers:
   - url: http://localhost:3002
 tags:
+  - name: reports
   - name: health
   - name: purchase-orders
   - name: reorder-suggestions
@@ -38,14 +39,34 @@ paths:
         - in: query
           name: status
           schema: { $ref: "#/components/schemas/PurchaseOrderStatus" }
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+        - in: query
+          name: q
+          description: Search — matches PO number or supplier name (case-insensitive).
+          schema: { type: string, maxLength: 100 }
+        - $ref: "#/components/parameters/From"
+        - $ref: "#/components/parameters/To"
+        - $ref: "#/components/parameters/ExportFormat"
       responses:
         "200":
           description: OK
           content:
             application/json:
               schema:
-                type: array
-                items: { $ref: "#/components/schemas/PurchaseOrder" }
+                type: object
+                required: [items, total, page, pageSize]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/PurchaseOrder" }
+                  total: { type: integer, description: Rows matching the filters }
+                  page: { type: integer }
+                  pageSize: { type: integer }
+            text/csv:
+              schema: { type: string, format: binary }
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema: { type: string, format: binary }
     post:
       tags: [purchase-orders]
       summary: >
@@ -92,16 +113,13 @@ paths:
     post:
       tags: [purchase-orders]
       summary: >
-        Pending Approval -> Approved (FR-2.3, D-1). Requires MANAGER role
-        below PO_APPROVAL_THRESHOLD_KES, OWNER role at/above it. Publishes
-        PurchaseOrderApproved on success (FR-2.6).
+        Pending Approval -> Approved (FR-2.3, D-1). The signed-in user is
+        the approver and their role comes from the session (D-16): MANAGER
+        below PO_APPROVAL_THRESHOLD_KES, OWNER at/above it; any other role
+        gets 403. No request body. Publishes PurchaseOrderApproved on success
+        (FR-2.6).
       parameters:
         - $ref: "#/components/parameters/PurchaseOrderId"
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: "#/components/schemas/ApprovePurchaseOrderDto" }
       responses:
         "200":
           description: OK
@@ -168,14 +186,33 @@ paths:
         FR-2.7 — reorder suggestions surfaced from consumed StockLow events.
         A human still creates the PO; this is advisory only (no
         auto-ordering).
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+        - in: query
+          name: q
+          description: Search — matches SKU.
+          schema: { type: string, maxLength: 100 }
+        - $ref: "#/components/parameters/ExportFormat"
       responses:
         "200":
           description: OK
           content:
             application/json:
               schema:
-                type: array
-                items: { $ref: "#/components/schemas/ReorderSuggestion" }
+                type: object
+                required: [items, total, page, pageSize]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/ReorderSuggestion" }
+                  total: { type: integer, description: Rows matching the filters }
+                  page: { type: integer }
+                  pageSize: { type: integer }
+            text/csv:
+              schema: { type: string, format: binary }
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema: { type: string, format: binary }
   /reorder-suggestions/{id}/dismiss:
     post:
       tags: [reorder-suggestions]
@@ -191,14 +228,78 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ReorderSuggestion" }
+  /reports/supplier-performance:
+    get:
+      tags: [reports]
+      summary: >
+        D-20 — per supplier, for POs approved between from and to (approved,
+        sent, partially received or closed): orders, KES spend (other
+        currencies counted, never converted), units ordered vs received,
+        and fill rate on closed POs (over-delivery capped). OWNER, MANAGER,
+        BUYER or ACCOUNTANT.
+      parameters:
+        - { in: query, name: from, required: true, schema: { type: string, format: date } }
+        - { in: query, name: to, required: true, schema: { type: string, format: date } }
+        - $ref: "#/components/parameters/ExportFormat"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/SupplierPerformance" }
+            text/csv:
+              schema: { type: string, format: binary }
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema: { type: string, format: binary }
 components:
   parameters:
+    Page:
+      in: query
+      name: page
+      description: 1-based page number.
+      schema: { type: integer, minimum: 1, default: 1 }
+    PageSize:
+      in: query
+      name: pageSize
+      schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+    ExportFormat:
+      in: query
+      name: format
+      description: >
+        Download every matching row (up to 50,000) as a file instead of a
+        page. Paging params are ignored; filters and q apply.
+      schema: { type: string, enum: [csv, xlsx] }
+    From:
+      in: query
+      name: from
+      description: YYYY-MM-DD, inclusive (UTC day).
+      schema: { type: string, format: date }
+    To:
+      in: query
+      name: to
+      description: YYYY-MM-DD, inclusive (UTC day).
+      schema: { type: string, format: date }
     PurchaseOrderId:
       in: path
       name: id
       required: true
       schema: { type: string, format: uuid }
   schemas:
+    SupplierPerformance:
+      type: object
+      properties:
+        supplierId: { type: string }
+        supplierName: { type: string }
+        purchaseOrders: { type: integer }
+        openOrders: { type: integer }
+        closedOrders: { type: integer }
+        spendKes: { type: number }
+        otherCurrencyOrders: { type: integer }
+        unitsOrdered: { type: integer }
+        unitsReceived: { type: integer }
+        fillRate: { type: number, nullable: true, description: 0–1 on closed POs; null until one closes }
     PurchaseOrderStatus:
       type: string
       enum:
@@ -249,10 +350,10 @@ components:
         updatedAt: { type: string, format: date-time }
     CreatePurchaseOrderDto:
       type: object
-      required: [supplierId, requestedById, lines]
+      description: The signed-in user is recorded as requestedById (D-16).
+      required: [supplierId, lines]
       properties:
         supplierId: { type: string, format: uuid }
-        requestedById: { type: string }
         lines:
           type: array
           items:
@@ -261,12 +362,6 @@ components:
             properties:
               sku: { type: string }
               quantityOrdered: { type: integer }
-    ApprovePurchaseOrderDto:
-      type: object
-      required: [approvedById, approverRole]
-      properties:
-        approvedById: { type: string }
-        approverRole: { type: string, enum: [MANAGER, OWNER] }
     ReorderSuggestion:
       type: object
       properties:

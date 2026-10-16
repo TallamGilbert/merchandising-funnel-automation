@@ -51,6 +51,44 @@ describe("StockService", () => {
     );
   });
 
+  describe("adjust", () => {
+    beforeEach(() => {
+      prisma.product.findUnique.mockResolvedValue({ ...product, name: "Sofa" });
+      prisma.$transaction.mockResolvedValue([
+        { id: "level-1", onHand: 7, allocated: 2 },
+        { id: "txn-9", createdAt: new Date("2026-10-10T09:00:00Z") },
+      ]);
+    });
+
+    it("changes the level and records the transaction together", async () => {
+      await expect(service.adjust("SKU-1", "WH-MAIN", -3, "Water damage", "mgr-sam")).resolves.toMatchObject({
+        onHand: 7,
+        available: 5,
+      });
+      expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+      expect(prisma.$transaction.mock.calls[0][0]).toHaveLength(2);
+    });
+
+    it("publishes StockAdjusted so Financials books the value", async () => {
+      await service.adjust("SKU-1", "WH-MAIN", -3, "Water damage", "mgr-sam");
+      expect(eventBus.publish).toHaveBeenCalledWith(EventRoutingKey.STOCK_ADJUSTED, {
+        eventId: expect.any(String),
+        occurredAt: "2026-10-10T09:00:00.000Z",
+        kind: "MANUAL",
+        reference: "txn-9",
+        locationCode: "WH-MAIN",
+        description: "Stock adjustment: Water damage",
+        adjustedById: "mgr-sam",
+        lines: [{ sku: "SKU-1", productName: "Sofa", quantityDelta: -3, unitCost: 100 }],
+      });
+    });
+
+    it("publishes nothing for a zero adjustment", async () => {
+      await service.adjust("SKU-1", "WH-MAIN", 0, "Checked", "mgr-sam");
+      expect(eventBus.publish).not.toHaveBeenCalled();
+    });
+  });
+
   describe("reserve", () => {
     it("declines the reservation when available stock is insufficient", async () => {
       prisma.stockLevel.findUniqueOrThrow.mockResolvedValue({

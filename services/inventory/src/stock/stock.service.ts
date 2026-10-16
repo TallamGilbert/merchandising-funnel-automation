@@ -5,6 +5,10 @@ import {
   EventBusService,
   EventRoutingKey,
   GoodsReceivedEvent,
+  pageArgs,
+  paged,
+  searchAny,
+  StockAdjustedEvent,
   StockLowEvent,
   StockTransferredEvent,
 } from "@mms/shared";
@@ -15,6 +19,7 @@ import {
   StockLevel,
 } from "../generated/prisma";
 import { PrismaService } from "../prisma/prisma.service";
+import { ListStockLevelsQuery } from "./list-stock-levels.query";
 
 const VELOCITY_WINDOW_DAYS = 14;
 
@@ -55,38 +60,69 @@ export class StockService {
     return levels.map((level) => this.withAvailable(level));
   }
 
-  async listStockLevels(locationCode?: string) {
-    const levels = await this.prisma.stockLevel.findMany({
-      where: locationCode ? { locationCode } : undefined,
-      include: { product: true },
-    });
-    return levels.map((level) => ({
+  async listStockLevels(query: ListStockLevelsQuery) {
+    const where = { locationCode: query.locationCode, product: searchAny(query.q, ["sku", "name"]) };
+    const [levels, total] = await Promise.all([
+      this.prisma.stockLevel.findMany({
+        where,
+        include: { product: true },
+        orderBy: [{ product: { sku: "asc" } }, { locationCode: "asc" }],
+        ...pageArgs(query),
+      }),
+      this.prisma.stockLevel.count({ where }),
+    ]);
+    const items = levels.map(({ product, ...level }) => ({
       ...this.withAvailable(level),
-      sku: level.product.sku,
+      sku: product.sku,
+      productName: product.name,
     }));
+    return paged(items, total, query);
   }
 
-  /** FR-4.8 — manual stock adjustment (e.g. after a physical count). */
+  /**
+   * FR-4.8 — manual stock adjustment (a one-off correction; whole counts go
+   * through stock counts, D-19). The level and its transaction change
+   * together, and StockAdjusted lets Financials book the value (D-19).
+   */
   async adjust(
     sku: string,
     locationCode: string,
     quantityDelta: number,
     reason: string,
+    adjustedById: string,
   ) {
     const product = await this.getProductOrThrow(sku);
-    await this.upsertLevel(product.id, locationCode, product.unitCost);
-    const level = await this.prisma.stockLevel.update({
-      where: { productId_locationCode: { productId: product.id, locationCode } },
-      data: { onHand: { increment: quantityDelta } },
-    });
-    await this.recordTransaction(
-      product.id,
-      locationCode,
-      InventoryTransactionType.ADJUSTMENT,
-      quantityDelta,
-      "ADJUSTMENT",
-      reason,
-    );
+    const [level, transaction] = await this.prisma.$transaction([
+      this.prisma.stockLevel.upsert({
+        where: { productId_locationCode: { productId: product.id, locationCode } },
+        create: { productId: product.id, locationCode, onHand: quantityDelta, allocated: 0, unitValue: product.unitCost },
+        update: { onHand: { increment: quantityDelta } },
+      }),
+      this.prisma.inventoryTransaction.create({
+        data: {
+          productId: product.id,
+          locationCode,
+          type: InventoryTransactionType.ADJUSTMENT,
+          quantityDelta,
+          referenceType: "ADJUSTMENT",
+          referenceId: reason,
+        },
+      }),
+    ]);
+
+    if (quantityDelta !== 0) {
+      const event: StockAdjustedEvent = {
+        eventId: randomUUID(),
+        occurredAt: transaction.createdAt.toISOString(),
+        kind: "MANUAL",
+        reference: transaction.id,
+        locationCode,
+        description: `Stock adjustment: ${reason}`,
+        adjustedById,
+        lines: [{ sku, productName: product.name, quantityDelta, unitCost: Number(product.unitCost) }],
+      };
+      await this.eventBus.publish(EventRoutingKey.STOCK_ADJUSTED, event);
+    }
     return this.withAvailable(level);
   }
 

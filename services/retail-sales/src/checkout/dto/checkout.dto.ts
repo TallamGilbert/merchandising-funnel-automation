@@ -43,10 +43,6 @@ export class CheckoutDto {
   @IsString()
   registerId!: string;
 
-  @ApiProperty({ example: "cashier-amy" })
-  @IsString()
-  cashierId!: string;
-
   @ApiProperty({
     description: "Inventory location code this register sells from (matches Inventory's locationCode)",
     example: "STORE-1",

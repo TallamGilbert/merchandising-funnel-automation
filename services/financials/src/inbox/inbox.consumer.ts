@@ -8,10 +8,11 @@ const CONSUMED: EventRoutingKey[] = [
   EventRoutingKey.ITEM_SOLD,
   EventRoutingKey.ITEM_RETURNED,
   EventRoutingKey.DAY_CLOSED,
+  EventRoutingKey.STOCK_ADJUSTED,
 ];
 
 /**
- * FR-8.1–8.3 (+ D-14 returns). The handler only has to store the event —
+ * FR-8.1–8.3 (+ D-14 returns, D-19 stock adjustments). The handler only has to store the event —
  * once it's in the inbox it's acknowledged, and posting (which calls
  * Procurement/Inventory) can fail and retry without the bus dropping it.
  */

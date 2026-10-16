@@ -1,43 +1,33 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { formatDateTime, formatQuantity, useLocations, usePolling } from "@mms/ui";
-import { AppShell, type NavSection } from "../../components/AppShell";
-import { BoxesIcon, LayersIcon } from "../../components/icons";
-import { api, type StockLevel } from "../../lib/api";
+import {
+  ExportMenu,
+  exportUrl,
+  formatDateTime,
+  formatQuantity,
+  Pagination,
+  useLocations,
+  usePagedList,
+  usePolling,
+} from "@mms/ui";
+import { AppShell } from "../../components/AppShell";
+import { NAV } from "../../lib/nav";
+import { api } from "../../lib/api";
 
-const NAV: NavSection[] = [
-  {
-    label: "Main menu",
-    items: [
-      { label: "Products", href: "/", icon: <BoxesIcon /> },
-      { label: "Stock levels", href: "/stock-levels", icon: <LayersIcon /> },
-    ],
-  },
-];
 
 export default function StockLevelsPage() {
-  const [levels, setLevels] = useState<StockLevel[] | null>(null);
   const [locationFilter, setLocationFilter] = useState("");
-  const [error, setError] = useState<string | null>(null);
-
   const [refreshedAt, setRefreshedAt] = useState<Date | null>(null);
   const { data: directoryLocations } = useLocations();
+  const list = usePagedList(api.listStockLevels, { locationCode: locationFilter }, 50);
+  const levels = list.data?.items ?? null;
 
-  const load = () => {
-    api
-      .listStockLevels(locationFilter || undefined)
-      .then((rows) => {
-        setLevels(rows);
-        setError(null);
-        setRefreshedAt(new Date());
-      })
-      .catch((err: Error) => setError(err.message));
-  };
-
-  useEffect(load, [locationFilter]);
+  useEffect(() => {
+    if (list.data) setRefreshedAt(new Date());
+  }, [list.data]);
   // Checkout reserves stock and ItemSold settles it — keep this screen live.
-  usePolling(load, 5000);
+  usePolling(list.reload, 5000);
 
   const locationName = useMemo(() => {
     const names = new Map(directoryLocations.map((l) => [l.code, l.name]));
@@ -56,8 +46,10 @@ export default function StockLevelsPage() {
       nav={NAV}
       title="Stock levels"
       subtitle="On hand / allocated / available across every location (FR-4.1, FR-4.3)."
+      search={{ value: list.q, onChange: list.setQ, placeholder: "Search SKU or product…" }}
+      actions={<ExportMenu href={(format) => exportUrl(api.stockLevelsUrl, list.params, format)} />}
     >
-      {error && <p className="error">{error}</p>}
+      {list.error && <p className="error">{list.error}</p>}
 
       <div className="row-between">
         <label style={{ maxWidth: 220 }}>
@@ -92,6 +84,7 @@ export default function StockLevelsPage() {
             <thead>
               <tr>
                 <th>SKU</th>
+                <th>Product</th>
                 <th>Location</th>
                 <th className="num">On hand</th>
                 <th className="num">Allocated</th>
@@ -104,6 +97,7 @@ export default function StockLevelsPage() {
                   <td>
                     <code>{level.sku}</code>
                   </td>
+                  <td>{level.productName}</td>
                   <td>{locationName(level.locationCode)}</td>
                   <td className="num">{formatQuantity(level.onHand)}</td>
                   <td className="num">{formatQuantity(level.allocated)}</td>
@@ -113,6 +107,7 @@ export default function StockLevelsPage() {
             </tbody>
           </table>
         )}
+        <Pagination data={list.data} onPageChange={list.setPage} />
       </div>
     </AppShell>
   );

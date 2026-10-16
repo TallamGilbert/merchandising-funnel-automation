@@ -1,35 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { formatDateTime, useFlash } from "@mms/ui";
-import { AppShell, type NavSection } from "../../components/AppShell";
-import { BellAlertIcon, ClipboardListIcon } from "../../components/icons";
-import { api, type ReorderSuggestion, type ReorderSuggestionStatus } from "../../lib/api";
+import { useState } from "react";
+import { ExportMenu, exportUrl, formatDateTime, Pagination, useFlash, usePagedList } from "@mms/ui";
+import { AppShell } from "../../components/AppShell";
+import { NAV } from "../../lib/nav";
+import { api, type ReorderSuggestionStatus } from "../../lib/api";
 
-const NAV: NavSection[] = [
-  {
-    label: "Main menu",
-    items: [
-      { label: "Purchase orders", href: "/", icon: <ClipboardListIcon /> },
-      { label: "Reorder suggestions", href: "/reorder-suggestions", icon: <BellAlertIcon /> },
-    ],
-  },
-];
 
 export default function ReorderSuggestionsPage() {
-  const [suggestions, setSuggestions] = useState<ReorderSuggestion[] | null>(null);
   const [statusFilter, setStatusFilter] = useState<ReorderSuggestionStatus | "">("NEW");
-  const [error, setError] = useState<string | null>(null);
-
-  const load = () => {
-    setError(null);
-    api
-      .listReorderSuggestions(statusFilter || undefined)
-      .then(setSuggestions)
-      .catch((err: Error) => setError(err.message));
-  };
-
-  useEffect(load, [statusFilter]);
+  const list = usePagedList(api.listReorderSuggestions, { status: statusFilter });
 
   const flash = useFlash();
 
@@ -37,7 +17,7 @@ export default function ReorderSuggestionsPage() {
     try {
       await api.dismissReorderSuggestion(id);
       flash.success(`Suggestion for ${sku} dismissed`);
-      load();
+      list.reload();
     } catch (err) {
       flash.error((err as Error).message);
     }
@@ -49,8 +29,10 @@ export default function ReorderSuggestionsPage() {
       nav={NAV}
       title="Reorder suggestions"
       subtitle="Advisory suggestions surfaced from low-stock events (FR-2.7). A human still creates the PO."
+      search={{ value: list.q, onChange: list.setQ, placeholder: "Search SKU…" }}
+      actions={<ExportMenu href={(format) => exportUrl(api.reorderSuggestionsUrl, list.params, format)} />}
     >
-      {error && <p className="error">{error}</p>}
+      {list.error && <p className="error">{list.error}</p>}
 
       <div className="row-between">
         <label style={{ maxWidth: 220 }}>
@@ -68,11 +50,11 @@ export default function ReorderSuggestionsPage() {
       </div>
 
       <div className="card" style={{ padding: 0 }}>
-        {suggestions === null ? (
+        {list.data === null ? (
           <p className="muted" style={{ padding: "1.4rem" }}>
             Loading…
           </p>
-        ) : suggestions.length === 0 ? (
+        ) : list.items.length === 0 ? (
           <p className="muted" style={{ padding: "1.4rem" }}>
             No reorder suggestions.
           </p>
@@ -88,7 +70,7 @@ export default function ReorderSuggestionsPage() {
               </tr>
             </thead>
             <tbody>
-              {suggestions.map((s) => (
+              {list.items.map((s) => (
                 <tr key={s.id}>
                   <td>
                     <code>{s.sku}</code>
@@ -108,6 +90,7 @@ export default function ReorderSuggestionsPage() {
             </tbody>
           </table>
         )}
+        <Pagination data={list.data} onPageChange={list.setPage} />
       </div>
     </AppShell>
   );

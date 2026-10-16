@@ -1,10 +1,12 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
+import { pageArgs, paged, searchAny } from "@mms/shared";
 import { PrismaService } from "../prisma/prisma.service";
 import { StockService } from "../stock/stock.service";
 import { CreateProductDto } from "./dto/create-product.dto";
 import { SetBinLocationDto } from "./dto/set-bin-location.dto";
 import { StockAdjustmentDto } from "./dto/stock-adjustment.dto";
 import { UpdateProductDto } from "./dto/update-product.dto";
+import { ListProductsQuery } from "./list-products.query";
 
 @Injectable()
 export class ProductsService {
@@ -13,8 +15,17 @@ export class ProductsService {
     private readonly stock: StockService,
   ) {}
 
-  list() {
-    return this.prisma.product.findMany({ orderBy: { name: "asc" } });
+  /** `q` matches the SKU or name. */
+  async list(query: ListProductsQuery) {
+    const where = {
+      category: query.category ? { equals: query.category, mode: "insensitive" as const } : undefined,
+      ...searchAny(query.q, ["sku", "name"]),
+    };
+    const [items, total] = await Promise.all([
+      this.prisma.product.findMany({ where, orderBy: { name: "asc" }, ...pageArgs(query) }),
+      this.prisma.product.count({ where }),
+    ]);
+    return paged(items, total, query);
   }
 
   create(dto: CreateProductDto) {
@@ -48,8 +59,8 @@ export class ProductsService {
     return this.prisma.product.update({ where: { sku }, data: dto });
   }
 
-  adjust(sku: string, dto: StockAdjustmentDto) {
-    return this.stock.adjust(sku, dto.locationCode, dto.quantityDelta, dto.reason);
+  adjust(sku: string, dto: StockAdjustmentDto, adjustedById: string) {
+    return this.stock.adjust(sku, dto.locationCode, dto.quantityDelta, dto.reason, adjustedById);
   }
 
   /**

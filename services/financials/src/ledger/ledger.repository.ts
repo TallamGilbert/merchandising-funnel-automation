@@ -1,4 +1,5 @@
 import { Injectable } from "@nestjs/common";
+import { searchAny } from "@mms/shared";
 import { EntrySource, InboxStatus, Prisma } from "../generated/prisma";
 import { ACCOUNTS } from "../accounts/chart-of-accounts";
 import { PrismaService } from "../prisma/prisma.service";
@@ -9,7 +10,8 @@ export interface EntryFilter {
   to?: Date;
   accountCode?: string;
   source?: EntrySource;
-  take: number;
+  /** Matches the source reference or description. */
+  q?: string;
 }
 
 @Injectable()
@@ -77,17 +79,17 @@ export class LedgerRepository {
     });
   }
 
-  findEntries(filter: EntryFilter) {
+  findEntries(filter: EntryFilter, page: { skip: number; take: number }) {
     return this.prisma.journalEntry.findMany({
-      where: {
-        occurredAt: { gte: filter.from, lt: filter.to },
-        source: filter.source,
-        lines: filter.accountCode ? { some: { accountCode: filter.accountCode } } : undefined,
-      },
-      include: { lines: { orderBy: [{ debit: "desc" }, { accountCode: "asc" }] } },
+      where: entryWhere(filter),
+      include: { lines: { include: { account: true }, orderBy: [{ debit: "desc" }, { accountCode: "asc" }] } },
       orderBy: { sequence: "desc" },
-      take: filter.take,
+      ...page,
     });
+  }
+
+  countEntries(filter: EntryFilter) {
+    return this.prisma.journalEntry.count({ where: entryWhere(filter) });
   }
 
   /** Debit and credit totals per account for everything up to `asOf`. */
@@ -97,6 +99,15 @@ export class LedgerRepository {
       where: asOf ? { entry: { occurredAt: { lt: asOf } } } : undefined,
       _sum: { debit: true, credit: true },
     });
+  }
+
+  /** Lines on one account in a period, with when and why they were posted. */
+  async findAccountLinesBetween(accountCode: string, from: Date, to: Date) {
+    const lines = await this.prisma.journalLine.findMany({
+      where: { accountCode, entry: { occurredAt: { gte: from, lt: to } } },
+      select: { debit: true, credit: true, entry: { select: { occurredAt: true, source: true } } },
+    });
+    return lines.map(({ entry, ...line }) => ({ ...line, ...entry }));
   }
 
   findSaleFactsBetween(from: Date, to: Date) {
@@ -113,4 +124,13 @@ export class LedgerRepository {
     const credit = result._sum.credit ?? new Prisma.Decimal(0);
     return debit.minus(credit);
   }
+}
+
+function entryWhere(filter: EntryFilter): Prisma.JournalEntryWhereInput {
+  return {
+    occurredAt: { gte: filter.from, lt: filter.to },
+    source: filter.source,
+    lines: filter.accountCode ? { some: { accountCode: filter.accountCode } } : undefined,
+    ...searchAny(filter.q, ["sourceRef", "description"]),
+  };
 }

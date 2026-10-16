@@ -1,15 +1,26 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
+import { dateRange, pageArgs, paged, searchAny } from "@mms/shared";
+import { ListTransactionsQuery } from "./list-transactions.query";
 import { TransactionsRepository } from "./transactions.repository";
 
 @Injectable()
 export class TransactionsService {
   constructor(private readonly transactions: TransactionsRepository) {}
 
-  static readonly MAX_RECENT = 200;
-
-  listRecent(storeId?: string, limit = 50) {
-    const take = Math.min(Math.max(Math.trunc(limit) || 50, 1), TransactionsService.MAX_RECENT);
-    return this.transactions.findRecent({ storeId, take });
+  async list(query: ListTransactionsQuery) {
+    const where = {
+      storeId: query.storeId,
+      registerId: query.registerId,
+      cashierId: query.cashierId,
+      status: query.status,
+      createdAt: dateRange(query.from, query.to),
+      ...searchAny(query.q, ["transactionNumber"]),
+    };
+    const [items, total] = await Promise.all([
+      this.transactions.findPage(where, pageArgs(query)),
+      this.transactions.count(where),
+    ]);
+    return paged(items, total, query);
   }
 
   async findOne(id: string) {

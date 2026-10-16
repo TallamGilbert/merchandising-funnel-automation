@@ -19,7 +19,9 @@ describe("ProductsController", () => {
   });
 
   it("lists products", async () => {
-    await expect(controller.list()).resolves.toEqual([{ sku: "SKU-1" }]);
+    const query = { page: 1, pageSize: 20, q: "stool" };
+    await expect(controller.list(query)).resolves.toEqual([{ sku: "SKU-1" }]);
+    expect(products.list).toHaveBeenCalledWith(query);
   });
 
   it("creates a product from the body", async () => {

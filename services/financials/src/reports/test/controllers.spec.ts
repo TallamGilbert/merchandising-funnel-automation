@@ -31,8 +31,9 @@ describe("LedgerController", () => {
   const controller = new LedgerController(ledger as unknown as LedgerService);
 
   it("passes entry filters through", async () => {
-    await controller.entries("2026-09-01", "2026-09-30", "1200", undefined, 50);
-    expect(ledger.entries).toHaveBeenCalledWith({ from: "2026-09-01", to: "2026-09-30", accountCode: "1200", source: undefined, limit: 50 });
+    const query = { page: 1, pageSize: 50, from: "2026-09-01", to: "2026-09-30", accountCode: "1200" };
+    await controller.entries(query);
+    expect(ledger.entries).toHaveBeenCalledWith(query);
   });
 
   it("returns the trial balance as of a date", async () => {
@@ -46,8 +47,8 @@ describe("PayablesController", () => {
   const controller = new PayablesController(payables as unknown as PayablesService);
 
   it("lists, ages and pays bills", async () => {
-    await controller.list(undefined, "s1");
-    expect(payables.list).toHaveBeenCalledWith({ status: undefined, supplierId: "s1" });
+    await controller.list({ page: 1, pageSize: 20, supplierId: "s1" });
+    expect(payables.list).toHaveBeenCalledWith({ page: 1, pageSize: 20, supplierId: "s1" });
 
     await controller.aging("2026-09-30");
     expect(payables.aging).toHaveBeenCalledWith("2026-09-30");

@@ -43,14 +43,32 @@ paths:
         - in: query
           name: status
           schema: { $ref: "#/components/schemas/ExpectedDeliveryStatus" }
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+        - in: query
+          name: q
+          description: Search — matches PO number or supplier name.
+          schema: { type: string, maxLength: 100 }
+        - $ref: "#/components/parameters/ExportFormat"
       responses:
         "200":
           description: OK
           content:
             application/json:
               schema:
-                type: array
-                items: { $ref: "#/components/schemas/ExpectedDelivery" }
+                type: object
+                required: [items, total, page, pageSize]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/ExpectedDelivery" }
+                  total: { type: integer, description: Rows matching the filters }
+                  page: { type: integer }
+                  pageSize: { type: integer }
+            text/csv:
+              schema: { type: string, format: binary }
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema: { type: string, format: binary }
   /expected-deliveries/{poNumber}:
     get:
       tags: [expected-deliveries]
@@ -72,14 +90,34 @@ paths:
         - in: query
           name: status
           schema: { $ref: "#/components/schemas/GoodsReceivedNoteStatus" }
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+        - in: query
+          name: q
+          description: Search — matches GRN or PO number.
+          schema: { type: string, maxLength: 100 }
+        - $ref: "#/components/parameters/From"
+        - $ref: "#/components/parameters/To"
+        - $ref: "#/components/parameters/ExportFormat"
       responses:
         "200":
           description: OK
           content:
             application/json:
               schema:
-                type: array
-                items: { $ref: "#/components/schemas/GoodsReceivedNote" }
+                type: object
+                required: [items, total, page, pageSize]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/GoodsReceivedNote" }
+                  total: { type: integer, description: Rows matching the filters }
+                  page: { type: integer }
+                  pageSize: { type: integer }
+            text/csv:
+              schema: { type: string, format: binary }
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema: { type: string, format: binary }
     post:
       tags: [goods-received-notes]
       summary: >
@@ -157,6 +195,32 @@ paths:
         "404": { description: Not found }
 components:
   parameters:
+    Page:
+      in: query
+      name: page
+      description: 1-based page number.
+      schema: { type: integer, minimum: 1, default: 1 }
+    PageSize:
+      in: query
+      name: pageSize
+      schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+    ExportFormat:
+      in: query
+      name: format
+      description: >
+        Download every matching row (up to 50,000) as a file instead of a
+        page. Paging params are ignored; filters and q apply.
+      schema: { type: string, enum: [csv, xlsx] }
+    From:
+      in: query
+      name: from
+      description: YYYY-MM-DD, inclusive (UTC day).
+      schema: { type: string, format: date }
+    To:
+      in: query
+      name: to
+      description: YYYY-MM-DD, inclusive (UTC day).
+      schema: { type: string, format: date }
     PoNumber:
       in: path
       name: poNumber
@@ -204,14 +268,14 @@ components:
         quantityReceived: { type: integer }
     CreateGoodsReceivedNoteDto:
       type: object
-      required: [poNumber, receivedAtLocation, receivedById]
+      description: The signed-in user is recorded as receivedById (D-16).
+      required: [poNumber, receivedAtLocation]
       properties:
         poNumber: { type: string, example: PO-1001 }
         receivedAtLocation:
           type: string
           description: Location code of the dock the goods arrived at (matches Inventory's locationCode).
           example: WH-MAIN
-        receivedById: { type: string, description: User id of the dock worker. }
     RecordScanDto:
       type: object
       required: [sku, quantity, condition]

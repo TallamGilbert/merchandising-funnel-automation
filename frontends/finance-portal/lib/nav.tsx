@@ -1,5 +1,5 @@
 import type { NavSection } from "../components/AppShell";
-import { AlertIcon, BookIcon, ChartIcon, ReceiptIcon, TrendIcon } from "../components/icons";
+import { AlertIcon, BookIcon, ChartIcon, PercentIcon, ReceiptIcon, TrendIcon } from "../components/icons";
 
 export const NAV: NavSection[] = [
   {
@@ -9,6 +9,7 @@ export const NAV: NavSection[] = [
       { label: "Profitability", href: "/profitability", icon: <TrendIcon /> },
       { label: "Accounts payable", href: "/payables", icon: <ReceiptIcon /> },
       { label: "General ledger", href: "/ledger", icon: <BookIcon /> },
+      { label: "VAT", href: "/vat", icon: <PercentIcon /> },
       { label: "Posting issues", href: "/events", icon: <AlertIcon /> },
     ],
   },

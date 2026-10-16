@@ -5,15 +5,17 @@ import { useState } from "react";
 import {
   BarChart,
   ChartCard,
+  DateRange,
+  defaultRange,
   formatCompact,
   formatDate,
   formatMoney,
   formatQuantity,
+  type Range,
   TimeSeriesChart,
   useLocations,
 } from "@mms/ui";
 import { AppShell } from "../components/AppShell";
-import { DateRange, defaultRange, type Range } from "../components/DateRange";
 import { Kpi, Show, value } from "../components/Panels";
 import { combineSales, todayIso } from "../lib/aggregate";
 import { NAV, STATUS_CARD } from "../lib/nav";
