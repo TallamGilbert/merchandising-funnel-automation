@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, ReactNode, useState } from "react";
+import { appsFor } from "../apps/apps";
 import { STAFF_ROLE_LABEL, StaffRole } from "../directory/client";
 import { useAuth } from "./AuthProvider";
 import { authApi } from "./client";
@@ -126,8 +127,13 @@ function ChooseNewPasswordScreen({ appName }: { appName: string }) {
   );
 }
 
+/**
+ * Also the landing screen for staff who open the shared front door (the
+ * Executive Dashboard) without access to it, so it links to their own apps.
+ */
 function NoAccessScreen({ appName, allow }: { appName: string; allow: StaffRole[] }) {
   const { user, signOut } = useAuth();
+  const yourApps = user ? appsFor(user.role) : [];
   return (
     <AuthFrame appName={appName}>
       <h1>No access</h1>
@@ -135,6 +141,18 @@ function NoAccessScreen({ appName, allow }: { appName: string; allow: StaffRole[
         You&apos;re signed in as {user?.name} ({user && STAFF_ROLE_LABEL[user.role]}). {appName} is for{" "}
         {allow.map((r) => STAFF_ROLE_LABEL[r]).join(", ")}.
       </p>
+      {yourApps.length > 0 && (
+        <>
+          <p>Your apps:</p>
+          <div className="mms-auth-apps">
+            {yourApps.map((app) => (
+              <a key={app.id} href={app.url}>
+                {app.name}
+              </a>
+            ))}
+          </div>
+        </>
+      )}
       <button type="button" onClick={() => void signOut()}>
         Sign in as someone else
       </button>

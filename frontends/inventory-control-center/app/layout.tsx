@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
-import { AuthGate, AuthProvider, FlashProvider } from "@mms/ui";
+import { AuthGate, AuthProvider, FlashProvider, MMS_APPS } from "@mms/ui";
 import "@mms/ui/styles.css";
 import "./globals.css";
 
@@ -19,7 +19,7 @@ export default function RootLayout({
       <body>
         <FlashProvider>
           <AuthProvider>
-            <AuthGate appName="Inventory Control Center" allow={["OWNER", "MANAGER", "BUYER", "WAREHOUSE_STAFF"]}>
+            <AuthGate appName={MMS_APPS.inventory.name} allow={MMS_APPS.inventory.allow}>
               {children}
             </AuthGate>
           </AuthProvider>

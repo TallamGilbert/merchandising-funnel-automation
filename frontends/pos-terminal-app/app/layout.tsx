@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
-import { AuthGate, AuthProvider, FlashProvider } from "@mms/ui";
+import { AuthGate, AuthProvider, FlashProvider, MMS_APPS } from "@mms/ui";
 import "@mms/ui/styles.css";
 import "./globals.css";
 
@@ -19,7 +19,7 @@ export default function RootLayout({
       <body>
         <FlashProvider>
           <AuthProvider>
-            <AuthGate appName="Point of Sale Terminal" allow={["OWNER", "MANAGER", "CASHIER"]}>
+            <AuthGate appName={MMS_APPS.pos.name} allow={MMS_APPS.pos.allow}>
               {children}
             </AuthGate>
           </AuthProvider>

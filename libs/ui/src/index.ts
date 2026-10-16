@@ -2,6 +2,7 @@ export * from "./auth/client";
 export * from "./auth/AuthProvider";
 export * from "./auth/AuthGate";
 export * from "./auth/UserMenu";
+export * from "./apps/apps";
 export * from "./lists/page";
 export * from "./lists/usePagedList";
 export * from "./lists/ListControls";
