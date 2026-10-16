@@ -34,6 +34,15 @@ declare -A API_PORT=(
   [directory]=3009
 )
 
+# The dashboard is the front door, the one link to share. With a prefix it
+# takes the bare prefix name (HOST_PREFIX=mms- -> mms.example.com); its
+# sign-in screen links staff who can't use it to their own apps.
+if [ -n "$HOST_PREFIX" ]; then
+  DASHBOARD_HOST="${HOST_PREFIX%-}.${DOMAIN}"
+else
+  DASHBOARD_HOST="dashboard.${DOMAIN}"
+fi
+
 # Frontend (frontends/<dir>) -> public hostname (a Worker custom domain)
 declare -A APP_HOST=(
   [vendor-management-portal]="${HOST_PREFIX}vendors.${DOMAIN}"
@@ -44,7 +53,7 @@ declare -A APP_HOST=(
   [pos-terminal-app]="${HOST_PREFIX}pos.${DOMAIN}"
   [store-manager-dashboard]="${HOST_PREFIX}stores.${DOMAIN}"
   [finance-portal]="${HOST_PREFIX}finance.${DOMAIN}"
-  [executive-dashboard]="${HOST_PREFIX}dashboard.${DOMAIN}"
+  [executive-dashboard]="${DASHBOARD_HOST}"
 )
 
 api_url() { echo "https://${API_HOST[$1]}"; }

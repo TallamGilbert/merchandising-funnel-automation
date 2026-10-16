@@ -21,13 +21,18 @@
 
 ### Hostnames: `DOMAIN=reduzer.co.ke`, `HOST_PREFIX=mms-`
 
+**Share one link: `https://mms.reduzer.co.ke`** (the Executive Dashboard).
+Owners and managers land on the dashboard. Everyone else sees the apps their
+role can use and opens theirs from there. Every app's user menu has a
+**Switch app** list, and one sign-in covers them all.
+
 The system shares the `reduzer.co.ke` zone with other sites, so every app and
 API gets an `mms-` name directly under it (`mms-pos.reduzer.co.ke`), not a
 deeper subdomain (`pos.mms.reduzer.co.ke`). Cloudflare's free Universal SSL
 certificate covers only one level below the zone. Two levels would fail HTTPS
 on the API hostnames unless you pay for Advanced Certificate Manager.
 
-None of these names may already have a DNS record: the tunnel setup overwrites
+None of these names, `mms.reduzer.co.ke` included, may already have a DNS record: the tunnel setup overwrites
 `mms-*-api` records, and Workers custom domains refuse a name that is taken.
 
 | App | URL | API it calls |
@@ -40,7 +45,7 @@ None of these names may already have a DNS record: the tunnel setup overwrites
 | POS Terminal App | `mms-pos.reduzer.co.ke` | `mms-sales-api.reduzer.co.ke` |
 | Store Manager Dashboard | `mms-stores.reduzer.co.ke` | `mms-audit-api.reduzer.co.ke` |
 | Finance Portal | `mms-finance.reduzer.co.ke` | `mms-finance-api.reduzer.co.ke` |
-| Executive Dashboard | `mms-dashboard.reduzer.co.ke` | all of them |
+| Executive Dashboard | `mms.reduzer.co.ke` | all of them |
 | (pickers, every app) | — | `mms-directory-api.reduzer.co.ke` |
 
 After setup, **every push to `main` that passes CI deploys automatically**
@@ -120,7 +125,7 @@ curl https://mms-directory-api.reduzer.co.ke/health      # from anywhere → 200
 curl https://mms-procurement-api.reduzer.co.ke/purchase-orders   # → 401 without a session
 ```
 
-Then open any app (e.g. `https://mms-dashboard.reduzer.co.ke`) and sign in as
+Then open `https://mms.reduzer.co.ke` and sign in as
 `BOOTSTRAP_OWNER_ID` with `BOOTSTRAP_OWNER_PASSWORD`. You'll be asked to choose
 a new password; after that, add your staff on the Store Manager Dashboard's
 Staff page (each new person gets a one-time temporary password to hand over).
@@ -151,7 +156,7 @@ Settings → Environments → **New environment** `production`, then add:
 | Secret | `CLOUDFLARE_API_TOKEN` | token from step 6 |
 | Secret | `CLOUDFLARE_ACCOUNT_ID` | account ID from step 6 |
 
-Then Actions → **Deploy** → Run workflow. When it's green, open `https://mms-dashboard.reduzer.co.ke`.
+Then Actions → **Deploy** → Run workflow. When it's green, open `https://mms.reduzer.co.ke`.
 
 ## Day to day
 
