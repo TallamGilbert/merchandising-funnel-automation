@@ -1,0 +1,12 @@
+# Service images install their own dependencies and compile inside the build;
+# never copy host build output, installs or secrets into them.
+**/node_modules
+**/dist
+**/.next
+**/.open-next
+**/.env
+**/.env.*
+!**/.env.example
+.git
+frontends
+deploy/cloudflared

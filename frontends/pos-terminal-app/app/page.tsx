@@ -10,7 +10,7 @@ import {
   LocationPicker,
   lookupApi,
   RegisterPicker,
-  StaffPicker,
+  useCurrentUser,
   useFlash,
   usePolling,
 } from "@mms/ui";
@@ -18,7 +18,7 @@ import { AppShell } from "../components/AppShell";
 import { NAV } from "../lib/nav";
 import { api, type PaymentMethodType, type Product } from "../lib/api";
 import { activePromotion, computeLinePrice } from "../lib/pricing";
-import { useTerminal } from "../lib/terminal";
+import { useTabState, useTerminal } from "../lib/terminal";
 
 const FEATURE_ENABLED = process.env.NEXT_PUBLIC_FEATURE_RETAIL_SALES_ENABLED !== "false";
 
@@ -45,13 +45,16 @@ interface Receipt {
 
 export default function Page() {
   const flash = useFlash();
-  const [terminal, setTerminal] = useTerminal();
-  const { storeId, registerId, cashierId } = terminal;
+  const cashier = useCurrentUser();
+  const [terminal, setTerminal] = useTerminal(cashier.locationCode);
+  const { storeId, registerId } = terminal;
   const [products, setProducts] = useState<Product[] | null>(null);
   const [catalogError, setCatalogError] = useState<string | null>(null);
   const [available, setAvailable] = useState<Map<string, number> | null>(null);
-  const [cart, setCart] = useState<CartLine[]>([]);
-  const [payments, setPayments] = useState<PaymentRow[]>([{ method: "CASH", amount: 0 }]);
+  const [cart, setCart] = useTabState<CartLine[]>(`mms.pos.cart.${cashier.id}`, []);
+  const [payments, setPayments] = useTabState<PaymentRow[]>(`mms.pos.payments.${cashier.id}`, [
+    { method: "CASH", amount: 0 },
+  ]);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [receipt, setReceipt] = useState<Receipt | null>(null);
@@ -194,7 +197,6 @@ export default function Page() {
       const transaction = await api.checkout({
         storeId,
         registerId,
-        cashierId,
         locationCode: storeId,
         lines: cart.map((l) => ({ sku: l.sku, quantity: l.quantity })),
         payments: payments.map((p) => ({ method: p.method, amount: p.amount })),
@@ -216,7 +218,7 @@ export default function Page() {
     }
   };
 
-  const ready = Boolean(storeId && registerId && cashierId);
+  const ready = Boolean(storeId && registerId);
 
   return (
     <AppShell
@@ -234,7 +236,7 @@ export default function Page() {
               required
               value={storeId}
               // A different store has different tills and staff.
-              onChange={(value) => setTerminal({ storeId: value, registerId: "", cashierId: "" })}
+              onChange={(value) => setTerminal({ storeId: value, registerId: "" })}
             />
           </label>
           <label>
@@ -248,15 +250,7 @@ export default function Page() {
           </label>
           <label>
             Cashier
-            <StaffPicker
-              required
-              roles={["CASHIER", "MANAGER"]}
-              locationCode={storeId || undefined}
-              disabled={!storeId}
-              placeholder={storeId ? "Search by name…" : "Choose a store first"}
-              value={cashierId}
-              onChange={(value) => setTerminal({ cashierId: value })}
-            />
+            <input value={cashier.name} readOnly aria-readonly title="Recorded from who is signed in" />
           </label>
         </div>
       </div>

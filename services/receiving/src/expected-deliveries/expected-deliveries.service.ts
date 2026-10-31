@@ -1,19 +1,25 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
-import { PurchaseOrderApprovedEvent } from "@mms/shared";
-import { ExpectedDeliveryStatus } from "../generated/prisma";
+import { pageArgs, paged, PurchaseOrderApprovedEvent, searchAny } from "@mms/shared";
 import { PrismaService } from "../prisma/prisma.service";
+import { ListExpectedDeliveriesQuery } from "./list-expected-deliveries.query";
 import { OpenPurchaseOrder } from "../procurement-client/procurement-client.service";
 
 @Injectable()
 export class ExpectedDeliveriesService {
   constructor(private readonly prisma: PrismaService) {}
 
-  list(status?: ExpectedDeliveryStatus) {
-    return this.prisma.expectedDelivery.findMany({
-      where: status ? { status } : undefined,
-      include: { lines: true },
-      orderBy: { createdAt: "desc" },
-    });
+  async list(query: ListExpectedDeliveriesQuery) {
+    const where = { status: query.status, ...searchAny(query.q, ["poNumber", "supplierName"]) };
+    const [items, total] = await Promise.all([
+      this.prisma.expectedDelivery.findMany({
+        where,
+        include: { lines: true },
+        orderBy: { createdAt: "desc" },
+        ...pageArgs(query),
+      }),
+      this.prisma.expectedDelivery.count({ where }),
+    ]);
+    return paged(items, total, query);
   }
 
   async findByPoNumber(poNumber: string) {

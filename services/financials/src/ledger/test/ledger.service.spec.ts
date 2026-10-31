@@ -13,11 +13,12 @@ describe("parseDay", () => {
 
 describe("LedgerService", () => {
   let service: LedgerService;
-  let ledger: { findEntries: jest.Mock; totalsByAccount: jest.Mock };
+  let ledger: { findEntries: jest.Mock; countEntries: jest.Mock; totalsByAccount: jest.Mock };
 
   beforeEach(() => {
     ledger = {
       findEntries: jest.fn().mockResolvedValue([]),
+      countEntries: jest.fn().mockResolvedValue(0),
       totalsByAccount: jest.fn().mockResolvedValue([
         { accountCode: "1000", _sum: { debit: 20, credit: 50 } },
         { accountCode: "1200", _sum: { debit: 995, credit: 10 } },
@@ -30,15 +31,29 @@ describe("LedgerService", () => {
     service = new LedgerService(ledger as unknown as LedgerRepository);
   });
 
-  it("filters entries by an inclusive date range and caps the page size", async () => {
-    await service.entries({ from: "2026-09-01", to: "2026-09-30", accountCode: "1200", limit: 5000 });
-    expect(ledger.findEntries).toHaveBeenCalledWith({
+  it("pages entries filtered by an inclusive date range, account and search", async () => {
+    ledger.findEntries.mockResolvedValue([{ id: "e1" }]);
+    ledger.countEntries.mockResolvedValue(61);
+
+    const page = await service.entries({
+      page: 2,
+      pageSize: 30,
+      from: "2026-09-01",
+      to: "2026-09-30",
+      accountCode: "1200",
+      q: "GRN-1001",
+    });
+
+    const filter = {
       from: new Date("2026-09-01T00:00:00Z"),
       to: new Date("2026-10-01T00:00:00Z"),
       accountCode: "1200",
       source: undefined,
-      take: 500,
-    });
+      q: "GRN-1001",
+    };
+    expect(ledger.findEntries).toHaveBeenCalledWith(filter, { skip: 30, take: 30 });
+    expect(ledger.countEntries).toHaveBeenCalledWith(filter);
+    expect(page).toEqual({ items: [{ id: "e1" }], total: 61, page: 2, pageSize: 30 });
   });
 
   it("lists every account with its balance on its normal side", async () => {

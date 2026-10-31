@@ -14,13 +14,17 @@ export class TransactionsRepository {
   }
 
   /** Newest first — what a cashier scrolls to find the sale being returned. */
-  findRecent(filter: { storeId?: string; take: number }) {
+  findPage(where: Prisma.TransactionWhereInput, page: { skip: number; take: number }) {
     return this.prisma.transaction.findMany({
-      where: { storeId: filter.storeId },
-      include: { lines: true },
+      where,
+      include: { lines: true, payments: true },
       orderBy: { createdAt: "desc" },
-      take: filter.take,
+      ...page,
     });
+  }
+
+  count(where: Prisma.TransactionWhereInput) {
+    return this.prisma.transaction.count({ where });
   }
 
   findByIdWithLines(id: string) {

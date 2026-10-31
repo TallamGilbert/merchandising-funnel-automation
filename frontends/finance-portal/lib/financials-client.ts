@@ -1,6 +1,14 @@
+import { apiFetch, type ListParams, type Page, withQuery } from "@mms/ui";
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3008";
 
-export type EntrySource = "GOODS_RECEIVED" | "ITEM_SOLD" | "ITEM_RETURNED" | "DAY_CLOSED" | "BILL_PAYMENT";
+export type EntrySource =
+  | "GOODS_RECEIVED"
+  | "ITEM_SOLD"
+  | "ITEM_RETURNED"
+  | "DAY_CLOSED"
+  | "BILL_PAYMENT"
+  | "STOCK_ADJUSTMENT";
 export type BillStatus = "OPEN" | "PAID";
 export type InboxStatus = "PENDING" | "POSTED" | "NEEDS_ATTENTION";
 export type AgingBucket = "current" | "1-30" | "31-60" | "61-90" | "90+";
@@ -12,6 +20,7 @@ export const SOURCE_LABEL: Record<EntrySource, string> = {
   ITEM_RETURNED: "Refund",
   DAY_CLOSED: "Day close",
   BILL_PAYMENT: "Bill payment",
+  STOCK_ADJUSTMENT: "Stock count / adjustment",
 };
 
 export interface Account {
@@ -110,7 +119,7 @@ export interface InboxEvent {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_URL}${path}`, {
+  const res = await apiFetch(`${API_URL}${path}`, {
     ...init,
     headers: { "Content-Type": "application/json", ...init?.headers },
   });
@@ -134,6 +143,21 @@ function toQueryString(params: Record<string, string | undefined>): string {
   return `?${new URLSearchParams(presentParams)}`;
 }
 
+export interface VatMonth {
+  month: string;
+  outputVat: number;
+  refundedVat: number;
+  otherAdjustments: number;
+  netVat: number;
+}
+
+export interface VatReport {
+  from: string;
+  to: string;
+  months: VatMonth[];
+  total: Omit<VatMonth, "month">;
+}
+
 export const api = {
   summary: (from: string, to: string) => request<Summary>(`/reports/summary${toQueryString({ from, to })}`),
 
@@ -142,19 +166,29 @@ export const api = {
 
   accounts: () => request<Account[]>("/accounts"),
 
-  entries: (filter: { from?: string; to?: string; accountCode?: string; source?: EntrySource }) =>
-    request<JournalEntry[]>(`/ledger/entries${toQueryString({ ...filter, limit: "200" })}`),
+  entriesUrl: `${API_URL}/ledger/entries`,
+  vatUrl: `${API_URL}/reports/vat`,
+
+  /** D-20 — VAT on the VAT-payable account by month. */
+  vat: (from: string, to: string) => request<VatReport>(withQuery("/reports/vat", { from, to })),
+  payablesUrl: `${API_URL}/payables`,
+  inboxUrl: `${API_URL}/inbox`,
+
+  /** `q` matches the reference or description; filters: from, to, accountCode, source. */
+  entries: (params: ListParams) => request<Page<JournalEntry>>(withQuery("/ledger/entries", params)),
 
   trialBalance: (asOf?: string) => request<TrialBalance>(`/ledger/trial-balance${toQueryString({ asOf })}`),
 
-  payables: (status?: BillStatus) => request<PayableBill[]>(`/payables${toQueryString({ status })}`),
+  /** `q` matches the supplier, PO or GRN number; filters: status, supplierId. */
+  payables: (params: ListParams) => request<Page<PayableBill>>(withQuery("/payables", params)),
 
   aging: () => request<AgingReport>("/payables/aging"),
 
   payBill: (id: string, data: { paymentReference?: string; paidOn?: string }) =>
     request<PayableBill>(`/payables/${id}/pay`, { method: "POST", body: JSON.stringify(data) }),
 
-  inbox: (status?: InboxStatus) => request<InboxEvent[]>(`/inbox${toQueryString({ status })}`),
+  /** `q` matches the event id or type; filter: status. */
+  inbox: (params: ListParams) => request<Page<InboxEvent>>(withQuery("/inbox", params)),
 
   retryEvent: (eventId: string) =>
     request<{ eventId: string; result: string }>(`/inbox/${encodeURIComponent(eventId)}/retry`, { method: "POST" }),

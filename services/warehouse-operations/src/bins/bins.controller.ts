@@ -1,5 +1,6 @@
 import { Body, Controller, Get, Param, Post, Query } from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
+import { Role, Roles } from "@mms/shared";
 import { BinsService } from "./bins.service";
 import { CreateBinDto } from "./dto/create-bin.dto";
 
@@ -14,6 +15,7 @@ export class BinsController {
   }
 
   @Post("bins")
+  @Roles(Role.OWNER, Role.MANAGER)
   create(@Body() dto: CreateBinDto) {
     return this.bins.create(dto);
   }

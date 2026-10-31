@@ -3,19 +3,10 @@
 import Link from "next/link";
 import { use, useEffect, useState } from "react";
 import { formatMoney, formatQuantity, LocationPicker, useFlash, useLocations, usePolling } from "@mms/ui";
-import { AppShell, type NavSection } from "../../../components/AppShell";
-import { BoxesIcon, LayersIcon } from "../../../components/icons";
+import { AppShell } from "../../../components/AppShell";
+import { NAV } from "../../../lib/nav";
 import { api, type ProductDetail } from "../../../lib/api";
 
-const NAV: NavSection[] = [
-  {
-    label: "Main menu",
-    items: [
-      { label: "Products", href: "/", icon: <BoxesIcon /> },
-      { label: "Stock levels", href: "/stock-levels", icon: <LayersIcon /> },
-    ],
-  },
-];
 
 export default function ProductPage({
   params,
@@ -85,6 +76,8 @@ export default function ProductPage({
           <dl style={{ display: "grid", gridTemplateColumns: "160px 1fr", gap: "0.5rem 1rem", margin: 0 }}>
             <dt className="muted">Description</dt>
             <dd style={{ margin: 0 }}>{product.description ?? "—"}</dd>
+            <dt className="muted">Category</dt>
+            <dd style={{ margin: 0 }}>{product.category ?? "—"}</dd>
             <dt className="muted">Unit cost</dt>
             <dd style={{ margin: 0 }}>{formatMoney(product.unitCost)}</dd>
             <dt className="muted">Dimensions (L×W×H cm)</dt>
@@ -120,6 +113,7 @@ function EditProductForm({
 }) {
   const [name, setName] = useState(product.name);
   const [description, setDescription] = useState(product.description ?? "");
+  const [category, setCategory] = useState(product.category ?? "");
   const [unitCost, setUnitCost] = useState(Number(product.unitCost));
   const [weightKg, setWeightKg] = useState(product.weightKg ? Number(product.weightKg) : 0);
   const [error, setError] = useState<string | null>(null);
@@ -130,7 +124,13 @@ function EditProductForm({
     setSubmitting(true);
     setError(null);
     try {
-      await api.updateProduct(product.sku, { name, description, unitCost, weightKg });
+      await api.updateProduct(product.sku, {
+        name,
+        description,
+        category: category.trim() || null,
+        unitCost,
+        weightKg,
+      });
       onSaved();
     } catch (err) {
       setError((err as Error).message);
@@ -149,6 +149,10 @@ function EditProductForm({
         <label>
           Description
           <input value={description} onChange={(e) => setDescription(e.target.value)} />
+        </label>
+        <label>
+          Category
+          <input value={category} onChange={(e) => setCategory(e.target.value)} placeholder="e.g. Sofas" />
         </label>
       </div>
       <div className="field-row">

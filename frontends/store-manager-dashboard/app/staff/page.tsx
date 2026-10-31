@@ -3,12 +3,13 @@
 import { useMemo, useState } from "react";
 import {
   directoryApi,
-  formatDate,
+  formatDateTime,
   LocationPicker,
   Modal,
   STAFF_ROLE_LABEL,
   type StaffMember,
   type StaffRole,
+  useCurrentUser,
   useFlash,
   useLocations,
   useStaff,
@@ -19,11 +20,20 @@ import { NAV } from "../../lib/nav";
 const ROLES = Object.keys(STAFF_ROLE_LABEL) as StaffRole[];
 
 const ROLE_HINT: Record<StaffRole, string> = {
-  OWNER: "Approves purchase orders at or above the approval limit.",
-  MANAGER: "Approves smaller purchase orders, closes stores, requests transfers.",
+  OWNER: "Everything, including approving purchase orders at or above the approval limit and managing managers.",
+  MANAGER: "Approves smaller purchase orders, closes stores, requests transfers, manages cashiers and warehouse staff.",
+  BUYER: "Manages suppliers and raises purchase orders for a manager to approve.",
+  ACCOUNTANT: "Works in the Finance Portal: payables, ledger and reports.",
   CASHIER: "Rings up sales and returns at a store's registers.",
   WAREHOUSE_STAFF: "Receives deliveries, puts stock away and picks transfers.",
 };
+
+/** Mirrors Directory's rule (D-17): managers manage cashiers and warehouse staff, owners manage everyone. */
+function manageableRoles(role: StaffRole): StaffRole[] {
+  if (role === "OWNER") return ROLES;
+  if (role === "MANAGER") return ["CASHIER", "WAREHOUSE_STAFF"];
+  return [];
+}
 
 export default function StaffPage() {
   const flash = useFlash();
@@ -32,6 +42,9 @@ export default function StaffPage() {
   const [showInactive, setShowInactive] = useState(false);
   const [changingRole, setChangingRole] = useState<StaffMember | null>(null);
   const [adding, setAdding] = useState(false);
+  const [handover, setHandover] = useState<{ name: string; id: string; password: string } | null>(null);
+  const me = useCurrentUser();
+  const canManage = manageableRoles(me.role);
   const { data: staff, loading, error, reload } = useStaff({ includeInactive: true });
   const { data: locations } = useLocations();
   const locationName = (code: string | null) =>
@@ -57,17 +70,30 @@ export default function StaffPage() {
     }
   };
 
+  const resetPassword = async (member: StaffMember) => {
+    if (!window.confirm(`Reset ${member.name}'s password? They'll be signed out everywhere.`)) return;
+    try {
+      const { temporaryPassword } = await directoryApi.resetPassword(member.id);
+      setHandover({ name: member.name, id: member.id, password: temporaryPassword });
+      reload();
+    } catch (err) {
+      flash.error((err as Error).message);
+    }
+  };
+
   return (
     <AppShell
       brandName="Store Manager"
       nav={NAV}
       title="Staff"
-      subtitle="Who works where, and what they're allowed to do. Every picker across MMS reads from this list."
+      subtitle="Who works where, what they're allowed to do, and their sign-in. Every picker across MMS reads from this list."
       search={{ value: search, onChange: setSearch, placeholder: "Search staff…" }}
       actions={
-        <button className="primary" onClick={() => setAdding(true)}>
-          Add staff member
-        </button>
+        canManage.length > 0 && (
+          <button className="primary" onClick={() => setAdding(true)}>
+            Add staff member
+          </button>
+        )
       }
     >
       <div className="row-between">
@@ -102,7 +128,7 @@ export default function StaffPage() {
                 <th>Name</th>
                 <th>Role</th>
                 <th>Works at</th>
-                <th>Since</th>
+                <th>Last sign-in</th>
                 <th />
               </tr>
             </thead>
@@ -116,14 +142,24 @@ export default function StaffPage() {
                   <td>
                     <span className="badge">{STAFF_ROLE_LABEL[member.role]}</span>
                     {!member.active && <span className="badge warn" style={{ marginLeft: 6 }}>Inactive</span>}
+                    {member.active && member.mustChangePassword && (
+                      <span className="badge warn" style={{ marginLeft: 6 }}>Temporary password</span>
+                    )}
                   </td>
                   <td>{locationName(member.locationCode)}</td>
-                  <td>{formatDate(member.createdAt)}</td>
+                  <td>{member.lastLoginAt ? formatDateTime(member.lastLoginAt) : <span className="muted">Never</span>}</td>
                   <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>
-                    <button onClick={() => setChangingRole(member)} disabled={!member.active}>
-                      Change role
-                    </button>{" "}
-                    <button onClick={() => toggleActive(member)}>{member.active ? "Deactivate" : "Reactivate"}</button>
+                    {member.id !== me.id && canManage.includes(member.role) && (
+                      <>
+                        <button onClick={() => setChangingRole(member)} disabled={!member.active}>
+                          Change role
+                        </button>{" "}
+                        <button onClick={() => resetPassword(member)} disabled={!member.active}>
+                          Reset password
+                        </button>{" "}
+                        <button onClick={() => toggleActive(member)}>{member.active ? "Deactivate" : "Reactivate"}</button>
+                      </>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -135,6 +171,7 @@ export default function StaffPage() {
       {changingRole && (
         <ChangeRoleModal
           member={changingRole}
+          roles={canManage}
           onClose={() => setChangingRole(null)}
           onSaved={(updated) => {
             setChangingRole(null);
@@ -146,22 +183,34 @@ export default function StaffPage() {
 
       {adding && (
         <AddStaffModal
+          roles={canManage}
           onClose={() => setAdding(false)}
           onSaved={(created) => {
             setAdding(false);
             flash.success(`${created.name} added as ${STAFF_ROLE_LABEL[created.role].toLowerCase()}`);
+            setHandover({ name: created.name, id: created.id, password: created.temporaryPassword });
             reload();
           }}
         />
       )}
+
+      {handover && <TemporaryPasswordModal {...handover} onClose={() => setHandover(null)} />}
     </AppShell>
   );
 }
 
-function RoleChoices({ value, onChange }: { value: StaffRole; onChange: (role: StaffRole) => void }) {
+function RoleChoices({
+  value,
+  roles,
+  onChange,
+}: {
+  value: StaffRole;
+  roles: StaffRole[];
+  onChange: (role: StaffRole) => void;
+}) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-      {ROLES.map((role) => (
+      {roles.map((role) => (
         <label
           key={role}
           className="card"
@@ -189,10 +238,12 @@ function RoleChoices({ value, onChange }: { value: StaffRole; onChange: (role: S
 
 function ChangeRoleModal({
   member,
+  roles,
   onClose,
   onSaved,
 }: {
   member: StaffMember;
+  roles: StaffRole[];
   onClose: () => void;
   onSaved: (updated: StaffMember) => void;
 }) {
@@ -218,11 +269,14 @@ function ChangeRoleModal({
   return (
     <Modal open title={`Change role — ${member.name}`} onClose={onClose}>
       <form onSubmit={save}>
-        <RoleChoices value={role} onChange={setRole} />
+        <RoleChoices value={role} roles={roles} onChange={setRole} />
         <label>
           Works at
           <LocationPicker clearable value={locationCode} onChange={setLocationCode} placeholder="All locations" />
         </label>
+        {role !== member.role && (
+          <p className="muted" style={{ margin: 0 }}>{member.name} will be signed out and sign in again with the new role.</p>
+        )}
         {error && <p className="error">{error}</p>}
         <div className="mms-modal-footer">
           <button type="button" onClick={onClose}>
@@ -245,14 +299,29 @@ function slugify(name: string): string {
     .replace(/^-+|-+$/g, "");
 }
 
-function AddStaffModal({ onClose, onSaved }: { onClose: () => void; onSaved: (created: StaffMember) => void }) {
+function AddStaffModal({
+  roles,
+  onClose,
+  onSaved,
+}: {
+  roles: StaffRole[];
+  onClose: () => void;
+  onSaved: (created: StaffMember & { temporaryPassword: string }) => void;
+}) {
   const [name, setName] = useState("");
   const [role, setRole] = useState<StaffRole>("CASHIER");
   const [locationCode, setLocationCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   // The id other modules record — generated so nobody has to invent one.
-  const prefix: Record<StaffRole, string> = { OWNER: "owner", MANAGER: "mgr", CASHIER: "cashier", WAREHOUSE_STAFF: "wh" };
+  const prefix: Record<StaffRole, string> = {
+    OWNER: "owner",
+    MANAGER: "mgr",
+    BUYER: "buyer",
+    ACCOUNTANT: "acct",
+    CASHIER: "cashier",
+    WAREHOUSE_STAFF: "wh",
+  };
   const firstName = slugify(name).split("-")[0];
   const id = firstName ? `${prefix[role]}-${firstName}` : "";
 
@@ -276,14 +345,14 @@ function AddStaffModal({ onClose, onSaved }: { onClose: () => void; onSaved: (cr
           Full name
           <input required autoFocus value={name} onChange={(e) => setName(e.target.value)} />
         </label>
-        <RoleChoices value={role} onChange={setRole} />
+        <RoleChoices value={role} roles={roles} onChange={setRole} />
         <label>
           Works at
           <LocationPicker clearable value={locationCode} onChange={setLocationCode} placeholder="All locations" />
         </label>
         {id && (
           <p className="muted" style={{ margin: 0 }}>
-            Staff id: <code>{id}</code>
+            Staff id (what they sign in with): <code>{id}</code>
           </p>
         )}
         {error && <p className="error">{error}</p>}
@@ -296,6 +365,43 @@ function AddStaffModal({ onClose, onSaved }: { onClose: () => void; onSaved: (cr
           </button>
         </div>
       </form>
+    </Modal>
+  );
+}
+
+/** Shown once: Directory never returns this password again. */
+function TemporaryPasswordModal({
+  name,
+  id,
+  password,
+  onClose,
+}: {
+  name: string;
+  id: string;
+  password: string;
+  onClose: () => void;
+}) {
+  return (
+    <Modal open title={`Sign-in for ${name}`} onClose={onClose}>
+      <p style={{ margin: 0 }}>
+        Give {name} these details. They&apos;ll choose their own password the first time they sign in.
+      </p>
+      <dl style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: "0.4rem 1rem", margin: 0 }}>
+        <dt className="muted">Staff ID</dt>
+        <dd style={{ margin: 0 }}>
+          <code>{id}</code>
+        </dd>
+        <dt className="muted">Temporary password</dt>
+        <dd style={{ margin: 0 }}>
+          <code style={{ fontSize: "1.15rem", letterSpacing: "0.05em" }}>{password}</code>
+        </dd>
+      </dl>
+      <p className="muted" style={{ margin: 0 }}>This password won&apos;t be shown again — reset it if it gets lost.</p>
+      <div className="mms-modal-footer">
+        <button className="primary" type="button" onClick={onClose}>
+          Done
+        </button>
+      </div>
     </Modal>
   );
 }

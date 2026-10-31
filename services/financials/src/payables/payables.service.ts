@@ -1,9 +1,11 @@
 import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
+import { pageArgs, paged, searchAny } from "@mms/shared";
 import { ACCOUNTS } from "../accounts/chart-of-accounts";
 import { BillStatus, EntrySource, PayableBill } from "../generated/prisma";
 import { balanced } from "../ledger/journal";
 import { parseDay } from "../ledger/ledger.service";
 import { fromCents, toCents } from "../ledger/money";
+import { ListPayablesQuery } from "./list-payables.query";
 import { PayablesRepository } from "./payables.repository";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -33,10 +35,19 @@ export class PayablesService {
   constructor(private readonly payables: PayablesRepository) {}
 
   /** FR-8.4 — what's owed to whom, and when it's due. */
-  async list(filter: { status?: BillStatus; supplierId?: string }) {
+  async list(query: ListPayablesQuery) {
+    const where = {
+      status: query.status,
+      supplierId: query.supplierId,
+      ...searchAny(query.q, ["supplierName", "poNumber", "goodsReceivedNoteNumber"]),
+    };
     const now = new Date();
-    const bills = await this.payables.findAll(filter);
-    return bills.map((bill) => this.withAge(bill, now));
+    const [bills, total] = await Promise.all([this.payables.findPage(where, pageArgs(query)), this.payables.count(where)]);
+    return paged(
+      bills.map((bill) => this.withAge(bill, now)),
+      total,
+      query,
+    );
   }
 
   /** FR-8.6 — AP aging: open balances per supplier by how overdue they are. */

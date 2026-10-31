@@ -1,11 +1,15 @@
+import { apiFetch } from "../auth/client";
+
 const DIRECTORY_URL = process.env.NEXT_PUBLIC_DIRECTORY_URL ?? "http://localhost:3009";
 
-export type StaffRole = "OWNER" | "MANAGER" | "CASHIER" | "WAREHOUSE_STAFF";
+export type StaffRole = "OWNER" | "MANAGER" | "BUYER" | "ACCOUNTANT" | "CASHIER" | "WAREHOUSE_STAFF";
 export type LocationType = "STORE" | "WAREHOUSE";
 
 export const STAFF_ROLE_LABEL: Record<StaffRole, string> = {
   OWNER: "Owner",
   MANAGER: "Manager",
+  BUYER: "Buyer",
+  ACCOUNTANT: "Accountant",
   CASHIER: "Cashier",
   WAREHOUSE_STAFF: "Warehouse staff",
 };
@@ -16,6 +20,9 @@ export interface StaffMember {
   role: StaffRole;
   locationCode: string | null;
   active: boolean;
+  /** Still on a temporary password (new account or reset). */
+  mustChangePassword: boolean;
+  lastLoginAt: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -43,7 +50,7 @@ export interface StaffFilter {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${DIRECTORY_URL}${path}`, {
+  const res = await apiFetch(`${DIRECTORY_URL}${path}`, {
     ...init,
     headers: { "Content-Type": "application/json", ...init?.headers },
   });
@@ -70,8 +77,14 @@ export const directoryApi = {
       })}`,
     ),
 
+  /** Returns a temporary password to hand over once — the person must change it on first sign-in. */
   createStaff: (data: { id: string; name: string; role: StaffRole; locationCode?: string }) =>
-    request<StaffMember>("/staff", { method: "POST", body: JSON.stringify(data) }),
+    request<StaffMember & { temporaryPassword: string }>("/staff", { method: "POST", body: JSON.stringify(data) }),
+
+  resetPassword: (id: string) =>
+    request<{ id: string; temporaryPassword: string }>(`/staff/${encodeURIComponent(id)}/reset-password`, {
+      method: "POST",
+    }),
 
   updateStaff: (
     id: string,

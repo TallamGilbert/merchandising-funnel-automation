@@ -1,17 +1,20 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
-import { StockLowEvent } from "@mms/shared";
+import { pageArgs, paged, searchAny, StockLowEvent } from "@mms/shared";
 import { ReorderSuggestionStatus } from "../generated/prisma";
 import { PrismaService } from "../prisma/prisma.service";
+import { ListReorderSuggestionsQuery } from "./list-reorder-suggestions.query";
 
 @Injectable()
 export class ReorderSuggestionsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  list(status?: ReorderSuggestionStatus) {
-    return this.prisma.reorderSuggestion.findMany({
-      where: status ? { status } : undefined,
-      orderBy: { createdAt: "desc" },
-    });
+  async list(query: ListReorderSuggestionsQuery) {
+    const where = { status: query.status, ...searchAny(query.q, ["sku"]) };
+    const [items, total] = await Promise.all([
+      this.prisma.reorderSuggestion.findMany({ where, orderBy: { createdAt: "desc" }, ...pageArgs(query) }),
+      this.prisma.reorderSuggestion.count({ where }),
+    ]);
+    return paged(items, total, query);
   }
 
   async dismiss(id: string) {

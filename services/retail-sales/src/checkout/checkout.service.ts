@@ -34,7 +34,8 @@ export class CheckoutService {
    * already taken earlier in this same checkout is released (compensating
    * loop) so a partial cart never holds stock hostage.
    */
-  async checkout(dto: CheckoutDto): Promise<unknown> {
+  /** `cashierId` is the signed-in user, set by the controller. */
+  async checkout(dto: CheckoutDto & { cashierId: string }): Promise<unknown> {
     const transactionId = randomUUID();
     const now = new Date();
     const reserved: ReservedLine[] = [];

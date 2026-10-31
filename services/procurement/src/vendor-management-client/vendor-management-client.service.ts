@@ -1,5 +1,6 @@
 import { Injectable, Logger, ServiceUnavailableException } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
+import { internalFetch } from "@mms/shared";
 
 export interface SupplierOfferForSku {
   supplierId: string;
@@ -32,7 +33,7 @@ export class VendorManagementClientService {
     const url = `${this.baseUrl}/suppliers/by-sku/${encodeURIComponent(sku)}`;
     let response: Response;
     try {
-      response = await fetch(url);
+      response = await internalFetch(url);
     } catch (error) {
       this.logger.error(`Vendor Management unreachable at ${url}: ${(error as Error).message}`);
       throw new ServiceUnavailableException(

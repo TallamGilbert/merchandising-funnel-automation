@@ -2,11 +2,10 @@
 
 import Link from "next/link";
 import { use, useEffect, useState } from "react";
-import { formatDateTime, StaffPicker, useFlash, useLocations, useStaffNames } from "@mms/ui";
+import { formatDateTime, useFlash, useLocations, useStaffNames } from "@mms/ui";
 import { AppShell, type NavSection } from "../../../components/AppShell";
 import { BoxesIcon, LayersIcon, PackageIcon } from "../../../components/icons";
 import { api, type PickTask, type Transfer } from "../../../lib/api";
-import { useOperator } from "../../../lib/operator";
 
 const NAV: NavSection[] = [
   {
@@ -23,7 +22,6 @@ export default function TransferPage({ params }: { params: Promise<{ id: string 
   const { id } = use(params);
   const [transfer, setTransfer] = useState<Transfer | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [operator, setOperator] = useOperator();
   const nameOf = useStaffNames();
   const { data: locations } = useLocations();
   const locationName = (code: string) => locations.find((l) => l.code === code)?.name ?? code;
@@ -87,14 +85,8 @@ export default function TransferPage({ params }: { params: Promise<{ id: string 
 
       <section>
         <h2>Picks{transfer.status === "PICKING" ? ` — ${remaining} to go` : ""}</h2>
-        {transfer.status === "PICKING" && (
-          <label style={{ maxWidth: 360, marginBottom: "1rem" }}>
-            Picking as
-            <StaffPicker roles={["WAREHOUSE_STAFF", "MANAGER"]} value={operator} onChange={setOperator} />
-          </label>
-        )}
         {transfer.picks.map((pick) => (
-          <PickCard key={pick.id} pick={pick} operator={operator} pickedByName={nameOf(pick.pickedById)} onChanged={load} />
+          <PickCard key={pick.id} pick={pick} pickedByName={nameOf(pick.pickedById)} onChanged={load} />
         ))}
       </section>
     </AppShell>
@@ -103,12 +95,10 @@ export default function TransferPage({ params }: { params: Promise<{ id: string 
 
 function PickCard({
   pick,
-  operator,
   pickedByName,
   onChanged,
 }: {
   pick: PickTask;
-  operator: string;
   pickedByName: string;
   onChanged: () => void;
 }) {
@@ -122,7 +112,7 @@ function PickCard({
     setBusy(true);
     setError(null);
     try {
-      await api.completePick(pick.id, { pickedById: operator, scannedBinCode });
+      await api.completePick(pick.id, { scannedBinCode });
       flash.success(`Picked ${pick.quantity} × ${pick.sku} from ${pick.bin.code}`);
       onChanged();
     } catch (err) {
@@ -167,12 +157,11 @@ function PickCard({
             </label>
           </div>
           {error && <p className="error">{error}</p>}
-          {!operator && <p className="muted" style={{ margin: 0 }}>Choose who is picking above to confirm.</p>}
           <div>
             <button
               className="primary"
               type="submit"
-              disabled={busy || !operator}
+              disabled={busy}
               style={{ padding: "0.75rem 1.5rem" }}
             >
               {busy ? "Confirming…" : "Confirm pick"}

@@ -5,13 +5,14 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import { GoodsReceivedEvent } from "@mms/shared";
+import { GoodsReceivedEvent, pageArgs, paged, searchAny } from "@mms/shared";
 import { PutawayTask, PutawayTaskStatus } from "../generated/prisma";
 import { InventoryClientService } from "../inventory-client/inventory-client.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { BinCandidate, footprintFor, selectBin } from "./bin-selection";
 import { AssignBinDto } from "./dto/assign-bin.dto";
 import { CompletePutawayDto } from "./dto/complete-putaway.dto";
+import { ListPutawayTasksQuery } from "./list-putaway-tasks.query";
 
 const toCandidate = (bin: {
   id: string;
@@ -46,12 +47,17 @@ export class PutawayService {
     );
   }
 
-  list(status?: PutawayTaskStatus, locationCode?: string) {
-    return this.prisma.putawayTask.findMany({
-      where: { status, locationCode },
-      include: { bin: true },
-      orderBy: { createdAt: "asc" },
-    });
+  async list(query: ListPutawayTasksQuery) {
+    const where = {
+      status: query.status,
+      locationCode: query.locationCode,
+      ...searchAny(query.q, ["sku", "productName", "goodsReceivedNoteNumber", "poNumber"]),
+    };
+    const [items, total] = await Promise.all([
+      this.prisma.putawayTask.findMany({ where, include: { bin: true }, orderBy: { createdAt: "asc" }, ...pageArgs(query) }),
+      this.prisma.putawayTask.count({ where }),
+    ]);
+    return paged(items, total, query);
   }
 
   async findOne(id: string) {
@@ -116,7 +122,8 @@ export class PutawayService {
    * told the bin's absolute quantity *before* the task is committed locally,
    * so a failed call leaves the task open and the retry cannot double-count.
    */
-  async complete(id: string, dto: CompletePutawayDto) {
+  /** `completedById` is the signed-in user, set by the controller. */
+  async complete(id: string, dto: CompletePutawayDto & { completedById: string }) {
     const task = await this.findOne(id);
     this.assertPending(task);
     if (!task.bin) {

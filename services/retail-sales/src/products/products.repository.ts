@@ -6,11 +6,17 @@ import { PrismaService } from "../prisma/prisma.service";
 export class ProductsRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  findAll() {
+  findPage(where: Prisma.ProductWhereInput, page: { skip: number; take: number }) {
     return this.prisma.product.findMany({
+      where,
       include: { promotions: true },
       orderBy: { sku: "asc" },
+      ...page,
     });
+  }
+
+  count(where: Prisma.ProductWhereInput) {
+    return this.prisma.product.count({ where });
   }
 
   findBySku(sku: string) {

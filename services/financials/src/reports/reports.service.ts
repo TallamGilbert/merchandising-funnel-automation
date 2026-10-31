@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable } from "@nestjs/common";
+import { ACCOUNTS } from "../accounts/chart-of-accounts";
 import { BillStatus, InboxStatus } from "../generated/prisma";
 import { InboxRepository } from "../inbox/inbox.repository";
 import { LedgerRepository } from "../ledger/ledger.repository";
@@ -6,6 +7,7 @@ import { parseDay } from "../ledger/ledger.service";
 import { fromCents, toCents } from "../ledger/money";
 import { PayablesRepository } from "../payables/payables.repository";
 import { daysOverdue } from "../payables/payables.service";
+import { vatByMonth } from "./vat";
 
 export type ProfitGrouping = "product" | "store" | "day";
 
@@ -93,6 +95,13 @@ export class ReportsService {
     }
     const total = rollUp(facts.map((f) => ({ ...f, storeId: "all" })), "store")[0] ?? row("all", "all", 0, 0, 0);
     return { from, to, groupBy, rows, total: { ...total, key: "business", label: "Whole business" } };
+  }
+
+  /** D-20 — VAT charged, refunded and owed, by month. */
+  async vat(from: string, to: string) {
+    const { start, end } = range(from, to);
+    const lines = await this.ledger.findAccountLinesBetween(ACCOUNTS.VAT_PAYABLE.code, start, end);
+    return { from, to, ...vatByMonth(lines) };
   }
 
   /** The Finance Portal's front page in one call. */

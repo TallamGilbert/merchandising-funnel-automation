@@ -3,11 +3,12 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   Combobox,
-  type ComboboxOption,
   formatDateTime,
   formatMoney,
   LocationPicker,
   RegisterPicker,
+  type ComboboxOption,
+  useCurrentUser,
   useFlash,
   useStaffNames,
 } from "@mms/ui";
@@ -19,7 +20,7 @@ import { useTerminal } from "../../lib/terminal";
 export default function ReturnsPage() {
   const flash = useFlash();
   const nameOf = useStaffNames();
-  const [terminal, setTerminal] = useTerminal();
+  const [terminal, setTerminal] = useTerminal(useCurrentUser().locationCode);
   const { storeId, registerId } = terminal;
   const [recent, setRecent] = useState<Transaction[] | null>(null);
   const [recentError, setRecentError] = useState<string | null>(null);
@@ -138,7 +139,7 @@ export default function ReturnsPage() {
               required
               value={storeId}
               onChange={(value) => {
-                setTerminal({ storeId: value, registerId: "", cashierId: "" });
+                setTerminal({ storeId: value, registerId: "" });
                 void select("");
               }}
             />

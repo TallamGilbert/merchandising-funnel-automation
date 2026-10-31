@@ -1,3 +1,5 @@
+import { apiFetch, fetchAllPages, type ListParams, type Page, withQuery } from "@mms/ui";
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3002";
 const VENDOR_MANAGEMENT_URL =
   process.env.NEXT_PUBLIC_VENDOR_MANAGEMENT_URL ?? "http://localhost:3001";
@@ -62,7 +64,7 @@ export interface SupplierOfferedProduct {
 }
 
 async function request<T>(base: string, path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${base}${path}`, {
+  const res = await apiFetch(`${base}${path}`, {
     ...init,
     headers: { "Content-Type": "application/json", ...init?.headers },
   });
@@ -77,18 +79,48 @@ async function request<T>(base: string, path: string, init?: RequestInit): Promi
   return res.json() as Promise<T>;
 }
 
+export interface SupplierPerformance {
+  supplierId: string;
+  supplierName: string;
+  purchaseOrders: number;
+  openOrders: number;
+  closedOrders: number;
+  spendKes: number;
+  otherCurrencyOrders: number;
+  unitsOrdered: number;
+  unitsReceived: number;
+  /** 0–1 on closed POs; null until one closes. */
+  fillRate: number | null;
+}
+
+export interface SupplierOnTime {
+  supplierId: string;
+  supplierName: string;
+  deliveries: number;
+  onTime: number;
+  late: number;
+  onTimeRate: number;
+  averageDaysLate: number | null;
+}
+
 export const api = {
-  listPurchaseOrders: (status?: PurchaseOrderStatus) =>
-    request<PurchaseOrder[]>(
-      API_URL,
-      `/purchase-orders${status ? `?status=${status}` : ""}`,
+  purchaseOrdersUrl: `${API_URL}/purchase-orders`,
+
+  /** `q` matches the PO number or supplier; filters: status, from, to. */
+  listPurchaseOrders: (params: ListParams) =>
+    request<Page<PurchaseOrder>>(API_URL, withQuery("/purchase-orders", params)),
+
+  /** Every PO — for the charts, which total the whole book. */
+  allPurchaseOrders: () =>
+    fetchAllPages((page, pageSize) =>
+      request<Page<PurchaseOrder>>(API_URL, withQuery("/purchase-orders", { page, pageSize })),
     ),
 
   getPurchaseOrder: (id: string) => request<PurchaseOrder>(API_URL, `/purchase-orders/${id}`),
 
+  /** The signed-in user is recorded as the requester. */
   createPurchaseOrder: (data: {
     supplierId: string;
-    requestedById: string;
     lines: { sku: string; quantityOrdered: number }[];
   }) =>
     request<PurchaseOrder>(API_URL, "/purchase-orders", {
@@ -99,20 +131,18 @@ export const api = {
   submit: (id: string) =>
     request<PurchaseOrder>(API_URL, `/purchase-orders/${id}/submit`, { method: "POST" }),
 
-  approve: (id: string, data: { approvedById: string; approverRole: "MANAGER" | "OWNER" }) =>
-    request<PurchaseOrder>(API_URL, `/purchase-orders/${id}/approve`, {
-      method: "POST",
-      body: JSON.stringify(data),
-    }),
+  /** Approves as the signed-in user; the API checks their role against the limit (D-1). */
+  approve: (id: string) =>
+    request<PurchaseOrder>(API_URL, `/purchase-orders/${id}/approve`, { method: "POST" }),
 
   markSent: (id: string) =>
     request<PurchaseOrder>(API_URL, `/purchase-orders/${id}/mark-sent`, { method: "POST" }),
 
-  listReorderSuggestions: (status?: ReorderSuggestionStatus) =>
-    request<ReorderSuggestion[]>(
-      API_URL,
-      `/reorder-suggestions${status ? `?status=${status}` : ""}`,
-    ),
+  reorderSuggestionsUrl: `${API_URL}/reorder-suggestions`,
+
+  /** `q` matches the SKU; filter: status. */
+  listReorderSuggestions: (params: ListParams) =>
+    request<Page<ReorderSuggestion>>(API_URL, withQuery("/reorder-suggestions", params)),
 
   dismissReorderSuggestion: (id: string) =>
     request<ReorderSuggestion>(API_URL, `/reorder-suggestions/${id}/dismiss`, {
@@ -122,13 +152,22 @@ export const api = {
   // Vendor Management is read directly to populate the supplier/SKU pickers
   // when building a PO — Procurement's own backend only prices a PO once
   // supplierId + lines are already chosen.
-  listActiveSuppliers: async () => {
-    const res = await request<{ items: SupplierSummary[] }>(
-      VENDOR_MANAGEMENT_URL,
-      "/suppliers?status=ACTIVE&pageSize=100",
-    );
-    return res.items;
-  },
+  /** D-20 — fill rate and spend from Procurement's own POs. */
+  supplierPerformance: (from: string, to: string) =>
+    request<SupplierPerformance[]>(API_URL, withQuery("/reports/supplier-performance", { from, to })),
+
+  /** D-20 — delivery reliability, which Vendor Management records. */
+  supplierOnTime: (from: string, to: string) =>
+    request<SupplierOnTime[]>(VENDOR_MANAGEMENT_URL, withQuery("/suppliers/performance", { from, to })),
+
+  /** Every active supplier, for the PO supplier picker. */
+  listActiveSuppliers: () =>
+    fetchAllPages((page, pageSize) =>
+      request<Page<SupplierSummary>>(
+        VENDOR_MANAGEMENT_URL,
+        withQuery("/suppliers", { status: "ACTIVE", page, pageSize }),
+      ),
+    ),
 
   getSupplierProducts: (supplierId: string) =>
     request<{ products: SupplierOfferedProduct[] }>(

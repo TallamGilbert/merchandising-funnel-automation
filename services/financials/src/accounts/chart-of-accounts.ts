@@ -18,6 +18,8 @@ export const ACCOUNTS = {
   SALES_RETURNS: { code: "4900", name: "Sales returns and refunds", type: AccountType.REVENUE },
   COGS: { code: "5000", name: "Cost of goods sold", type: AccountType.EXPENSE },
   CASH_OVER_SHORT: { code: "6100", name: "Cash over/short", type: AccountType.EXPENSE },
+  /** Stock lost (or found) against the books — stock counts and adjustments (D-19). */
+  INVENTORY_SHRINKAGE: { code: "6200", name: "Inventory shrinkage", type: AccountType.EXPENSE },
 } as const;
 
 export type AccountKey = keyof typeof ACCOUNTS;

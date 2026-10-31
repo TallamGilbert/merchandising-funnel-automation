@@ -53,10 +53,7 @@ describe("SuppliersService", () => {
     prisma.supplier.findMany.mockResolvedValue([{ id: "s3" }]);
     prisma.supplier.count.mockResolvedValue(41);
 
-    const result = await service.list(SupplierStatus.ACTIVE, {
-      page: 3,
-      pageSize: 20,
-    });
+    const result = await service.list({ status: SupplierStatus.ACTIVE, page: 3, pageSize: 20 });
 
     expect(prisma.supplier.findMany).toHaveBeenCalledWith({
       where: { status: SupplierStatus.ACTIVE },
@@ -72,6 +69,24 @@ describe("SuppliersService", () => {
       total: 41,
       page: 3,
       pageSize: 20,
+    });
+  });
+
+  it("searches suppliers by name, contact or email", async () => {
+    prisma.supplier.findMany.mockResolvedValue([]);
+    prisma.supplier.count.mockResolvedValue(0);
+
+    await service.list({ page: 1, pageSize: 20, q: "timber" });
+
+    expect(prisma.supplier.count).toHaveBeenCalledWith({
+      where: {
+        status: undefined,
+        OR: [
+          { name: { contains: "timber", mode: "insensitive" } },
+          { contactName: { contains: "timber", mode: "insensitive" } },
+          { email: { contains: "timber", mode: "insensitive" } },
+        ],
+      },
     });
   });
 

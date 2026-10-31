@@ -7,7 +7,7 @@ import {
   formatMoney,
   formatSignedMoney,
   LocationPicker,
-  StaffPicker,
+  useCurrentUser,
   useFlash,
   useLocations,
   useStaffNames,
@@ -29,7 +29,7 @@ export default function ClosePage() {
   const store = stores.find((s) => s.code === storeId);
   const registerName = (code: string) => store?.registers.find((r) => r.code === code)?.name ?? code;
   const [businessDate, setBusinessDate] = useState(todayIso());
-  const [managerId, setManagerId] = useState("");
+  const manager = useCurrentUser();
   const [close, setClose] = useState<DailyClose | null>(null);
   const [cashierLines, setCashierLines] = useState<CashierLedgerLine[]>([]);
   const [actualCountedTotal, setActualCountedTotal] = useState("");
@@ -88,7 +88,7 @@ export default function ClosePage() {
     setBusy(true);
     setError(null);
     try {
-      const result = await api.closeDay(storeId, businessDate, managerId);
+      const result = await api.closeDay(storeId, businessDate);
       setClose(result);
       flash.success(`${store?.name ?? storeId} closed for ${formatDate(businessDate)}`);
     } catch (err) {
@@ -229,19 +229,11 @@ export default function ClosePage() {
 
           {close && !blocked && (
             <div className="card">
-              <label>
-                Closing manager
-                <StaffPicker
-                  required
-                  roles={["MANAGER", "OWNER"]}
-                  value={managerId}
-                  onChange={setManagerId}
-                />
-              </label>
+              <p className="muted" style={{ margin: 0 }}>Closing as {manager.name}.</p>
               <div className="actions">
                 <button
                   className="primary"
-                  disabled={busy || !managerId}
+                  disabled={busy}
                   onClick={closeDay}
                   style={{ padding: "0.75rem 1.5rem" }}
                 >

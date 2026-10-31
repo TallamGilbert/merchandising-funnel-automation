@@ -1,3 +1,5 @@
+import { apiFetch, type ListParams, type Page, withQuery } from "@mms/ui";
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3004";
 
 export type ExpectedDeliveryStatus = "EXPECTED" | "PARTIALLY_RECEIVED" | "RECEIVED";
@@ -51,7 +53,7 @@ export interface GoodsReceivedNote {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_URL}${path}`, {
+  const res = await apiFetch(`${API_URL}${path}`, {
     ...init,
     headers: { "Content-Type": "application/json", ...init?.headers },
   });
@@ -67,15 +69,21 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const api = {
-  listExpectedDeliveries: (status?: ExpectedDeliveryStatus) =>
-    request<ExpectedDelivery[]>(`/expected-deliveries${status ? `?status=${status}` : ""}`),
+  expectedDeliveriesUrl: `${API_URL}/expected-deliveries`,
+  goodsReceivedNotesUrl: `${API_URL}/goods-received-notes`,
 
-  listGoodsReceivedNotes: (status?: GoodsReceivedNoteStatus) =>
-    request<GoodsReceivedNote[]>(`/goods-received-notes${status ? `?status=${status}` : ""}`),
+  /** `q` matches the PO number or supplier; filter: status. */
+  listExpectedDeliveries: (params: ListParams) =>
+    request<Page<ExpectedDelivery>>(withQuery("/expected-deliveries", params)),
+
+  /** `q` matches the GRN or PO number; filters: status, from, to. */
+  listGoodsReceivedNotes: (params: ListParams) =>
+    request<Page<GoodsReceivedNote>>(withQuery("/goods-received-notes", params)),
 
   getGoodsReceivedNote: (id: string) => request<GoodsReceivedNote>(`/goods-received-notes/${id}`),
 
-  createGoodsReceivedNote: (data: { poNumber: string; receivedAtLocation: string; receivedById: string }) =>
+  /** Recorded as received by the signed-in user. */
+  createGoodsReceivedNote: (data: { poNumber: string; receivedAtLocation: string }) =>
     request<GoodsReceivedNote>("/goods-received-notes", { method: "POST", body: JSON.stringify(data) }),
 
   recordScan: (
