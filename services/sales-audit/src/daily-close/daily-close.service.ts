@@ -23,6 +23,11 @@ export class DailyCloseService {
     return this.closes.findByStoreDay(storeId, businessDate);
   }
 
+  /** Days still to close — Directory won't deactivate a store while there are any. */
+  async openDays(storeId: string) {
+    return { storeId, businessDates: await this.closes.findUnclosedBusinessDates(storeId) };
+  }
+
   /**
    * FR-7.1/7.2 — records the manager's physical count. The locally
    * accumulated expected total (kept current by consuming ItemSold, FR-7.7)

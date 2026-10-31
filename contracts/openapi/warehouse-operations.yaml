@@ -200,6 +200,10 @@ paths:
         - in: query
           name: status
           schema: { $ref: "#/components/schemas/TransferStatus" }
+        - in: query
+          name: locationCode
+          description: Matches either end of the transfer (from or to).
+          schema: { type: string }
         - $ref: "#/components/parameters/Page"
         - $ref: "#/components/parameters/PageSize"
         - in: query

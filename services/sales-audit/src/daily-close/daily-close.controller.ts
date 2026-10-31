@@ -17,6 +17,11 @@ export class DailyCloseController {
     return this.dailyClose.get(storeId, businessDate);
   }
 
+  @Get(":storeId/open-days")
+  openDays(@Param("storeId") storeId: string) {
+    return this.dailyClose.openDays(storeId);
+  }
+
   @Post(":storeId/daily-close/count")
   @Roles(Role.OWNER, Role.MANAGER, Role.CASHIER)
   recordCount(@Param("storeId") storeId: string, @Body() dto: RecordCountDto) {

@@ -48,6 +48,34 @@ paths:
           description: ''
       tags:
       - daily-close
+  /stores/{storeId}/open-days:
+    get:
+      operationId: DailyCloseController_openDays
+      summary: Business dates the store took sales on but hasn't closed (Directory checks this before deactivating it)
+      parameters:
+      - name: storeId
+        required: true
+        in: path
+        schema:
+          type: string
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [storeId, businessDates]
+                properties:
+                  storeId:
+                    type: string
+                  businessDates:
+                    type: array
+                    items:
+                      type: string
+                      example: '2026-10-31'
+      tags:
+      - daily-close
   /stores/{storeId}/daily-close/count:
     post:
       operationId: DailyCloseController_recordCount

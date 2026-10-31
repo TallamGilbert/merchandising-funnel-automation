@@ -66,7 +66,8 @@ describe("GoodsReceivedNotesService", () => {
   beforeEach(() => {
     prisma = {
       goodsReceivedNote: {
-        findMany: jest.fn(),
+        findMany: jest.fn().mockResolvedValue([]),
+        count: jest.fn().mockResolvedValue(0),
         findUnique: jest.fn(),
         create: jest.fn(),
         update: jest.fn().mockReturnValue("grn-update"),
@@ -100,6 +101,16 @@ describe("GoodsReceivedNotesService", () => {
       expectedDeliveries as unknown as ExpectedDeliveriesService,
       eventBus as unknown as EventBusService,
     );
+  });
+
+  describe("list", () => {
+    it("filters on where the GRN is being received", async () => {
+      await service.list({ status: GoodsReceivedNoteStatus.DRAFT, locationCode: "DOCK-1", page: 1, pageSize: 1 });
+
+      expect(prisma.goodsReceivedNote.count).toHaveBeenCalledWith({
+        where: expect.objectContaining({ status: GoodsReceivedNoteStatus.DRAFT, receivedAtLocation: "DOCK-1" }),
+      });
+    });
   });
 
   describe("create", () => {

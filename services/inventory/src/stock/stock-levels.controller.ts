@@ -1,4 +1,4 @@
-import { Controller, Get, Query } from "@nestjs/common";
+import { BadRequestException, Controller, Get, Query } from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
 import { Exportable } from "@mms/shared";
 import { ListStockLevelsQuery } from "./list-stock-levels.query";
@@ -18,6 +18,13 @@ interface StockLevelRow {
 @Controller("stock-levels")
 export class StockLevelsController {
   constructor(private readonly stock: StockService) {}
+
+  /** Declared before any `:param` route so "summary" is never read as one. */
+  @Get("summary")
+  summary(@Query("locationCode") locationCode?: string) {
+    if (!locationCode) throw new BadRequestException("locationCode query param is required");
+    return this.stock.locationSummary(locationCode);
+  }
 
   @Get()
   @Exportable<StockLevelRow>("stock-levels", [

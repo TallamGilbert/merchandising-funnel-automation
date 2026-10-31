@@ -13,6 +13,7 @@ describe("DailyCloseService", () => {
     saveCount: jest.Mock;
     update: jest.Mock;
     closeWithLogEntry: jest.Mock;
+    findUnclosedBusinessDates: jest.Mock;
   };
   let ledger: { ensureLedger: jest.Mock };
   let retailSales: { getExpectedTotal: jest.Mock };
@@ -24,6 +25,7 @@ describe("DailyCloseService", () => {
       saveCount: jest.fn().mockImplementation((count) => Promise.resolve({ id: "close-1", ...count })),
       update: jest.fn().mockResolvedValue({}),
       closeWithLogEntry: jest.fn().mockResolvedValue(undefined),
+      findUnclosedBusinessDates: jest.fn().mockResolvedValue([]),
     };
     ledger = { ensureLedger: jest.fn().mockResolvedValue({ id: "ledger-1", expectedTotal: 100 }) };
     retailSales = { getExpectedTotal: jest.fn().mockResolvedValue({ expectedTotal: 100 }) };
@@ -35,6 +37,18 @@ describe("DailyCloseService", () => {
       retailSales as unknown as RetailSalesClientService,
       eventBus as unknown as EventBusService,
     );
+  });
+
+  describe("openDays", () => {
+    it("lists the store's business dates that aren't closed yet", async () => {
+      closes.findUnclosedBusinessDates.mockResolvedValue(["2026-10-30", "2026-10-31"]);
+
+      await expect(service.openDays("STORE-1")).resolves.toEqual({
+        storeId: "STORE-1",
+        businessDates: ["2026-10-30", "2026-10-31"],
+      });
+      expect(closes.findUnclosedBusinessDates).toHaveBeenCalledWith("STORE-1");
+    });
   });
 
   describe("recordCount", () => {

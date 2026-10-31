@@ -213,6 +213,11 @@ services:
       <<: *common-service-env
       PORT: ${DIRECTORY_PORT:-3009}
       DATABASE_URL: postgresql://directory_svc:${DIRECTORY_DB_PASSWORD}@postgres:5432/directory?schema=public
+      # Read before deactivating a location: stock, open days, transfers, deliveries.
+      INVENTORY_URL: http://inventory:${INVENTORY_PORT:-3003}
+      SALES_AUDIT_URL: http://sales-audit:${SALES_AUDIT_PORT:-3007}
+      WAREHOUSE_OPERATIONS_URL: http://warehouse-operations:${WAREHOUSE_OPERATIONS_PORT:-3005}
+      RECEIVING_URL: http://receiving:${RECEIVING_PORT:-3004}
       DIRECTORY_SEED_DEMO: ${DIRECTORY_SEED_DEMO:-true}
       DEMO_STAFF_PASSWORD: ${DEMO_STAFF_PASSWORD:-}
       BOOTSTRAP_OWNER_ID: ${BOOTSTRAP_OWNER_ID:-}

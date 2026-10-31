@@ -5,11 +5,12 @@ import { DailyCloseService } from "../daily-close.service";
 
 describe("DailyCloseController", () => {
   let controller: DailyCloseController;
-  let dailyClose: Record<"get" | "recordCount" | "explainDiscrepancy" | "close", jest.Mock>;
+  let dailyClose: Record<"get" | "openDays" | "recordCount" | "explainDiscrepancy" | "close", jest.Mock>;
 
   beforeEach(() => {
     dailyClose = {
       get: jest.fn().mockResolvedValue({ id: "close-1" }),
+      openDays: jest.fn().mockResolvedValue({ storeId: "STORE-1", businessDates: [] }),
       recordCount: jest.fn().mockResolvedValue({ id: "close-1" }),
       explainDiscrepancy: jest.fn().mockResolvedValue({ id: "close-1" }),
       close: jest.fn().mockResolvedValue({ id: "close-1" }),
@@ -25,6 +26,11 @@ describe("DailyCloseController", () => {
   it("rejects a get without a businessDate", () => {
     expect(() => controller.get("STORE-1", undefined)).toThrow(BadRequestException);
     expect(dailyClose.get).not.toHaveBeenCalled();
+  });
+
+  it("lists a store's unclosed days", async () => {
+    await controller.openDays("STORE-1");
+    expect(dailyClose.openDays).toHaveBeenCalledWith("STORE-1");
   });
 
   it("records a physical count", async () => {

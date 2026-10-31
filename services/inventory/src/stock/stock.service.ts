@@ -80,6 +80,20 @@ export class StockService {
   }
 
   /**
+   * What is still physically at a location — Directory won't deactivate a
+   * location while this is nonzero, since the stock could no longer be
+   * picked for a transfer out.
+   */
+  async locationSummary(locationCode: string) {
+    const { _count, _sum } = await this.prisma.stockLevel.aggregate({
+      where: { locationCode, onHand: { gt: 0 } },
+      _count: { _all: true },
+      _sum: { onHand: true },
+    });
+    return { locationCode, skusOnHand: _count._all, unitsOnHand: _sum.onHand ?? 0 };
+  }
+
+  /**
    * FR-4.8 — manual stock adjustment (a one-off correction; whole counts go
    * through stock counts, D-19). The level and its transaction change
    * together, and StockAdjusted lets Financials book the value (D-19).

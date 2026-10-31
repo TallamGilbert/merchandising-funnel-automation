@@ -36,6 +36,8 @@ describe("TransfersService", () => {
     prisma = {
       transfer: {
         findUnique: jest.fn(),
+        findMany: jest.fn().mockResolvedValue([]),
+        count: jest.fn().mockResolvedValue(0),
         create: jest.fn().mockResolvedValue({ id: "tr-1" }),
         update: jest.fn(),
       },
@@ -60,6 +62,26 @@ describe("TransfersService", () => {
       inventory as unknown as InventoryClientService,
       eventBus as unknown as EventBusService,
     );
+  });
+
+  describe("list", () => {
+    it("matches a location at either end of the transfer", async () => {
+      await service.list({ status: TransferStatus.PICKING, locationCode: "STORE-1", page: 1, pageSize: 1 });
+
+      expect(prisma.transfer.count).toHaveBeenCalledWith({
+        where: expect.objectContaining({
+          status: TransferStatus.PICKING,
+          AND: [{ OR: [{ fromLocationCode: "STORE-1" }, { toLocationCode: "STORE-1" }] }],
+        }),
+      });
+    });
+
+    it("keeps search and location as separate conditions", async () => {
+      await service.list({ q: "SKU-1", locationCode: "WH-MAIN", page: 1, pageSize: 20 });
+
+      const { where } = prisma.transfer.count.mock.calls[0][0];
+      expect(where.AND).toHaveLength(2);
+    });
   });
 
   describe("create", () => {
