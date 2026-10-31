@@ -4,6 +4,7 @@
 # (docker-compose.yml does this for you — see the root README.)
 
 FROM node:20-slim AS base
+RUN apt-get update -y && apt-get install -y --no-install-recommends openssl ca-certificates && rm -rf /var/lib/apt/lists/*
 # Pin pnpm: an unpinned corepack pulls the newest pnpm, which refuses to run
 # Prisma/Nest install scripts without an explicit approve-builds list.
 RUN corepack enable && corepack prepare pnpm@9.15.9 --activate
