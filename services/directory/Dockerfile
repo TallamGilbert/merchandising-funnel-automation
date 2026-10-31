@@ -23,6 +23,7 @@ FROM deps AS build
 RUN pnpm --filter @mms/shared run build
 RUN pnpm --filter @mms/directory exec prisma generate
 RUN pnpm --filter @mms/directory run build
+RUN mkdir -p services/directory/dist/generated && cp -r services/directory/src/generated/. services/directory/dist/generated/
 
 # ---- runtime: slim image with only what's needed to run -------------------
 FROM base AS runtime
