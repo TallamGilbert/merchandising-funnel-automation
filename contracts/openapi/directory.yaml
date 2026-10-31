@@ -77,6 +77,27 @@ paths:
       responses:
         '200':
           description: ''
+        '409':
+          description: 'Deactivation refused: stock still on hand, a business day not closed, or a check that could not be made. The body lists `blockers`.'
+      tags:
+      - locations
+  /locations/{code}/deactivation-check:
+    get:
+      operationId: LocationsController_deactivationCheck
+      summary: What deactivating this location would block on (stock on hand, unclosed business days) or leave behind (staff, transfers, deliveries)
+      parameters:
+      - name: code
+        required: true
+        in: path
+        schema:
+          type: string
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeactivationCheck'
       tags:
       - locations
   /locations/{code}/registers:
@@ -270,6 +291,29 @@ components:
           type: string
         active:
           type: boolean
+    DeactivationIssue:
+      type: object
+      required: [kind, message]
+      properties:
+        kind:
+          type: string
+          enum: [STOCK_ON_HAND, OPEN_BUSINESS_DAYS, STAFF_ASSIGNED, TRANSFERS_IN_PROGRESS, DELIVERIES_IN_PROGRESS, CHECK_FAILED]
+        message:
+          type: string
+    DeactivationCheck:
+      type: object
+      required: [blockers, warnings]
+      properties:
+        blockers:
+          description: Stop the deactivation (also enforced on PATCH).
+          type: array
+          items:
+            $ref: '#/components/schemas/DeactivationIssue'
+        warnings:
+          description: Shown for the manager to confirm past.
+          type: array
+          items:
+            $ref: '#/components/schemas/DeactivationIssue'
     CreateRegisterDto:
       type: object
       properties:

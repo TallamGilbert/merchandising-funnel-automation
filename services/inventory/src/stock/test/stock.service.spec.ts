@@ -27,6 +27,7 @@ describe("StockService", () => {
         updateMany: jest.fn(),
         findUniqueOrThrow: jest.fn(),
         findUnique: jest.fn(),
+        aggregate: jest.fn(),
       },
       reservation: {
         create: jest.fn(),
@@ -49,6 +50,27 @@ describe("StockService", () => {
       eventBus as unknown as EventBusService,
       config as unknown as ConfigService,
     );
+  });
+
+  describe("locationSummary", () => {
+    it("counts only SKUs with units on hand at the location", async () => {
+      prisma.stockLevel.aggregate.mockResolvedValue({ _count: { _all: 3 }, _sum: { onHand: 42 } });
+
+      await expect(service.locationSummary("STORE-1")).resolves.toEqual({
+        locationCode: "STORE-1",
+        skusOnHand: 3,
+        unitsOnHand: 42,
+      });
+      expect(prisma.stockLevel.aggregate).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { locationCode: "STORE-1", onHand: { gt: 0 } } }),
+      );
+    });
+
+    it("reports zero for a location with no stock", async () => {
+      prisma.stockLevel.aggregate.mockResolvedValue({ _count: { _all: 0 }, _sum: { onHand: null } });
+
+      await expect(service.locationSummary("STORE-9")).resolves.toMatchObject({ skusOnHand: 0, unitsOnHand: 0 });
+    });
   });
 
   describe("adjust", () => {

@@ -32,10 +32,13 @@ export class TransfersService {
   ) {}
 
   async list(query: ListTransfersQuery) {
+    const location = query.locationCode
+      ? { OR: [{ fromLocationCode: query.locationCode }, { toLocationCode: query.locationCode }] }
+      : undefined;
     const where = {
       status: query.status,
       createdAt: dateRange(query.from, query.to),
-      ...searchAny(query.q, ["transferNumber", "sku"]),
+      AND: [searchAny(query.q, ["transferNumber", "sku"]), location].filter((f) => f !== undefined),
     };
     const [items, total] = await Promise.all([
       this.prisma.transfer.findMany({

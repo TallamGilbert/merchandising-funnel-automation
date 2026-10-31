@@ -46,8 +46,8 @@ export function useStaff(filter: StaffFilter = {}): Loaded<StaffMember[]> {
   return useLoader(() => directoryApi.listStaff(filter), [], key);
 }
 
-export function useLocations(type?: LocationType): Loaded<DirectoryLocation[]> {
-  return useLoader(() => directoryApi.listLocations(type), [], type ?? "all");
+export function useLocations(type?: LocationType, includeInactive = false): Loaded<DirectoryLocation[]> {
+  return useLoader(() => directoryApi.listLocations(type, includeInactive), [], `${type ?? "all"}:${includeInactive}`);
 }
 
 /** Show people by name wherever the API only gives an id; falls back to the id. */

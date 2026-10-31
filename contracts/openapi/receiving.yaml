@@ -90,6 +90,10 @@ paths:
         - in: query
           name: status
           schema: { $ref: "#/components/schemas/GoodsReceivedNoteStatus" }
+        - in: query
+          name: locationCode
+          description: Where the GRN is being received (receivedAtLocation).
+          schema: { type: string }
         - $ref: "#/components/parameters/Page"
         - $ref: "#/components/parameters/PageSize"
         - in: query

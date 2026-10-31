@@ -37,6 +37,10 @@ export class LocationsRepository {
     return this.prisma.location.update({ where: { code }, data });
   }
 
+  countActiveStaff(locationCode: string) {
+    return this.prisma.staff.count({ where: { locationCode, active: true } });
+  }
+
   findRegister(locationCode: string, code: string) {
     return this.prisma.register.findUnique({
       where: { locationCode_code: { locationCode, code } },

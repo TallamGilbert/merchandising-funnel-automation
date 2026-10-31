@@ -38,6 +38,7 @@ export class GoodsReceivedNotesService {
   async list(query: ListGoodsReceivedNotesQuery) {
     const where = {
       status: query.status,
+      receivedAtLocation: query.locationCode,
       createdAt: dateRange(query.from, query.to),
       ...searchAny(query.q, ["goodsReceivedNoteNumber", "poNumber"]),
     };

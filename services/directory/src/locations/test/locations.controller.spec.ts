@@ -4,7 +4,7 @@ import { LocationsService } from "../locations.service";
 
 describe("LocationsController", () => {
   let controller: LocationsController;
-  let locations: Record<"list" | "create" | "findOne" | "update" | "addRegister", jest.Mock>;
+  let locations: Record<"list" | "create" | "findOne" | "update" | "addRegister" | "deactivationCheck", jest.Mock>;
 
   beforeEach(() => {
     locations = {
@@ -13,6 +13,7 @@ describe("LocationsController", () => {
       findOne: jest.fn().mockResolvedValue({ code: "STORE-1" }),
       update: jest.fn().mockResolvedValue({}),
       addRegister: jest.fn().mockResolvedValue({}),
+      deactivationCheck: jest.fn().mockResolvedValue({ blockers: [], warnings: [] }),
     };
     controller = new LocationsController(locations as unknown as LocationsService);
   });
@@ -31,6 +32,11 @@ describe("LocationsController", () => {
   it("finds one location by code", async () => {
     await controller.findOne("STORE-1");
     expect(locations.findOne).toHaveBeenCalledWith("STORE-1");
+  });
+
+  it("checks what deactivating a location would leave behind", async () => {
+    await controller.deactivationCheck("STORE-1");
+    expect(locations.deactivationCheck).toHaveBeenCalledWith("STORE-1");
   });
 
   it("updates a location by code", async () => {

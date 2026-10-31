@@ -196,6 +196,29 @@ paths:
               schema: { type: string, format: binary }
             application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
               schema: { type: string, format: binary }
+  /stock-levels/summary:
+    get:
+      tags: [stock-levels]
+      summary: What is still physically on hand at one location (Directory checks this before deactivating it)
+      parameters:
+        - in: query
+          name: locationCode
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [locationCode, skusOnHand, unitsOnHand]
+                properties:
+                  locationCode: { type: string }
+                  skusOnHand: { type: integer, description: Products with at least one unit on hand }
+                  unitsOnHand: { type: integer }
+        "400":
+          description: locationCode missing
   /stock-counts:
     get:
       tags: [stock-counts]

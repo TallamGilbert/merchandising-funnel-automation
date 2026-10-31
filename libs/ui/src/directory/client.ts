@@ -43,6 +43,20 @@ export interface DirectoryLocation {
   registers: Register[];
 }
 
+export type DeactivationIssueKind =
+  | "STOCK_ON_HAND"
+  | "OPEN_BUSINESS_DAYS"
+  | "STAFF_ASSIGNED"
+  | "TRANSFERS_IN_PROGRESS"
+  | "DELIVERIES_IN_PROGRESS"
+  | "CHECK_FAILED";
+
+/** Blockers stop a deactivation (Directory enforces them too); warnings only need confirming. */
+export interface DeactivationCheck {
+  blockers: { kind: DeactivationIssueKind; message: string }[];
+  warnings: { kind: DeactivationIssueKind; message: string }[];
+}
+
 export interface StaffFilter {
   roles?: StaffRole[];
   locationCode?: string;
@@ -91,5 +105,26 @@ export const directoryApi = {
     data: Partial<{ name: string; role: StaffRole; locationCode: string | null; active: boolean }>,
   ) => request<StaffMember>(`/staff/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(data) }),
 
-  listLocations: (type?: LocationType) => request<DirectoryLocation[]>(`/locations${query({ type })}`),
+  listLocations: (type?: LocationType, includeInactive = false) =>
+    request<DirectoryLocation[]>(`/locations${query({ type, includeInactive: includeInactive ? "true" : undefined })}`),
+
+  /** The code is permanent — every other service records it. */
+  createLocation: (data: { code: string; name: string; type: LocationType }) =>
+    request<Omit<DirectoryLocation, "registers">>("/locations", { method: "POST", body: JSON.stringify(data) }),
+
+  deactivationCheck: (code: string) =>
+    request<DeactivationCheck>(`/locations/${encodeURIComponent(code)}/deactivation-check`),
+
+  /** No delete: other services reference the code, so a closed location is deactivated instead. */
+  updateLocation: (code: string, data: Partial<{ name: string; active: boolean }>) =>
+    request<Omit<DirectoryLocation, "registers">>(`/locations/${encodeURIComponent(code)}`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    }),
+
+  addRegister: (locationCode: string, data: { code: string; name: string }) =>
+    request<Register>(`/locations/${encodeURIComponent(locationCode)}/registers`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
 };

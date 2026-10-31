@@ -1,5 +1,5 @@
 import type { NavSection } from "../components/AppShell";
-import { ChartBarIcon, ClipboardCheckIcon, StoreIcon, UsersIcon } from "../components/icons";
+import { ChartBarIcon, ClipboardCheckIcon, MapPinIcon, StoreIcon, UsersIcon } from "../components/icons";
 
 export const NAV: NavSection[] = [
   {
@@ -9,6 +9,7 @@ export const NAV: NavSection[] = [
       { label: "Close register", href: "/close", icon: <ClipboardCheckIcon /> },
       { label: "Reports", href: "/reports", icon: <ChartBarIcon /> },
       { label: "Staff", href: "/staff", icon: <UsersIcon /> },
+      { label: "Stores", href: "/stores", icon: <MapPinIcon /> },
     ],
   },
 ];

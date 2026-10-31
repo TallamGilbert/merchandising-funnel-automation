@@ -27,6 +27,19 @@ export class DailyCloseRepository {
     return this.prisma.dailyClose.findFirst({ where: { storeId, businessDate } });
   }
 
+  /** Business dates the store has a ledger for (it took sales) but hasn't closed, oldest first. */
+  async findUnclosedBusinessDates(storeId: string): Promise<string[]> {
+    const ledgers = await this.prisma.storeDayLedger.findMany({
+      where: {
+        storeId,
+        OR: [{ close: null }, { close: { status: { not: DailyCloseStatus.CLOSED } } }],
+      },
+      select: { businessDate: true },
+      orderBy: { businessDate: "asc" },
+    });
+    return ledgers.map((l) => l.businessDate);
+  }
+
   /** A fresh count replaces the previous one and clears its explanation. */
   saveCount(count: CountToSave) {
     return this.prisma.dailyClose.upsert({

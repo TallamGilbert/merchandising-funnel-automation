@@ -16,6 +16,7 @@ export * from "./components/Flash";
 export * from "./components/Modal";
 export * from "./hooks/usePolling";
 export * from "./directory/client";
+export * from "./directory/codes";
 export * from "./directory/hooks";
 export * from "./directory/pickers";
 export * from "./lookups/client";

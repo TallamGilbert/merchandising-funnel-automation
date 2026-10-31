@@ -33,6 +33,13 @@ export class LocationsController {
     return this.locations.findOne(code);
   }
 
+  /** What deactivating this location would block on or leave behind — shown before the manager confirms. */
+  @Get(":code/deactivation-check")
+  @Roles(Role.OWNER, Role.MANAGER)
+  deactivationCheck(@Param("code") code: string) {
+    return this.locations.deactivationCheck(code);
+  }
+
   @Patch(":code")
   @Roles(Role.OWNER, Role.MANAGER)
   update(@Param("code") code: string, @Body() dto: UpdateLocationDto) {
